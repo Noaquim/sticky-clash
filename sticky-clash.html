@@ -348,6 +348,67 @@ function hueDist(a, b) {
   return d > 180 ? 360 - d : d;
 }
 
+/**
+ * Een lichtzweem wegwerken, gemeten tegen de kleur van de muur op die plek (wr, wg,
+ * wb) — zoals de witbalans van een camera. Begrensd: rood mag omlaag en blauw omhoog,
+ * niet andersom. Op een koele muur maakte volledig wegdelen een wit kaartje of gele
+ * post-it juist oranje (en dus 'huid'); op kurk, hout of karton — zelf huidkleurig —
+ * viel een echte hand weg. Een duidelijk gekleurde muur krijgt daarom helemaal geen
+ * correctie. Schrijft de kleur in uit en geeft die terug.
+ *
+ * zacht: niet ineens stoppen bij een gekleurde muur, maar de correctie tussen 0,35 en
+ * 0,55 verzadiging geleidelijk laten aflopen. Voor de soort van een briefje (zie
+ * noteKindOf): onder een felle gloeilamp op een al warm verlichte muur viel de
+ * correctie anders ineens helemaal weg, en werd roze rood en turkoois groen. Kurk
+ * (rond 0,55) krijgt nog steeds niets.
+ */
+function balanceToWall(r, g, b, wr, wg, wb, uit, zacht = false) {
+  if (wr > 0 && wg > 0 && wb > 0) {
+    const wmax = Math.max(wr, wg, wb), wmin = Math.min(wr, wg, wb), sat = (wmax - wmin) / wmax;
+    const k = sat <= 0.35 ? 1 : zacht ? Math.max(0, (0.55 - sat) / 0.2) : 0;
+    if (k > 0) {
+      const m = (wr + wg + wb) / 3;
+      let fr = Math.min(1, Math.max(0.75, m / wr));
+      let fg = Math.min(1.1, Math.max(0.9, m / wg));
+      let fb = Math.min(1.33, Math.max(1, m / wb));
+      if (k < 1) { fr = 1 + k * (fr - 1); fg = 1 + k * (fg - 1); fb = 1 + k * (fb - 1); }
+      r *= fr; g *= fg; b *= fb;
+    }
+  }
+  uit[0] = r; uit[1] = g; uit[2] = b;
+  return uit;
+}
+
+/** Tussen 0 en 255, zoals een camera meet. */
+function clampByte(v) {
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
+/** Tussen -1 en 1, en NaN wordt 0: een kapotte voorspelling mag nooit een cel aanzetten. */
+function unitClamp(v) {
+  return v > 1 ? 1 : v < -1 ? -1 : v === v ? v : 0;
+}
+
+/**
+ * Speciale briefjes: rood, groen en blauw krijgen een eigen rol in het spel. Gemeten
+ * op de kleur ná de witbalans hierboven, dus tegen de muur en niet tegen de lamp.
+ * Alles daartussen — geel, oranje, roze, wit, grijs, zwart, bruin — is een gewoon
+ * voorwerp.
+ *
+ * De eigen kleur moet ook echt licht zijn: kr, kg, kb is hoeveel van die kleur het
+ * voorwerp terugkaatst tegen de muur ernaast (1 = even veel), en dat verandert niet
+ * met de kleur van de lamp. Bruin is donkeroranje-rood en lag anders precies op de
+ * grens met rood; een donkerblauwe trui, spijkerbroek of boekomslag werd anders een
+ * blauw briefje.
+ */
+function noteKindOf(r, g, b, kr, kg, kb) {
+  const hsv = rgb2hsv(r, g, b), h = hsv[0], s = hsv[1];
+  if ((h >= 340 || h < 15) && s > 0.45 && kr > 0.7) return 'trampoline';
+  if (h >= 75 && h <= 165 && s > 0.35 && kg > 0.7) return 'booster';
+  if (h >= 190 && h <= 250 && s > 0.35 && kb > 0.7) return 'breek';
+  return null;
+}
+
 // Andrew's monotone chain.
 function convexHull(pts) {
   if (pts.length < 4) return pts.slice();
@@ -489,6 +550,7 @@ class Vision {
     this.projLuma = null;
     this.skinFilter = true;
     this.supTmp = new Float32Array(NDIR);
+    this.balTmp = [0, 0, 0];
     this.wobbleMax = 0.115;      // hoeveel de omtrek mag ademen voor het een mens is
     this.fgFraction = 0;         // aandeel voorgrond, om een verlopen muur te merken
     this.tooSmall = 0;           // vlekken die net onder de minimale grootte vielen
@@ -502,6 +564,23 @@ class Vision {
     this.jitterWindow = 0.8;     // over zo'n stuk tijd (s) wordt de trilling gemeten
     this.personGap = 8;
     this.insideFn = null;        // (x, y) => op het beamervlak? Gezet door main.js.
+    // Zoveel metingen achter elkaar moet een nieuwe briefjessoort winnen voordat een
+    // spoor van soort wisselt (zie kindVote). Eén bal erover of een half beeld mag
+    // een rood briefje niet even 'geen soort' maken.
+    this.kindFrames = 8;
+    // Hoe de muur oplicht onder vol wit van de beamer (zie endBackground en
+    // classifyObject). Alleen geldig voor de muur die erbij geleerd is.
+    this.resp = null;
+    this.hasResponse = false;
+    this.respAcc = null;
+    this.respN = 0;
+    this.white = null;
+    this.whiteFresh = false;
+    this.respGain = 1;
+    this.respPad = 0.35;         // marge boven de voorspelde band, keer projLuma
+    this.respPadDark = 0.1;      // en eronder
+    this.quietFactor = 1;        // < 1 bij een stille camera, zie endBackground
+    this.quietGap = 4;           // zoveel cellen vrij van al gezien voorwerp, zie acceptQuiet
   }
 
   /**
@@ -515,22 +594,9 @@ class Vision {
    * muurkleur blijft alleen over wat écht roder is dan de muur.
    */
   isSkin(i, wr, wg, wb) {
-    let r = this.cr[i], g = this.cg[i], b = this.cb[i];
     if (!(this.cvv[i] > 0.20)) return false;
-    // Alleen een lichtzweem wegwerken, en begrensd: rood mag omlaag en blauw omhoog,
-    // niet andersom. Op een koele muur maakte volledig wegdelen een wit kaartje of
-    // gele post-it juist oranje (en dus 'huid'); op kurk, hout of karton — zelf
-    // huidkleurig — viel een echte hand weg. Een duidelijk gekleurde muur krijgt
-    // daarom helemaal geen correctie.
-    if (wr > 0 && wg > 0 && wb > 0) {
-      const wmax = Math.max(wr, wg, wb), wmin = Math.min(wr, wg, wb);
-      if ((wmax - wmin) / wmax <= 0.35) {
-        const m = (wr + wg + wb) / 3;
-        r *= Math.min(1, Math.max(0.75, m / wr));
-        g *= Math.min(1.1, Math.max(0.9, m / wg));
-        b *= Math.min(1.33, Math.max(1, m / wb));
-      }
-    }
+    const c = balanceToWall(this.cr[i], this.cg[i], this.cb[i], wr, wg, wb, this.balTmp);
+    const r = c[0], g = c[1], b = c[2];
     if (!(r > g && g > b)) return false;
     const hsv = rgb2hsv(r, g, b), h = hsv[0], s = hsv[1];
     return s > 0.10 && s < 0.68 && (h < 48 || h > 342);
@@ -634,6 +700,43 @@ class Vision {
     this.pass = 0;
     this.gain = 1;
     this.shadowFraction = 0;
+    // Eigen licht als voorspelling (zie setProjection): per cel en per kleur de
+    // geprojecteerde sterkte, en een band eromheen in plaats en tijd.
+    this.projI = new Float32Array(n * 3);
+    this.projHi = new Float32Array(n * 3);
+    this.projLo = new Float32Array(n * 3);
+    this.projBand = new Uint8Array(n);           // valt hier nu (of net) ons licht? zie spreadSigned
+    this.projStride = 1;                         // 1 = grijs licht, 3 = r, g, b om en om
+    this.projSigned = false;
+    // Verwachte muurkleur per cel in dit beeld, en of die meting te vertrouwen is
+    // (niet half onder ons eigen licht). Voor de kleur van een briefje, zie blobs().
+    this.expR = new Float32Array(n); this.expG = new Float32Array(n); this.expB = new Float32Array(n);
+    this.colOk = new Uint8Array(n);
+    this.quietList = new Int32Array(n);          // net onder de drempel, zie acceptQuiet
+    this.quietOn = new Uint8Array(n);            // aan dankzij de stille camera
+    this.quietPrev = new Uint8Array(n);
+    this.strongCell = new Uint8Array(n);
+    this.clearResponse();
+    this.quietFactor = 1;
+  }
+
+  /**
+   * Hoeveel lager het vaste deel van de drempel mag bij een stille camera (zie
+   * endBackground), op een plek met deze lichtfactor (0,3 tot 1, zie classifyObject).
+   * Niet in het donker: zit de drempel al op zijn bodem, dan is het beeld zo
+   * samengedrukt dat een nog lagere drempel vooral halve randen oppikt. Gemeten: een
+   * post-it in een heel donkere kamer viel daar in stukken uiteen. Tussen lichtfactor
+   * 0,3 en 0,6 loopt het geleidelijk op tot de volle quietFactor.
+   */
+  quietAt(licht) {
+    const qf = this.quietFactor;
+    return qf >= 1 ? 1 : 1 - (1 - qf) * Math.max(0, Math.min(1, (licht - 0.3) / 0.3));
+  }
+
+  /** Het lichtmodel van de beamer weggooien: het hoort bij een ander raster of een andere muur. */
+  clearResponse() {
+    this.resp = null; this.hasResponse = false;
+    this.respAcc = null; this.respN = 0; this.white = null; this.whiteFresh = false; this.respGain = 1;
   }
 
   get hasBackground() { return !!this.bg; }
@@ -772,6 +875,10 @@ class Vision {
 
   beginBackground() {
     const n = this.cols * this.rows;
+    // Het witte beeld hoort alleen bij de muur die direct erna geleerd wordt. Werd die
+    // afgebroken, dan is het bij de volgende poging oud (zie learnResponse).
+    if (!this.whiteFresh) this.white = null;
+    this.whiteFresh = false;
     this.bgAcc = new Float32Array(n * 3);
     this.bgSq = new Float32Array(n);
     this.bgN = 0;
@@ -823,10 +930,103 @@ class Vision {
         this.noise[y * cols + x] = m;
       }
     }
+    // Een stille camera mag gevoeliger: de drempel is er vooral om korrel buiten te
+    // houden, en waar weinig korrel is bleven lichtgrijze en kraftbruine briefjes net
+    // onder de drempel. Mediaan over het hele beeld, dus een paar rumoerige plekjes
+    // (een voeg, iemand die langsliep) trekken hem niet mee.
+    const nz = Float32Array.from(this.noise).sort();
+    const q = nz.length ? nz[nz.length >> 1] : 6;
+    this.quietFactor = 1 - 0.25 * Math.max(0, Math.min(1, (6 - q) / 4));
     this.bg = bg; this.bgLearned = null;
     this.bgAcc = null; this.bgSq = null;
     this.tracks.length = 0; this.lostTracks = [];
     this.resident.fill(0); this.residentCount = 0;
+    this.learnResponse();
+    return true;
+  }
+
+  // ---- hoe de muur oplicht onder de beamer ----------------------------------
+  //
+  // Zonder dit weet de herkenning alleen wáár we licht projecteren, en zet ze daar de
+  // drempel omhoog. Dan verdwijnt juist een donker briefje onder een bal: dat kaatst
+  // weinig van ons licht terug en lijkt voor de camera op kale muur. Met dit model
+  // voorspellen we per cel hoe de muur er onder ons licht uit hoort te zien (zie
+  // classifyObject), en valt een donker briefje daar juist extra op.
+  //
+  // Volgorde in main.js: beamer vol wit -> beginResponse, een reeks addResponseFrame,
+  // endResponse -> beamer terug naar de muurverlichting -> beginBackground ...
+  // endBackground. Dat laatste rekent het model uit: wit min muur, per cel en kleur.
+
+  beginResponse() {
+    this.respAcc = new Float32Array(this.cols * this.rows * 3);
+    this.respN = 0;
+    this.white = null;
+  }
+
+  addResponseFrame() {
+    if (!this.respAcc || this.respAcc.length !== this.cr.length * 3) return 0;
+    const a = this.respAcc;
+    for (let i = 0; i < this.cr.length; i++) {
+      a[i * 3] += this.cr[i]; a[i * 3 + 1] += this.cg[i]; a[i * 3 + 2] += this.cb[i];
+    }
+    return ++this.respN;
+  }
+
+  endResponse() {
+    if (!this.respAcc || !this.respN) { this.respAcc = null; return false; }
+    const w = this.respAcc, n = this.respN;
+    for (let i = 0; i < w.length; i++) w[i] /= n;
+    this.white = w; this.whiteFresh = true;
+    this.respAcc = null;
+    return true;
+  }
+
+  /**
+   * Wit min muur. Alleen met een wit beeld dat vlak vóór deze muur geleerd is: een
+   * oud wit beeld hoort bij ander licht, en dan voorspellen we onzin.
+   *
+   * De camera past zijn belichting aan als het beeld ineens veel lichter wordt, en
+   * dan lijkt het wit minder fel dan het is. Zien we een stuk muur buiten het
+   * beamervlak (daar verandert ons licht niets), dan rekenen we dat verschil weg.
+   */
+  learnResponse() {
+    const white = this.white, bg = this.bg;
+    this.white = null; this.resp = null; this.hasResponse = false; this.respGain = 1;
+    if (!white || !bg || white.length !== bg.length) return false;
+    const cols = this.cols, rows = this.rows, cell = this.cell, n = cols * rows;
+    if (this.insideFn) {
+      const ratios = [];
+      const inside = (cx, cy) => this.insideFn((cx + 0.5) * cell, (cy + 0.5) * cell);
+      for (let cy = 0; cy < rows; cy += 2) {
+        for (let cx = 0; cx < cols; cx += 2) {
+          // minstens twee cellen van het beamervlak af: daar valt geen strooilicht
+          if (inside(cx, cy) || inside(cx - 2, cy) || inside(cx + 2, cy) || inside(cx, cy - 2) || inside(cx, cy + 2)) continue;
+          const i = cy * cols + cx;
+          const bl = 0.299 * bg[i * 3] + 0.587 * bg[i * 3 + 1] + 0.114 * bg[i * 3 + 2];
+          const wl = 0.299 * white[i * 3] + 0.587 * white[i * 3 + 1] + 0.114 * white[i * 3 + 2];
+          if (bl < 16 || wl < 16 || bl > 240 || wl > 240) continue;
+          ratios.push(bl / wl);
+        }
+      }
+      if (ratios.length >= 40) {
+        ratios.sort((a, b) => a - b);
+        this.respGain = Math.max(0.5, Math.min(2, ratios[ratios.length >> 1]));
+      }
+    }
+    const resp = new Float32Array(bg.length), k = this.respGain;
+    let lit = 0;
+    for (let i = 0; i < n; i++) {
+      let l = 0;
+      for (let c = 0; c < 3; c++) {
+        const d = Math.max(0, white[i * 3 + c] * k - bg[i * 3 + c]);
+        resp[i * 3 + c] = d; l += d;
+      }
+      if (l > 24) lit++;                                  // gemiddeld meer dan 8 per kleur
+    }
+    // Maakt wit nergens verschil (muurverlichting al op vol, of de beamer stond uit),
+    // dan is er niets te voorspellen: dan blijft alles zoals zonder model.
+    if (lit < n * 0.05) return false;
+    this.resp = resp; this.hasResponse = true;
     return true;
   }
 
@@ -849,6 +1049,8 @@ class Vision {
   clearBackground() {
     this.bg = null; this.bgAcc = null; this.bgLearned = null; this.tracks.length = 0; this.lostTracks = [];
     this.resident.fill(0); this.residentCount = 0;
+    this.clearResponse();
+    this.quietFactor = 1;
   }
 
   /** Wat er al hing weer gewoon als muur behandelen. */
@@ -946,6 +1148,7 @@ class Vision {
     const wall = new Float32Array(n * 3).fill(NaN);
     const ratio = new Float32Array(n);                    // afwijking / drempel
     const thrA = new Float32Array(n);
+    const qf = this.quietFactor, thrQ = qf < 1 ? new Float32Array(n) : null;
     for (let cy = 0; cy < rows; cy++) {
       const fy = (cy - (B - 1) / 2) / B, y0 = Math.floor(fy), ty = fy - y0;
       for (let cx = 0; cx < cols; cx++) {
@@ -966,10 +1169,33 @@ class Vision {
         wall[i * 3] = wr; wall[i * 3 + 1] = wg; wall[i * 3 + 2] = wb;
         // Dezelfde drempel als de gewone herkenning: wat die niet zou zien, zoeken we hier ook niet.
         const wl = 0.299 * wr + 0.587 * wg + 0.114 * wb;
-        const thr = this.objThresh * Math.max(0.3, Math.min(1, wl / 140)) + this.noise[i] * 2.2;
+        const licht = Math.max(0.3, Math.min(1, wl / 140));
+        const thr = this.objThresh * licht + this.noise[i] * 2.2;
         const d = (Math.abs(bg[i * 3] - wr) + Math.abs(bg[i * 3 + 1] - wg) + Math.abs(bg[i * 3 + 2] - wb)) / 3;
         ratio[i] = d / thr; thrA[i] = thr;
+        if (qf < 1) thrQ[i] = this.objThresh * licht * this.quietAt(licht) + this.noise[i] * 2.2;
       }
+    }
+    // Stille camera: net als bij de gewone herkenning (zie acceptQuiet) telt de lagere
+    // drempel alleen voor een voorwerp op zichzelf: minstens quietGap cellen vrij van
+    // alles wat de gewone drempel haalt. Zo'n vlekje wordt verder gekeurd met die
+    // lagere drempel.
+    if (qf < 1) {
+      const acc = [], R = this.quietGap, on = new Uint8Array(n), strong = new Uint8Array(n);
+      for (let i = 0; i < n; i++) on[i] = inn[i] && ratio[i] > 1 ? 1 : 0;
+      this.markStrong(on, strong, 5);
+      for (let i = 0; i < n; i++) {
+        if (!inn[i] || ratio[i] > 1 || !(ratio[i] * thrA[i] > thrQ[i])) continue;
+        const x = i % cols, y = (i - x) / cols;
+        let near = false;
+        for (let yy = Math.max(0, y - R); yy <= Math.min(rows - 1, y + R) && !near; yy++) {
+          for (let xx = Math.max(0, x - R); xx <= Math.min(cols - 1, x + R); xx++) {
+            if (strong[yy * cols + xx] === 1) { near = true; break; }
+          }
+        }
+        if (!near) acc.push(i);
+      }
+      for (const i of acc) { ratio[i] = ratio[i] * thrA[i] / thrQ[i]; thrA[i] = thrQ[i]; }
     }
 
     // Vlekjes zoeken en keuren.
@@ -1143,22 +1369,96 @@ class Vision {
   /**
    * Verwachte helderheid van onze eigen projectie per cel. Zonder dit zou het
    * spel zijn eigen licht op de muur als voorwerp zien.
+   *
+   * signed (mag weg): hetzelfde beeld als sterkte tegen de muurverlichting, in
+   * lineair licht: 0 = de muurverlichting zelf, 1 = vol wit, negatief = donkerder dan
+   * de muurverlichting. Even lang als luma (grijs licht), of drie keer zo lang (r, g,
+   * b om en om) voor gekleurd licht. Met het lichtmodel (hasResponse) voorspelt
+   * classifyObject daaruit hoe de muur er onder ons licht uit hoort te zien.
    */
-  setProjection(luma, lw, lh, toUV) {
-    const p = this.projLuma;
-    if (!luma || !toUV) { p.fill(0); this.projPrev.fill(0); return; }
+  setProjection(luma, lw, lh, toUV, signed) {
+    const p = this.projLuma, pI = this.projI;
+    if (!luma || !toUV) { p.fill(0); this.projPrev.fill(0); this.resetSigned(); return; }
+    // k: 1 = grijs licht (één sterkte per cel), 3 = gekleurd (r, g, b om en om)
+    const k = !signed ? 0 : signed.length === lw * lh * 3 ? 3 : signed.length === lw * lh ? 1 : 0;
+    if (k && k !== this.projStride) { this.resetSigned(); this.projStride = k; }
     const cols = this.cols, rows = this.rows, cell = this.cell;
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
         const idx = cy * cols + cx;
         const uv = toUV((cx + 0.5) * cell, (cy + 0.5) * cell);
         const u = uv[0], v = uv[1];
-        if (u < 0 || v < 0 || u > 1 || v > 1) { p[idx] = 0; continue; }
+        if (u < 0 || v < 0 || u > 1 || v > 1) {
+          p[idx] = 0;
+          if (k === 1) pI[idx] = 0;
+          else if (k) pI[idx * 3] = pI[idx * 3 + 1] = pI[idx * 3 + 2] = 0;
+          continue;
+        }
         const sx = Math.min(lw - 1, (u * lw) | 0), sy = Math.min(lh - 1, (v * lh) | 0);
         p[idx] = luma[sy * lw + sx];
+        if (!k) continue;
+        // Niet uitgesmeerd: dit is wat er precies op deze cel valt.
+        const s = sy * lw + sx;
+        if (k === 1) pI[idx] = unitClamp(signed[s]);
+        else {
+          const o = idx * 3;
+          pI[o] = unitClamp(signed[s * 3]); pI[o + 1] = unitClamp(signed[s * 3 + 1]); pI[o + 2] = unitClamp(signed[s * 3 + 2]);
+        }
       }
     }
     this.spreadProjection();
+    if (k) { this.spreadSigned(k); this.projSigned = true; } else if (this.projSigned) this.resetSigned();
+  }
+
+  resetSigned() {
+    this.projI.fill(0); this.projHi.fill(0); this.projLo.fill(0); this.projBand.fill(0);
+    this.projSigned = false;
+  }
+
+  /**
+   * Een band om de voorspelling: het minste en het meeste licht dat hier nu kan
+   * vallen. Eén cel opzij (de kalibratie zit nooit precies op de cel) en even terug
+   * in de tijd (de camera loopt achter op wat we tekenen): de bovengrens zakt maar
+   * langzaam als het licht weggaat, de ondergrens stijgt maar langzaam als het komt —
+   * even snel als bij spreadProjection. Wat de camera binnen die band ziet, is gewoon
+   * onze bal op de muur. projBand zegt per cel of er überhaupt licht in de band zit;
+   * waar niet, rekent classifyObject gewoon zoals zonder lichtmodel.
+   */
+  spreadSigned(k) {
+    const pI = this.projI, hi = this.projHi, lo = this.projLo, band = this.projBand;
+    const cols = this.cols, rows = this.rows, rk = cols * k;
+    let th = this.sigTmpHi, tl = this.sigTmpLo;
+    if (!th || th.length !== pI.length) { th = this.sigTmpHi = new Float32Array(pI.length); tl = this.sigTmpLo = new Float32Array(pI.length); }
+    for (let y = 0; y < rows; y++) {                       // horizontaal
+      const o0 = y * rk, o1 = o0 + rk;
+      for (let o = o0; o < o1; o++) {
+        let a = pI[o], z = a;
+        if (o - k >= o0) { const q = pI[o - k]; if (q > a) a = q; if (q < z) z = q; }
+        if (o + k < o1) { const q = pI[o + k]; if (q > a) a = q; if (q < z) z = q; }
+        th[o] = a; tl[o] = z;
+      }
+    }
+    for (let y = 0; y < rows; y++) {                       // verticaal, en de tijd
+      const o0 = y * rk, o1 = o0 + rk, boven = y > 0, onder = y < rows - 1;
+      for (let o = o0; o < o1; o++) {
+        let a = th[o], z = tl[o];
+        if (boven) { if (th[o - rk] > a) a = th[o - rk]; if (tl[o - rk] < z) z = tl[o - rk]; }
+        if (onder) { if (th[o + rk] > a) a = th[o + rk]; if (tl[o + rk] < z) z = tl[o + rk]; }
+        let h = hi[o] * 0.75 + a * 0.25, l = lo[o] * 0.75 + z * 0.25;
+        if (a > h) h = a;
+        if (z < l) l = z;
+        // Uitgedoofd is uit (3% van vol wit: hooguit een paar grijswaarden), anders
+        // sleept elke bal een lange staart van cellen 'in de band' achter zich aan.
+        if (h < 0.03 && h > -0.03) h = 0;
+        if (l < 0.03 && l > -0.03) l = 0;
+        hi[o] = h; lo[o] = l;
+      }
+    }
+    for (let i = 0, o = 0; i < band.length; i++, o += k) {
+      let on = hi[o] !== 0 || lo[o] !== 0;
+      if (k === 3) on = on || hi[o + 1] !== 0 || lo[o + 1] !== 0 || hi[o + 2] !== 0 || lo[o + 2] !== 0;
+      band[i] = on ? 1 : 0;
+    }
   }
 
   /**
@@ -1235,7 +1535,27 @@ class Vision {
     // belichting bij, dan schuift het hele beeld mee. Die factor schatten we uit de
     // mediaan en rekenen we weg, anders wordt de hele muur ineens voorgrond — of,
     // erger, valt alle herkenning stil zonder dat iemand het merkt.
-    const gain = this.fitGain();
+    //
+    // Met het lichtmodel (zie learnResponse) voorspellen we ons eigen licht in plaats
+    // van er alleen de drempel voor op te hogen: verwacht = (muur + wit·sterkte) keer
+    // de lichtfactor. Niet één getal maar een band (zie spreadSigned), want de
+    // kalibratie en de camera lopen altijd iets achter of naast wat we tekenen. Een
+    // donker briefje onder een bal kaatst weinig van ons licht terug en valt daardoor
+    // ver onder die band — waar het zonder model juist in het muurlicht verdween.
+    const model = this.hasResponse && this.projSigned && !!this.resp && this.resp.length === bg.length;
+    const resp = this.resp, pI = this.projI, hiA = this.projHi, loA = this.projLo, band = this.projBand;
+    // grijs licht: één sterkte per cel voor alle drie de kleuren (zie setProjection)
+    const ks = this.projStride, c1 = ks === 3 ? 1 : 0, c2 = c1 * 2;
+    const gain = model ? this.fitGain(true) : this.fitGain();
+    const qf = this.quietFactor;
+    const expR = this.expR, expG = this.expG, expB = this.expB, colOk = this.colOk;
+    // Welke cellen er vorige keer alleen dankzij de stille camera bij kwamen (zie
+    // acceptQuiet): die houden zich ook dit beeld aan die regels.
+    const quietPrev = this.quietOn;
+    this.quietOn = this.quietPrev; this.quietPrev = quietPrev;
+    this.quietOn.fill(0);
+    const quiet = this.quietList;
+    let nq = 0;
 
     const shadow = this.shadowCell, skin = this.skinCell, cand = this.candCell;
     // Vorige uitkomst bewaren, voor twee dingen: een cel die net nog voorwerp was
@@ -1248,7 +1568,39 @@ class Vision {
 
     for (let i = 0; i < n; i++) {
       const r = this.cr[i], g = this.cg[i], b = this.cb[i];
-      const br = bg[i * 3] * gain, bg2 = bg[i * 3 + 1] * gain, bb = bg[i * 3 + 2] * gain;
+      let br = bg[i * 3] * gain, bg2 = bg[i * 3 + 1] * gain, bb = bg[i * 3 + 2] * gain;
+      const pj = proj[i] > 0 ? proj[i] : 0;             // NaN mag nooit een cel aanzetten
+      // Valt ons licht hier niet: dan zegt deze cel iets over het zachte midden en de
+      // kleur van een voorwerp (zie hieronder en blobs).
+      const fresh = pj < 6;
+      let diff = 0, pad, below = 0, above = 0, padDark = 0;
+      const inBand = model && band[i] === 1;
+      if (inBand) {
+        const o = i * 3, q = i * ks, ar = resp[o], ag = resp[o + 1], ab = resp[o + 2];
+        const w0 = bg[o], w1 = bg[o + 1], w2 = bg[o + 2];
+        // De camera loopt vol bij 255: meer licht dan dat ziet hij niet.
+        br = clampByte((w0 + ar * pI[q]) * gain);
+        bg2 = clampByte((w1 + ag * pI[q + c1]) * gain);
+        bb = clampByte((w2 + ab * pI[q + c2]) * gain);
+        const lr = clampByte((w0 + ar * loA[q]) * gain), hr = clampByte((w0 + ar * hiA[q]) * gain);
+        const lg = clampByte((w1 + ag * loA[q + c1]) * gain), hg = clampByte((w1 + ag * hiA[q + c1]) * gain);
+        const lb = clampByte((w2 + ab * loA[q + c2]) * gain), hb = clampByte((w2 + ab * hiA[q + c2]) * gain);
+        below = (r < lr ? lr - r : 0) + (g < lg ? lg - g : 0) + (b < lb ? lb - b : 0);
+        above = (r > hr ? r - hr : 0) + (g > hg ? g - hg : 0) + (b > hb ? b - hb : 0);
+        // Wat overblijft is een kleine marge voor wat het model mist: vooral een camera
+        // die nog een bal ziet die we al verder getekend hebben (lichter dan de band).
+        // Donkerder dan de band kan ons licht een cel bijna niet maken — de ondergrens
+        // stijgt maar langzaam als er licht komt — dus daar een veel kleinere marge.
+        // Precies daar zit een donker briefje onder een regen van ballen.
+        pad = pj * this.respPad;
+        padDark = pj * this.respPadDark;
+        // (Het zachte midden en de kleur ook binnen een smalle band laten meten, waar we
+        // precies weten welk licht er valt, maakte het midden juist onrustiger: een
+        // donker briefje onder drie ballen telde pas na 1,5 s in plaats van 1,2 s.)
+      } else {
+        diff = (Math.abs(r - br) + Math.abs(g - bg2) + Math.abs(b - bb)) / 3;
+        pad = pj * 0.85;
+      }
       const bl = 0.299 * br + 0.587 * bg2 + 0.114 * bb;
       const cl = this.cl[i];
       shadow[i] = 0; skin[i] = 0; cand[i] = 0; keep[i] = 0;
@@ -1262,24 +1614,35 @@ class Vision {
       // het donker werd. De ruisterm blijft, die beschermt tegen camerakorrel.
       const licht = Math.max(0.3, Math.min(1, bl / 140));
       const base = this.objThresh * licht + this.noise[i] * 2.2;
-      const pj = proj[i] > 0 ? proj[i] : 0;             // NaN mag nooit een cel aanzetten
-      const thr = base + pj * 0.85;
-      const diff = (Math.abs(r - br) + Math.abs(g - bg2) + Math.abs(b - bb)) / 3;
+      const thr = base + pad;
+      // Te donker telt zwaarder, zodat het bij de kleine marge al de drempel haalt.
+      if (inBand) diff = (above + below * (thr / (base + padDark))) / 3;
       const s = diff / thr;                             // 1 = precies op de drempel
       // Hoe zeker is dit voorwerp, als getal tussen 0 en 1 (zie softCentre). Onder ons
       // eigen licht (een bal, de score) blijft de laatste waarde staan: een bal die over
       // een briefje valt, verschuift anders het midden en lijkt dan op trillen.
-      if (pj < 6) this.softW[i] = Math.max(0, Math.min(1, (s - 0.35) / 0.65));
+      if (fresh) this.softW[i] = Math.max(0, Math.min(1, (s - 0.35) / 0.65));
 
       // Hysterese in de tijd: was hij aan, dan blijft hij aan zolang hij boven 70%
       // van de drempel zit. Kost geen enkel frame vertraging, anders dan middelen.
-      const seed = s > 1;
-      let on = seed || (prev[i] && s > 0.7);
-      if (!on && prev[i] && diff > base && keepAge[i] < 90) {
+      const seed = s > 1, wasQuiet = quietPrev[i];
+      let on = seed || (prev[i] && !wasQuiet && s > 0.7);
+      if (!on && prev[i] && !wasQuiet && diff > base && keepAge[i] < 90) {
         // Alleen verstopt door ons eigen licht: vasthouden, met een plafond, zodat
         // het nooit een eeuwig spook wordt.
         on = true; keep[i] = 1; keepAge[i]++;
       } else if (!keep[i]) keepAge[i] = 0;
+      // Stille camera: het vaste deel van de drempel mag omlaag (quietFactor), maar
+      // alleen voor een voorwerp op zichzelf. Zie acceptQuiet. Met dezelfde
+      // hysterese als hierboven, op die lagere drempel.
+      // (Onder 0,5 van de gewone drempel komt geen cel ooit boven de lagere uit.)
+      if (!on && qf < 1 && s > 0.5 && licht > 0.3) {
+        const sq = diff / (this.objThresh * licht * this.quietAt(licht) + this.noise[i] * 2.2 + pad);
+        if (sq > 1 || (wasQuiet && prev[i] && sq > 0.7)) quiet[nq++] = i;
+      }
+      // Verwachte muurkleur, voor de kleur van het voorwerp (zie blobs). Alleen waar
+      // de cel voorgrond is of nog kan worden: alles wat later aangaat zit boven 0,5.
+      if (on || s > 0.5) { expR[i] = br; expG[i] = bg2; expB[i] = bb; colOk[i] = fresh ? 1 : 0; }
 
       if (!on && s > 0.6) { cand[i] = 1; gray++; }       // mag later meegroeien
       // Alleen aan door de hysterese: mag een voorwerp aan houden, maar geen brug
@@ -1315,6 +1678,13 @@ class Vision {
     this.grayFraction = gray / n;
     this.floodGuard = this.grayFraction > 0.08;
     if (!this.floodGuard && gray > 0) this.growMarked();
+    // Stille camera: zwakke voorwerpen mogen er ook bij — een lichtgrijs of kraftbruin
+    // briefje zat net onder de drempel. Maar alleen een voorwerp op zichzelf (zie
+    // acceptQuiet), en pas ná het groeien hierboven: wat daar al aan een gewoon
+    // voorwerp vastgroeide, hoort daarbij. Daarna mag zo'n zwak voorwerp zelf groeien
+    // (in wat dan nog over is, dus nooit tot tegen een ander voorwerp aan). En niet
+    // als er ineens overal zulke cellen zijn: dat is een lichtverandering, geen briefje.
+    if (nq && !this.floodGuard && nq < n * 0.03 && this.acceptQuiet(nq)) this.growMarked();
 
     let fg = 0, shade = 0;
     for (let i = 0; i < n; i++) {
@@ -1331,6 +1701,60 @@ class Vision {
   }
 
   /**
+   * Cellen die alleen de lagere drempel van een stille camera halen, tellen alleen
+   * als er binnen quietGap cellen geen stuk voorgrond ligt dat de gewone drempel
+   * haalt. Dichterbij blijven ze bij de gewone regels (meegroeien, zie growMarked).
+   * Met 2 cellen groeide de wazige strook tussen twee briefjes die vlak naast elkaar
+   * hangen dicht, en werd de rand van een mens één vlek met het briefje ernaast; met
+   * 3 werd een vale strook midden in een mens (een wit shirt onder de lichte
+   * scorebalk) een los voorwerp. Een los ruiscelletje dat toevallig de gewone drempel
+   * haalt telt niet als 'stuk voorgrond': in een schemerige kamer zit zo'n zwak
+   * briefje daar vol mee, en dan viel het in stukken uiteen.
+   */
+  acceptQuiet(nq) {
+    const q = this.quietList, mask = this.mask, cols = this.cols, rows = this.rows;
+    const R = this.quietGap, strong = this.strongCell;
+    this.markStrong(mask, strong, 5);
+    let k = 0;
+    for (let j = 0; j < nq; j++) {
+      const i = q[j], x = i % cols, y = (i - x) / cols;
+      if (mask[i]) continue;                            // al meegegroeid met een voorwerp
+      let near = false;
+      for (let yy = Math.max(0, y - R); yy <= Math.min(rows - 1, y + R) && !near; yy++) {
+        for (let xx = Math.max(0, x - R); xx <= Math.min(cols - 1, x + R); xx++) {
+          if (strong[yy * cols + xx] === 1) { near = true; break; }
+        }
+      }
+      if (!near) q[k++] = i;
+    }
+    // Pas na het kijken aanzetten: de volgorde mag niet uitmaken.
+    for (let j = 0; j < k; j++) { mask[q[j]] = 1; this.quietOn[q[j]] = 1; }
+    return k;
+  }
+
+  /**
+   * Welke cellen van on horen bij een aaneengesloten stuk van minstens minSize
+   * cellen? Die krijgen 1 in out (de rest 0 of 2).
+   */
+  markStrong(on, out, minSize) {
+    const cols = this.cols, n = on.length, q = this.stack;
+    out.fill(0);
+    for (let s0 = 0; s0 < n; s0++) {
+      if (!on[s0] || out[s0]) continue;
+      let h = 0, t = 0;
+      q[t++] = s0; out[s0] = 2;
+      while (h < t) {
+        const i = q[h++], x = i % cols;
+        if (x > 0 && on[i - 1] && !out[i - 1]) { out[i - 1] = 2; q[t++] = i - 1; }
+        if (x < cols - 1 && on[i + 1] && !out[i + 1]) { out[i + 1] = 2; q[t++] = i + 1; }
+        if (i >= cols && on[i - cols] && !out[i - cols]) { out[i - cols] = 2; q[t++] = i - cols; }
+        if (i + cols < n && on[i + cols] && !out[i + cols]) { out[i + cols] = 2; q[t++] = i + cols; }
+      }
+      if (t >= minSize) for (let k = 0; k < t; k++) out[q[k]] = 1;
+    }
+  }
+
+  /**
    * Groeien vanuit zaadjes, maar zo dat twee groeiende voorwerpen elkaar nooit
    * raken. Gewone hysterese liet een post-it vastgroeien aan een persoon die er vlak
    * naast stond (en dan werd de post-it mee afgekeurd). Daarom eerst elk zaadje een
@@ -1339,7 +1763,7 @@ class Vision {
    */
   growMarked() {
     const mask = this.mask, cand = this.candCell, lab = this.growLab, grown = this.grownCell;
-    const q = this.stack, cols = this.cols, n = mask.length;
+    const q = this.stack, cols = this.cols, n = mask.length, quietOn = this.quietOn, quietPrev = this.quietPrev;
     lab.fill(0); grown.fill(0);
 
     // 1. zaadjes nummeren
@@ -1368,6 +1792,11 @@ class Vision {
         for (const j of [nb0, nb1, nb2, nb3]) {
           if (j < 0 || lab[j] || !cand[j]) continue;
           lab[j] = l; mask[j] = 1; grown[j] = 1; q[t++] = j;
+          // Gegroeid uit een zwak voorwerp, of was dit al een zwak voorwerp (een arm die
+          // tegen een briefje aan komt): blijft zwak. Anders pakte de gewone hysterese
+          // het volgende beeld over, en knipte cutBridges de arm los van het briefje —
+          // waarna het briefje de huid eronder als zijn eigen kleur ging meten.
+          if (quietOn[i] || quietPrev[j]) quietOn[j] = 1;
         }
       }
 
@@ -1382,7 +1811,7 @@ class Vision {
           grown[i] = 2;                                 // markeren, pas na de lus uitzetten
         }
       }
-      for (let i = 0; i < n; i++) if (grown[i] === 2) { mask[i] = 0; lab[i] = 0; }
+      for (let i = 0; i < n; i++) if (grown[i] === 2) { mask[i] = 0; lab[i] = 0; quietOn[i] = 0; }
     }
   }
 
@@ -1479,13 +1908,20 @@ class Vision {
    * steekproef. De mediaan en niet het gemiddelde, want voorwerpen voor de muur
    * mogen de schatting niet meetrekken.
    */
-  fitGain() {
+  fitGain(model = false) {
     const bg = this.bg;
     if (!bg) return 1;
-    const s = this.gainSample;
+    const s = this.gainSample, resp = this.resp, pI = this.projI, band = this.projBand;
+    const ks = this.projStride, c1 = ks === 3 ? 1 : 0, c2 = c1 * 2;
     let n = 0;
     for (let i = 0; i < this.cl.length; i += 7) {
-      const bl = 0.299 * bg[i * 3] + 0.587 * bg[i * 3 + 1] + 0.114 * bg[i * 3 + 2];
+      let bl = 0.299 * bg[i * 3] + 0.587 * bg[i * 3 + 1] + 0.114 * bg[i * 3 + 2];
+      // Met het lichtmodel tegen de muur mét ons voorspelde licht: anders telt een
+      // groot verlicht vlak (de score, een flits) dubbel mee.
+      if (model && band[i]) {
+        const q = i * ks;
+        bl += 0.299 * resp[i * 3] * pI[q] + 0.587 * resp[i * 3 + 1] * pI[q + c1] + 0.114 * resp[i * 3 + 2] * pI[q + c2];
+      }
       if (bl < 12) continue;                       // te donker om een verhouding uit te halen
       s[n++] = this.cl[i] / bl;
       if (n === s.length) break;
@@ -1496,6 +1932,69 @@ class Vision {
     const med = a[n >> 1];
     return Math.max(0.6, Math.min(1.6, med));
   }
+
+  /**
+   * Is de camera verschoven sinds de muur geleerd is? Iemand stoot tegen het statief
+   * en ineens klopt de hele geleerde muur een paar pixels niet meer: overal langs
+   * randen, voegen en briefjes duiken dan valse vlekken op, en de kalibratie zit ernaast.
+   *
+   * We leggen het huidige beeld op de geleerde muur, verschoven met hele cellen (tot 4
+   * opzij en 4 omhoog of omlaag), en kijken welke verschuiving het best past. Alleen op
+   * cellen met structuur (een rand in de geleerde muur): op egale muur past alles even
+   * goed. Elk verschil wordt begrensd, zodat een mens die voor de muur staat of een
+   * nieuw briefje overal even zwaar weegt en de uitslag niet kan kantelen. De
+   * lichtfactor gaat er eerst af, dus een lamp die aangaat is geen verschuiving.
+   *
+   * Goedkoop (een steekproef van hooguit ~1200 cellen); bedoeld voor ongeveer één keer
+   * per seconde.
+   *
+   * @returns {null | {dx: number, dy: number, ratio: number, moved: boolean, n: number}}
+   *   null zonder geleerde muur. dx, dy: hoeveel cellen het beeld verschoven is (+ is
+   *   naar rechts of omlaag in het werkbeeld; × this.cell voor werkpixels). ratio: fout
+   *   bij de beste verschuiving gedeeld door de fout zonder verschuiving. moved: echt
+   *   verschoven (minstens 2 cellen, duidelijk beter passend, genoeg structuur). n: het
+   *   aantal meetcellen.
+   */
+  cameraShift() {
+    const bg = this.bg;
+    if (!bg) return null;
+    const cols = this.cols, rows = this.rows, n = cols * rows, cl = this.cl, M = 4, CAP = 30;
+    let bl = this.shiftL, idx = this.shiftIdx;
+    if (!bl || bl.length !== n) { bl = this.shiftL = new Float32Array(n); idx = this.shiftIdx = new Int32Array(n); }
+    for (let i = 0; i < n; i++) bl[i] = 0.299 * bg[i * 3] + 0.587 * bg[i * 3 + 1] + 0.114 * bg[i * 3 + 2];
+    // Meetcellen: een dambord met om de cel een meting, alleen waar de muur een rand heeft.
+    let m = 0;
+    for (let y = M + 1; y < rows - M - 1; y += 2) {
+      for (let x = M + 1 + ((y >> 1) & 1); x < cols - M - 1; x += 2) {
+        const i = y * cols + x;
+        if (Math.abs(bl[i + 1] - bl[i - 1]) + Math.abs(bl[i + cols] - bl[i - cols]) > 12) idx[m++] = i;
+      }
+    }
+    const step = Math.max(1, Math.ceil(m / 1200));
+    const inv = 1 / this.fitGain();
+    let best = Infinity, bestE = 0, bdx = 0, bdy = 0, e0 = 0, k = 0;
+    for (let dy = -M; dy <= M; dy++) {
+      for (let dx = -M; dx <= M; dx++) {
+        const off = dy * cols + dx;
+        let e = 0;
+        k = 0;
+        for (let j = 0; j < m; j += step) {
+          const i = idx[j], d = Math.abs(cl[i + off] * inv - bl[i]);
+          e += d < CAP ? d : CAP; k++;
+        }
+        e /= Math.max(1, k);
+        if (!dx && !dy) e0 = e;
+        // Bij twijfel de kleinste verschuiving: een rand die maar één kant op loopt
+        // zegt niets over de andere richting.
+        const score = e * (1 + 0.02 * Math.max(Math.abs(dx), Math.abs(dy)));
+        if (score < best) { best = score; bestE = e; bdx = dx; bdy = dy; }
+      }
+    }
+    const ratio = e0 > 1e-6 ? bestE / e0 : 1;
+    const moved = k >= 30 && Math.max(Math.abs(bdx), Math.abs(bdy)) >= 2 && ratio < 0.6;
+    return { dx: bdx, dy: bdy, ratio, moved, n: k };
+  }
+
   // ---- vlekken -------------------------------------------------------------
 
   blobs() {
@@ -1513,6 +2012,7 @@ class Vision {
       if (!cls || seen[start] === pass) continue;
       let sp = 0, n = 0, sumH = 0, sumS = 0, sumW = 0, touchEdge = false;
       let nShadow = 0, nSkin = 0, nRes = 0;
+      let kw = 0, kr = 0, kg = 0, kb = 0, kwr = 0, kwg = 0, kwb = 0;
       const steps = this.stepBuf;
       let nSteps = 0;
       stack[sp++] = start; seen[start] = pass;
@@ -1527,6 +2027,16 @@ class Vision {
         if (this.shadowCell[idx]) nShadow++;
         if (this.skinCell[idx]) nSkin++;
         if (this.resident[idx]) nRes++;
+        // Kleur van het voorwerp, alleen waar we de muur eronder kennen (niet half
+        // onder ons eigen licht), en gewogen naar hoe zeker de cel bij het voorwerp
+        // hoort: randcellen zijn half muur en maken elke kleur grauwer.
+        if (objectMode && this.colOk[idx]) {
+          const w = this.softW[idx];
+          if (w > 0) {
+            kw += w; kr += w * this.cr[idx]; kg += w * this.cg[idx]; kb += w * this.cb[idx];
+            kwr += w * this.expR[idx]; kwg += w * this.expG[idx]; kwb += w * this.expB[idx];
+          }
+        }
         // Randsprong: hoeveel donkerder/lichter is deze cel dan de achtergrondcel
         // ernaast? Een voorwerp heeft een harde rand, een schaduw loopt uit.
         const nb = [cx > 0 ? idx - 1 : -1, cx < cols - 1 ? idx + 1 : -1,
@@ -1553,6 +2063,14 @@ class Vision {
       // stand rustiger — en even strak, want een vierkant past in elk assenstelsel.
       const ang = axis[1] > 0.25 ? axis[0] : 0;
       const sup = supportOf(hull, mx, my, ang, new Float32Array(NDIR));
+
+      // Soort briefje (zie noteKindOf). undefined = nu niet te meten: te veel van ons
+      // eigen licht erop. Dan telt deze meting niet mee (zie kindVote).
+      let kind;
+      if (objectMode && kw >= 3 && kw >= n * 0.3) {
+        const c = balanceToWall(kr / kw, kg / kw, kb / kw, kwr / kw, kwg / kw, kwb / kw, this.balTmp, true);
+        kind = noteKindOf(c[0], c[1], c[2], kr / Math.max(kw, kwr), kg / Math.max(kw, kwg), kb / Math.max(kw, kwb));
+      }
 
       let team;
       if (objectMode) {
@@ -1586,7 +2104,7 @@ class Vision {
       }
 
       out.push({
-        cls: team, mx, my, sup, hull, ang, ecc: axis[1], cells: n, touchEdge,
+        cls: team, kind, mx, my, sup, hull, ang, ecc: axis[1], cells: n, touchEdge,
         shadowFrac: nShadow / n, skinFrac: nSkin / n, residentFrac: nRes / n, solidity, medStep,
         cx: (mx + 0.5) * cell, cy: (my + 0.5) * cell,
         corners: polyFromSupport(mx, my, sup, ang, cell),
@@ -1880,6 +2398,7 @@ class Vision {
     t.residentFrac = best.residentFrac;
     t.solidity = best.solidity; t.medStep = best.medStep;
     t.cls = best.cls;
+    this.kindVote(t, best.kind);
 
     // Dode zone: kleine verschillen zijn ruis, grote zijn echte beweging.
     const k = moved < 1.6 ? 0.10 : moved < 5 ? 0.30 : 0.55;
@@ -1929,7 +2448,7 @@ class Vision {
   }
 
   newTrack(b) {
-    return {
+    const t = {
       id: this.nextId++, cls: b.cls, cx: b.cx, cy: b.cy,
       mx: b.mx, my: b.my, ang: b.ang, sup: Float32Array.from(b.sup),
       corners: b.corners,
@@ -1942,7 +2461,24 @@ class Vision {
       lost: 0, hold: 0, held: false,
       ax: b.cx, ay: b.cy, stillT: 0, adopt: false, residentFrac: b.residentFrac, trusted: false, fallback: null,
       hx: new Float32Array(JITTER_N), hy: new Float32Array(JITTER_N), hn: 0, jitter: Infinity,
+      kind: null, kindCand: null, kindN: 0,
     };
+    this.kindVote(t, b.kind);
+    return t;
+  }
+
+  /**
+   * Soort briefje met hysterese: een nieuwe soort (of 'geen soort') moet
+   * kindFrames metingen achter elkaar winnen voordat t.kind wisselt. Een bal die
+   * over een rood briefje valt, of een hand die er even voor zit, verandert het dus
+   * niet. Metingen zonder oordeel (undefined) tellen niet en breken ook niets af.
+   */
+  kindVote(t, k) {
+    if (k === undefined) return;
+    if (k === t.kind) { t.kindCand = null; t.kindN = 0; return; }
+    if (k === t.kindCand) t.kindN++;
+    else { t.kindCand = k; t.kindN = 1; }
+    if (t.kindN >= this.kindFrames) { t.kind = k; t.kindCand = null; t.kindN = 0; }
   }
 
   /** Voorspelde plek van een spoor: laatste meting plus snelheid keer gemiste frames. */
