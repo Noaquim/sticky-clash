@@ -41,6 +41,14 @@ MAKKELIJKE AANPASSINGEN
     Kleur van de bak           ctx.strokeStyle = '#3ddc84';  (in drawGoal)
     Kleur van de balbron       ctx.strokeStyle = '#ff4fa3';  (in drawSource)
     Kleur bij een doelpunt     '#ffd479'
+  Speciale briefjes (in js/game.js):
+    Hoe hard de trampoline      const TRAMPOLINE_MAX = 1600;
+    Hoe hard de turbo duwt      const BOOST_KICK = 550;
+    Tikken voor blauw breekt    const BREAK_HITS = 5;
+    Hoe lang blauw weg is       const BREAK_TIME = 5;      (in seconden)
+    Bonusbak verhuist elke      const BONUS_MOVE = 20;     (in seconden)
+  Welke kleur wat doet staat in js/vision.js bij noteKindOf.
+
   Kleuren schrijf je als #rrggbb, bijvoorbeeld '#ff0000' voor rood. Zoek op internet
   naar "color picker" om er een te kiezen.
 

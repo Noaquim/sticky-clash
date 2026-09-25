@@ -122,6 +122,8 @@ in en zet hem naast of op de beamer, gericht op de muur.
 - **Werkt hij niet?** Het spel zegt waarom: bezet door een ander programma (sluit Teams,
   Zoom, OBS of de Camera-app), geen toestemming (camera-icoon in de adresbalk), of
   losgekoppeld.
+- **Geen webcam?** Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een
+  Mac kan een iPhone meteen als camera. Leg de telefoon stil neer, gericht op de muur.
 
 ### Beamer op het tweede scherm
 
@@ -278,6 +280,30 @@ je hem, dan verschijnt NIEUW RECORD.
 Doel en balbron kun je ook gewoon met de muis verslepen in de rechter weergave: het doel
 pak je door erin te klikken, de bron met Ctrl+klik. Dat werkt ook midden in een ronde.
 
+### Extra's
+
+Ook onder **Spelregels**, allemaal los aan of uit te zetten:
+
+- **Speciale briefjes** — de kleur geeft een briefje een rol. **Rood** is een trampoline:
+  ballen stuiteren er hard vanaf. **Groen** is een turbo: ballen krijgen een flinke zet in de
+  richting waarin ze rollen. **Blauw** is een breekbare muur: na 5 tikken is hij 5 seconden weg. Boven elk
+  speciaal briefje staat wat het doet. Alle andere kleuren zijn gewone obstakels.
+- **Gouden ballen** — af en toe valt er een gouden bal. Die is 3 punten waard.
+- **Bonusbak** — een tweede, kleinere bak die elke 20 seconden ergens anders staat. Ook
+  3 punten.
+- **Spelvorm: Uitdaging** — in plaats van vrij spel speel je levels. Haal je het doel
+  van een level op tijd, dan wordt het volgende moeilijker: de bak verhuist, gaat bewegen,
+  er komt wind, en daarna beweegt de balbron en komen er meer ballen.
+
+Voor wie het voor het eerst speelt, staan er op het startscherm korte tips op de muur:
+hoe je een baan bouwt en wat de speciale briefjes doen.
+
+### Ranglijst
+
+Haal je de ranglijst, dan vraagt het paneel na de ronde je naam. De tien beste scores staan
+onder **Ranglijst**, per speelmodus; bij Uitdaging telt het hoogste level. Ze blijven bewaard in deze browser op deze computer; met
+*Ranglijst wissen* begin je opnieuw.
+
 ## Kalibratie is niet optioneel
 
 Zonder kalibratie weet het spel niet welke camerapixel bij welke beamerpixel hoort. Je
@@ -317,8 +343,11 @@ er als voorwerp geldt.
 - **Er verschijnen vlekken waar de beamer iets projecteert** → hoort niet te gebeuren, het
   spel rekent zijn eigen licht eruit. Gebeurt het toch, zet dan "Voorwerpen omlijnen op de
   muur" uit.
-- **Alles schuift na een tijdje** → camera of beamer verplaatst. Klik *Meer instellingen →
-  Kalibratie → Automatisch*.
+- **Alles schuift na een tijdje** → camera of beamer verplaatst. Het spel merkt dat zelf
+  en stelt alles opnieuw in (een ronde gaat dan even op pauze). Staat *Vanzelf opnieuw
+  instellen* uit, klik dan *Meer instellingen → Kalibratie → Automatisch*.
+- **Snap je niet wat er misgaat?** Klik op **Foto van wat de camera ziet** (onder de
+  teller). Dat bewaart één plaatje met het camerabeeld en wat het spel als voorwerp ziet. Stuur die foto op: dan is precies te zien wat er gebeurt.
 - **Veel doelpunten zonder dat je iets doet** → kijk naar de teller onder de speelmodus.
   Staat daar "0 voorwerpen actief", dan raakt er niets.
 - **Niets komt in de bak** → sleep het doel dichter naar de baan van de ballen. In de
@@ -342,6 +371,7 @@ node test/spel.mjs          # scoren en ronde-verloop
 node test/modi.mjs          # speciale briefjes, gouden ballen, bonusbak, levels, tips, ranglijst
 node test/losbestand.mjs    # sticky-clash.html past bij de broncode
 node test/briefjes.mjs      # zwart/bruin briefje onder warm licht, wat er al hing, twee naast elkaar
+node test/extra.mjs         # soort briefje uit de kleur, camera verschoven, lichtmodel beamer, stille camera
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code
@@ -382,6 +412,17 @@ veiligheidsmarge rond de lichtvoorspelling is al breder dan het briefje. Daarom 
 en valt het licht dat er nog is naast het voorwerp. Op je laptop zie je de omlijningen
 altijd. `test/feedback.mjs` legt het verschil vast: 16 voorgrondcellen zonder projectie
 erop, 0 met.
+
+### Door de ballen heen kijken
+
+Tijdens het leren van de muur flitst het spel één keer kort wit. Zo meet het per plek op de
+muur hoeveel licht de beamer daar geeft. Vallen er daarna ballen over een briefje, dan weet
+het spel hoeveel lichter dat stukje daardoor wordt en rekent het dat eraf: het briefje
+blijft een briefje.
+
+Een camera die weinig ruist (een goede webcam, een rustige kamer) krijgt vanzelf een lagere
+drempel, zodat ook bleke briefjes gevonden worden. Die lagere drempel geldt alleen voor een
+los voorwerp en niet in het donker, zodat camerakorrel geen vlekken geeft.
 
 ### Beeld bijsnijden tot het beamervlak
 
