@@ -1,0 +1,127 @@
+:root{
+  --bg:#0c0d10; --panel:#15171c; --line:#252932; --ink:#e8eaf0; --dim:#8b93a5;
+  --acc:#ff8a1e; --acc2:#3aa0ff; --ok:#3ddc84;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:14px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+  display:flex; flex-direction:column;
+}
+header{
+  display:flex; align-items:center; gap:16px; padding:10px 18px;
+  border-bottom:1px solid var(--line); background:#101217;
+}
+h1{margin:0; font-size:17px; letter-spacing:.02em; font-weight:700}
+h1 em{font-style:normal; color:var(--acc)}
+.status{font-size:12px; color:var(--dim)}
+.status.err{color:#ff6b6b}
+.status.ok{color:var(--ok)}
+
+main{flex:1; display:flex; min-height:0}
+
+.panel{
+  width:320px; flex:none; overflow-y:auto; padding:4px 0 40px;
+  border-right:1px solid var(--line); background:var(--panel);
+}
+.panel section{padding:14px 16px; border-bottom:1px solid var(--line)}
+.panel section.foot{border:0}
+h2{margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); display:flex; align-items:center; gap:8px}
+.num{
+  width:18px; height:18px; border-radius:50%; background:#272c36; color:var(--ink);
+  display:grid; place-items:center; font-size:11px; letter-spacing:0;
+}
+.row{display:flex; gap:8px; margin-bottom:8px}
+button{
+  flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--line);
+  background:#1d2029; color:var(--ink); font:inherit; font-size:13px; cursor:pointer;
+}
+button:hover{background:#262a35}
+button.primary{background:var(--acc); border-color:var(--acc); color:#1a1000; font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button:disabled{opacity:.45; cursor:default}
+select{width:100%; margin-bottom:8px; padding:7px; border-radius:7px; background:#1d2029; color:var(--ink); border:1px solid var(--line); font:inherit}
+.hint{margin:6px 0 0; font-size:12px; color:var(--dim)}
+kbd{background:#272c36; border:1px solid #333a47; border-bottom-width:2px; border-radius:4px; padding:0 4px; font-size:11px}
+.badge{display:inline-block; margin:8px 0 0; padding:3px 8px; border-radius:99px; background:#2a1f1f; color:#ffab8f; font-size:11px}
+.badge.ok{background:#16301f; color:var(--ok)}
+.slider{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); margin-top:8px}
+.slider input{flex:1; accent-color:var(--acc)}
+.slider output{width:46px; text-align:right; color:var(--ink); font-variant-numeric:tabular-nums}
+.check{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); margin-top:8px}
+.check input{accent-color:var(--acc)}
+
+.cls{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.cls .dot{width:14px; height:14px; border-radius:4px; flex:none}
+.cls .nm{flex:1; font-size:12px}
+.cls .cnt{font-size:11px; color:var(--dim); width:16px; text-align:right; font-variant-numeric:tabular-nums}
+.cls button{flex:none; padding:4px 8px; font-size:11px}
+.cls button.learning{background:var(--acc); color:#1a1000; border-color:var(--acc)}
+
+.stage{flex:1; display:flex; flex-direction:column; gap:10px; padding:12px; min-width:0}
+.pane{flex:1; display:flex; flex-direction:column; min-height:0}
+.pane-head{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px}
+.tabs{display:flex; gap:4px}
+.tabs button{flex:none; padding:2px 8px; font-size:11px; text-transform:none; letter-spacing:0}
+.tabs button.on{background:#2f3542; color:#fff}
+.fps{font-variant-numeric:tabular-nums; text-transform:none}
+canvas{
+  flex:1; min-height:0; width:100%; background:#000; border-radius:10px;
+  border:1px solid var(--line); object-fit:contain; display:block;
+}
+#debug{cursor:crosshair}
+
+/* ---- eenvoudige bediening ---- */
+.hidden{display:none !important}
+button.big{padding:12px; font-size:15px; font-weight:600}
+.quick{background:#181b22}
+.camkeuze{display:block; margin-top:10px; font-size:12px; color:var(--dim)}
+.camkeuze select{margin:4px 0 0}
+input[type=text]{flex:1; min-width:0; padding:7px; border-radius:7px; background:#1d2029; color:var(--ink); border:1px solid var(--line); font:inherit}
+.scores{margin:6px 0 8px; padding-left:22px; font-size:13px}
+.scores li{padding:2px 0}
+.scores li b{color:var(--ink)}
+.scores .leeg{list-style:none; margin-left:-22px; color:var(--dim)}
+button.klein{font-size:12px; padding:5px 9px}
+.steps{list-style:none; margin:12px 0 4px; padding:0; display:flex; flex-direction:column; gap:5px}
+.steps li{
+  display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim);
+  padding-left:22px; position:relative;
+}
+.steps li::before{
+  content:""; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:14px; height:14px; border-radius:50%; border:1.5px solid #333a47;
+}
+.steps li.on{color:var(--ink)}
+.steps li.on::before{background:var(--ok); border-color:var(--ok)}
+.steps li.busy{color:var(--acc)}
+.steps li.busy::before{border-color:var(--acc); border-top-color:transparent; animation:spin .7s linear infinite}
+@keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+
+.seg{display:flex; gap:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:8px}
+.seg button{border:0; border-radius:0; background:#1a1d25; font-size:12px; padding:9px 6px}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button.on{background:#2f3542; color:#fff; font-weight:600}
+
+details{border-bottom:1px solid var(--line)}
+details summary{
+  padding:12px 16px; cursor:pointer; font-size:12px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--dim); list-style:none;
+}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:"▸ "; }
+details[open] summary::before{content:"▾ "; }
+details summary:hover{color:var(--ink)}
+details section{border-bottom:0; border-top:1px solid var(--line)}
+.only-color{text-transform:none; letter-spacing:0; color:#5b6376}
+.live{
+  margin:10px 0 0; padding:6px 9px; border-radius:6px; background:#1d2029;
+  font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums;
+}
+.live.warn{background:#3a1c1c; color:#ffab8f; font-weight:600}
+#world{cursor:grab}
+#world:active{cursor:grabbing}
+.slider.sub{margin-left:22px; opacity:.75}
+.slider.sub.off{opacity:.35; pointer-events:none}
+#world{touch-action:none}
