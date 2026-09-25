@@ -1,0 +1,61 @@
+﻿STICKY CLASH ZELF AANPASSEN
+
+Alles is gewone JavaScript. Open een bestand in een teksteditor, pas iets aan, sla op.
+Er hoeft niets geïnstalleerd of gecompileerd te worden.
+
+EDITOR
+  Visual Studio Code is gratis en het fijnst (code.visualstudio.com): open daarin de
+  hele map via Bestand > Map openen. Kladblok werkt ook.
+
+ZO WERK JE
+  1. Maak eerst een kopie van de hele map. Dan kun je altijd terug.
+  2. Start het spel met "Sticky Clash" (of start.bat). Dan laadt het spel de losse
+     bestanden uit js/ en css/, en zie je elke wijziging meteen.
+  3. Pas een bestand aan en sla het op.
+  4. Druk in de browser op F5.
+
+  Werkt er iets niet meer? Druk op F12 en kijk bij "Console": daar staat de fout, met
+  het bestand en het regelnummer erbij.
+
+  Let op: sticky-clash.html (het losse bestand) verandert niet vanzelf mee. Wil je jouw
+  versie als één bestand delen? Dubbelklik op "Los bestand maken". Dat werkt op elke
+  Windows-pc; Node.js is niet nodig.
+
+WAT STAAT WAAR
+  js/game.js     het spel zelf: ballen, zwaartekracht, punten, de bak, kleuren
+  js/main.js     het paneel, de knoppen, de wizard, wat er op de beamer komt
+  js/vision.js   de camera en het herkennen van voorwerpen (lastig, pas op)
+  js/audio.js    de geluidjes
+  css/style.css  hoe het paneel eruitziet
+  index.html     welke knoppen, schuifjes en teksten er in het paneel staan
+
+MAKKELIJKE AANPASSINGEN
+  Zoek met Ctrl+F naar het stukje tekst hieronder.
+
+  In js/game.js:
+    Grootte van de ballen      r: 11,                        (groter getal = grotere bal)
+    Kleur van de ballen        ctx.fillStyle = '#fff';       (in drawBalls)
+    Meeste ballen tegelijk     this.balls.length > 70
+    Punten per doelpunt        const pts = 1 + Math.floor(this.combo / 3);
+    Grootte van de bak         r: 110, auto: false           (in de constructor)
+    Kleur van de bak           ctx.strokeStyle = '#3ddc84';  (in drawGoal)
+    Kleur van de balbron       ctx.strokeStyle = '#ff4fa3';  (in drawSource)
+    Kleur bij een doelpunt     '#ffd479'
+  Kleuren schrijf je als #rrggbb, bijvoorbeeld '#ff0000' voor rood. Zoek op internet
+  naar "color picker" om er een te kiezen.
+
+  In index.html (de beginstand van de schuifjes, bij value="..."):
+    Rondetijd       id="roundLen"   (in seconden; 180 = 3 minuten)
+    Zwaartekracht   id="gravity"
+    Stuiteren       id="bounce"
+    Ballen per tel  id="rate"
+    Wind            id="wind"
+  Het spel onthoudt je laatste instellingen. Zie je je nieuwe beginstand niet? Druk
+  F12, typ bij Console:  localStorage.clear()  en druk op Enter, daarna F5.
+
+  Teksten in het paneel veranderen: gewoon in index.html.
+
+VOOR WIE MEER WIL
+  README.md legt uit hoe alles werkt (herkenning, physics, kalibratie).
+  Heb je Node.js? Dan kun je de tests draaien, bijvoorbeeld:  node test/spel.mjs
+  Die zeggen "alles goed" als je niets kapot hebt gemaakt.

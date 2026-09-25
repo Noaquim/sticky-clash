@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sticky Clash — projection mapping game</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="sticky-clash.ico">
+<!-- los:weg -->
+<script>
+  // Dubbelgeklikt als bestand? Dan laadt de browser de losse modules niet (beveiliging
+  // voor file://). Door naar de versie waar alles in één bestand zit.
+  if (location.protocol === 'file:') location.replace('sticky-clash.html');
+</script>
+<!-- /los:weg -->
+</head>
+<body>
+<header>
+  <h1>Sticky <em>Clash</em></h1>
+  <div id="status" class="status">Klik op "Alles automatisch instellen"</div>
+</header>
+
+<main>
+  <aside class="panel">
+
+    <section class="quick">
+      <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
+      <label class="camkeuze">Camera
+        <select id="camSelect"><option value="">Automatisch — losse webcam als die er is</option></select>
+      </label>
+      <p class="hint">Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.</p>
+      <ol class="steps" id="steps">
+        <li data-k="proj">Beamer</li>
+        <li data-k="cam">Camera</li>
+        <li data-k="cal">Kalibratie</li>
+        <li data-k="bg">Muur geleerd</li>
+        <li data-k="goal">Doel gevonden</li>
+      </ol>
+      <p id="wizHint" class="hint">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
+      <button id="btnAbort" class="hidden">Afbreken</button>
+    </section>
+
+    <section>
+      <h2>Speelmodus</h2>
+      <div class="seg" id="modeSeg">
+        <button data-mode="object" class="on">Elk voorwerp</button>
+        <button data-mode="color">Post-its · duel</button>
+      </div>
+      <p id="modeHint" class="hint"></p>
+      <label class="slider">Gevoeligheid <input type="range" id="sens" min="0" max="100" value="60"><output id="sensOut">60</output></label>
+      <p class="hint">Hoger = pakt ook zwakkere verschillen op. Te hoog en de hele muur licht op.</p>
+      <label class="slider">Muurverlichting <input type="range" id="fill" min="0" max="80" value="25"><output id="fillOut">25%</output></label>
+      <label class="check"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
+      <p class="hint">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
+      <label class="check"><input type="checkbox" id="noPeople" checked> Mensen negeren</label>
+      <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
+      <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
+      <div class="row">
+        <button id="btnBg">Muur opnieuw leren</button>
+        <button id="btnGoal">Doel aanwijzen</button>
+      </div>
+      <p id="live" class="live">—</p>
+      <button id="btnDiag">Foto van wat de camera ziet</button>
+      <p class="hint">Wordt iets niet goed herkend? Klik hierop en stuur de foto op: dan is precies te zien wat er gebeurt.</p>
+    </section>
+
+    <section>
+      <div class="row">
+        <button id="btnPlay" class="primary big">Start ronde</button>
+        <button id="btnReset">Reset</button>
+      </div>
+      <label class="check"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
+    </section>
+
+    <section id="ranglijst">
+      <h2>Ranglijst</h2>
+      <div id="naamInvoer" class="hidden">
+        <p class="hint" id="naamVraag">Nieuwe score! Hoe heet je?</p>
+        <div class="row">
+          <input id="naam" type="text" maxlength="16" placeholder="Naam" autocomplete="off">
+          <button id="btnNaam" class="primary">Opslaan</button>
+        </div>
+      </div>
+      <ol id="scoreLijst" class="scores"></ol>
+      <button id="btnScoresWis" class="klein">Ranglijst wissen</button>
+    </section>
+
+    <section>
+      <h2>Spelregels</h2>
+      <label class="camkeuze">Spelvorm
+        <select id="spelvorm">
+          <option value="vrij">Vrij spel — zo veel mogelijk in de tijd</option>
+          <option value="levels">Uitdaging — levels die steeds moeilijker worden</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="special" checked> Speciale briefjes: rood = trampoline, groen = turbo, blauw = breekt na 5 tikken</label>
+      <label class="check"><input type="checkbox" id="gold" checked> Gouden ballen — 3 punten</label>
+      <label class="check"><input type="checkbox" id="bonus" checked> Bonusbak — 3 punten, verspringt elke 20 seconden</label>
+      <label class="slider">Rondetijd <input type="range" id="roundLen" min="30" max="900" step="15" value="180"><output id="roundLenOut">3:00</output></label>
+      <label class="check"><input type="checkbox" id="endless"> Geen tijdslimiet — blijft doorgaan</label>
+
+      <label class="check"><input type="checkbox" id="moveSource"> Balbron beweegt heen en weer</label>
+      <label class="slider sub">tempo <input type="range" id="srcSpeed" min="1" max="20" value="5"><output id="srcSpeedOut">0.5</output></label>
+
+      <label class="check"><input type="checkbox" id="moveGoal"> Bak beweegt heen en weer</label>
+      <label class="slider sub">tempo <input type="range" id="goalSpeed" min="1" max="20" value="4"><output id="goalSpeedOut">0.4</output></label>
+
+      <label class="slider">Wind <input type="range" id="wind" min="0" max="900" step="25" value="0"><output id="windOut">uit</output></label>
+      <p class="hint">Wind duwt de ballen langzaam heen en weer. Je ziet de richting boven in beeld.</p>
+    </section>
+
+    <details>
+      <summary>Meer instellingen</summary>
+
+      <section>
+        <h2>Camera</h2>
+        <div class="row">
+          <button id="btnCam">Camera starten</button>
+          <button id="btnFlip">Spiegelen</button>
+        </div>
+        <label class="check"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
+        <p class="hint">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
+      </section>
+
+      <section>
+        <h2>Beamer</h2>
+        <div class="row">
+          <button id="btnProj">Venster openen</button>
+          <button id="btnProjClose">Sluiten</button>
+        </div>
+        <button id="btnScreens">Beamerscherm herkennen</button>
+        <p class="hint">Eén keer toestaan, daarna opent het beamervenster voortaan vanzelf op de beamer.</p>
+        <p class="hint">Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.</p>
+      </section>
+
+      <section>
+        <h2>Kalibratie</h2>
+        <div class="row">
+          <button id="btnCalAuto">Automatisch</button>
+          <button id="btnCal">Met de hand</button>
+        </div>
+        <button id="btnCalReset">Wissen</button>
+        <p id="calState" class="badge">Niet gekalibreerd</p>
+        <label class="check"><input type="checkbox" id="autoRecal" checked> Vanzelf opnieuw instellen als de camera of beamer verschuift</label>
+      </section>
+
+      <section>
+        <h2>Kleuren <span class="only-color">(duelmodus)</span></h2>
+        <div id="classList"></div>
+        <p class="hint">Klik "Leren" en klik daarna op het voorwerp in het camerabeeld.</p>
+      </section>
+
+      <section>
+        <h2>Spel</h2>
+        <label class="slider">Min. grootte <input type="range" id="minSize" min="4" max="120" value="8"><output id="minSizeOut">8</output></label>
+        <label class="slider">Max. grootte <input type="range" id="maxSize" min="5" max="90" value="35"><output id="maxSizeOut">35%</output></label>
+        <label class="slider">Stilstaan <input type="range" id="stable" min="0" max="60" value="0"><output id="stableOut">0.0s</output></label>
+        <label class="slider">Mensenfilter <input type="range" id="strict" min="0" max="100" value="50"><output id="strictOut">50</output></label>
+        <p class="hint">Hoger = strenger. Het filter kijkt of een vorm star is: een voorwerp houdt zijn omtrek, een mens niet.</p>
+        <label class="slider">Zwaartekracht <input type="range" id="gravity" min="400" max="3000" step="50" value="1300"><output id="gravityOut">1300</output></label>
+        <label class="slider">Stuiter <input type="range" id="bounce" min="0" max="95" value="58"><output id="bounceOut">0.58</output></label>
+        <label class="slider">Baltempo <input type="range" id="rate" min="2" max="40" value="10"><output id="rateOut">1.0/s</output></label>
+        <label class="check"><input type="checkbox" id="sound" checked> Geluid</label>
+        <label class="check"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
+        <p class="hint">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
+      </section>
+
+      <section class="foot">
+        <p class="hint"><b>Doel en bron verplaatsen:</b> sleep ze met de muis in de rechter weergave. Het doel pak je door erin te klikken, de bron met <kbd>Ctrl</kbd>+klik. Of met de pijltjestoetsen en <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. <kbd>spatie</kbd> = pauze.</p>
+      </section>
+    </details>
+
+  </aside>
+
+  <div class="stage">
+    <div class="pane">
+      <div class="pane-head">
+        <span>Camera</span>
+        <div class="tabs">
+          <button data-view="video" class="on">Beeld</button>
+          <button data-view="mask">Wat het spel ziet</button>
+        </div>
+      </div>
+      <canvas id="debug" width="320" height="240"></canvas>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><span>Wat de beamer laat zien</span><span id="fps" class="fps"></span></div>
+      <canvas id="world" width="640" height="360"></canvas>
+    </div>
+  </div>
+</main>
+
+<script type="module" src="js/main.js" onerror="document.getElementById('status').textContent='Kon het spel niet laden — open sticky-clash.html, of start via start.bat'"></script>
+</body>
+</html>
