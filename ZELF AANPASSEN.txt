@@ -26,6 +26,8 @@ WAT STAAT WAAR
   js/main.js     het paneel, de knoppen, de wizard, wat er op de beamer komt
   js/vision.js   de camera en het herkennen van voorwerpen (lastig, pas op)
   js/audio.js    de geluidjes
+  js/muziek.js   de achtergrondmuziek
+  js/telefoon.js je telefoon als afstandsbediening; die opent telefoon.html
   css/style.css  hoe het paneel eruitziet
   index.html     welke knoppen, schuifjes en teksten er in het paneel staan
 
@@ -36,7 +38,7 @@ MAKKELIJKE AANPASSINGEN
     Grootte van de ballen      r: 11,                        (groter getal = grotere bal)
     Kleur van de ballen        ctx.fillStyle = '#fff';       (in drawBalls)
     Meeste ballen tegelijk     this.balls.length > 70
-    Punten per doelpunt        const pts = 1 + Math.floor(this.combo / 3);
+    Punten per doelpunt        1 + Math.floor(Math.min(9, this.combo) / 3)
     Grootte van de bak         r: 110, auto: false           (in de constructor)
     Kleur van de bak           ctx.strokeStyle = '#3ddc84';  (in drawGoal)
     Kleur van de balbron       ctx.strokeStyle = '#ff4fa3';  (in drawSource)
@@ -48,6 +50,15 @@ MAKKELIJKE AANPASSINGEN
     Hoe lang blauw weg is       const BREAK_TIME = 5;      (in seconden)
     Bonusbak verhuist elke      const BONUS_MOVE = 20;     (in seconden)
   Welke kleur wat doet staat in js/vision.js bij noteKindOf.
+  Effecten op de muur (in js/game.js):
+    Meeste deeltjes tegelijk    const FX_MAX_PARTS = 250;  (meer = zwaarder voor de pc)
+    Kleuren van de confetti     const FX_CONFETTI
+  Muziek (in js/muziek.js):
+    Harder of zachter           const MUZIEK_VOLUME = 0.18;  (hoger = harder, 0 = geen muziek)
+    Tempo                       const MUZIEK_TEMPO = 120;    (tellen per minuut)
+    Sneller op het eind         const MUZIEK_SPURT = 1.25;   (1.25 = een kwart sneller)
+    Het deuntje zelf            const MUZIEK_AKKOORDEN       (vier maten, als MIDI-noten)
+  Geluid, muziek en effecten zet je los uit onder Meer instellingen > Spel.
 
   Kleuren schrijf je als #rrggbb, bijvoorbeeld '#ff0000' voor rood. Zoek op internet
   naar "color picker" om er een te kiezen.

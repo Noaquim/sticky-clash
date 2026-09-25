@@ -29,6 +29,8 @@ const TYPES = {
   '.ico': 'image/x-icon',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm',
 };

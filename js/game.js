@@ -101,6 +101,23 @@ const JAM_AFTER = 3;
 const POP_PX = 46;
 const POP_RISE = 70;
 
+// ---- effecten (vinkje Effecten; uit = alleen de vonken en de +1 van vroeger) ------
+// Harde grens op het aantal deeltjes. Ze komen uit een vaste voorraad, dus tijdens het
+// spelen wordt er niets nieuws aangemaakt. Vol? Dan wordt een levend deeltje hergebruikt.
+const FX_MAX_PARTS = 250;
+const FX_MAX_POPS = 24;
+const FX_CONFETTI = ['#ff4fa3', '#3ddc84', '#3aa0ff', '#ffd479', '#ff8a1e', '#b58cff'];
+const FX_GOUD = ['#ffd479', '#ffe9a8', '#ffb347', '#fff3c4'];
+// Lettertypes van de zwevende teksten, één keer samengesteld (niet elk beeldje opnieuw).
+const FX_POP_FONT = '700 ' + POP_PX + 'px ui-sans-serif, system-ui, sans-serif';
+const FX_POP_GROOT = '800 60px ui-sans-serif, system-ui, sans-serif';
+const FX_COMBO_FONT = '800 56px ui-sans-serif, system-ui, sans-serif';
+
+// Eén deeltje. Soort 0 = vonk (rondje), 1 = confetti (draaiend papiertje), 2 = sterretje.
+function fxDeeltje() {
+  return { x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, col: '#fff', r: 2, kind: 0, rot: 0, vr: 0, drag: 0, grav: 0.45 };
+}
+
 // Legt de normaal van het contact op de bal vast (ball.nx, ball.ny, naar buiten), zodat
 // speciale briefjes weten welke kant op ze moeten duwen. `thresh` is de stuiterdrempel;
 // een trampoline geeft 0 mee, zodat ook een trage bal wegveert.
@@ -273,6 +290,18 @@ export class Game {
     // Tekst op de muur buiten een ronde.
     this.tips = [];               // wisselen elke 4,5 s onder het startscherm
     this.highscores = [];         // [{ name, score }], al gesorteerd; top 5 in een hoek
+    // Effecten: confetti bij een doelpunt, sterretjes achter gouden ballen, COMBO-tekst,
+    // feest bij een record of een gehaald level, en een kloppende klok op het eind.
+    this.effects = true;
+    this.partPool = [];           // vrije deeltjes; this.parts zijn de levende
+    for (let i = 0; i < FX_MAX_PARTS; i++) this.partPool.push(fxDeeltje());
+    this.partSteal = 0;           // welk levend deeltje als eerste hergebruikt wordt als het vol is
+    this.popPool = [];            // vrije zwevende teksten
+    this.feestN = 0;              // hoeveel vuurwerkjes er nog komen
+    this.feestT = 0;              // seconden tot het volgende
+    // Eigen toeval voor de effecten, los van Math.random: zo verandert confetti niets aan
+    // het spelverloop, en niets aan de tests die Math.random vastzetten.
+    this.fxSeed = 0x2545f491;
   }
 
   setAspect(ar) {
@@ -293,7 +322,11 @@ export class Game {
 
   reset() {
     this.restoreSettings();
-    this.balls.length = 0; this.parts.length = 0; this.pops.length = 0;
+    this.balls.length = 0;
+    // deeltjes en teksten terug in de voorraad, niet weggooien
+    while (this.parts.length) this.partPool.push(this.parts.pop());
+    while (this.pops.length) this.popPool.push(this.pops.pop());
+    this.feestN = 0;
     this.score.attack = 0; this.score.block = 0; this.misses = 0;
     this.combo = 0; this.comboT = 0;
     this.elapsed = 0;
@@ -417,7 +450,12 @@ export class Game {
     this.countdown = 3;
     this.state = 'count';
     this.flash = 0.75; this.flashCol = '#ffd479';
-    if (this.sfx) this.sfx.tick(false);
+    this.feest(3);
+    // Het fanfaretje is korter dan een tel: daarna tikt het aftellen gewoon door.
+    if (this.sfx) {
+      if (this.sfx.levelGehaald) this.sfx.levelGehaald();
+      else this.sfx.tick(false);
+    }
   }
 
   /** Tijd op: de reeks strandt op dit level. */
@@ -431,7 +469,13 @@ export class Game {
     this.bestLevel = Math.max(this.bestLevel, n);
     this.banner = { text: 'LEVEL ' + n + ' — GAME OVER', t: 9999 };
     this.restoreSettings();
-    if (this.sfx) this.sfx.end();
+    if (this.newRecord) this.feest(6);
+    if (this.sfx) {
+      const s = this.sfx;
+      if (this.newRecord && s.record) s.record();
+      else if (s.gameOver) s.gameOver();
+      else s.end();
+    }
   }
 
   levelHint() {
@@ -628,6 +672,7 @@ export class Game {
       boostAt: -1,               // b.life bij de laatste turbo-zet
       nx: 0, ny: 0,              // normaal van het laatste contact (zie collide)
       jamT: null, jamX: 0, jamY: 0, // sinds wanneer en waar een speciaal briefje hem wegschiet
+      spark: 0,                  // seconden tot het volgende sterretje (gouden bal)
     });
   }
 
@@ -638,10 +683,123 @@ export class Game {
     for (let i = 0; i < n; i++) {
       const a = half ? a0 + (Math.random() - 0.5) * Math.PI : Math.random() * Math.PI * 2;
       const s = spread * (0.35 + Math.random() * 0.9);
-      this.parts.push({
-        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - spread * 0.25,
-        life: 0.45 + Math.random() * 0.5, max: 0.95, col, r: 2 + Math.random() * 3.5,
-      });
+      const p = this.part();
+      p.x = x; p.y = y; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s - spread * 0.25;
+      p.life = 0.45 + Math.random() * 0.5; p.max = 0.95; p.col = col; p.r = 2 + Math.random() * 3.5;
+      p.kind = 0; p.rot = 0; p.vr = 0; p.drag = 0; p.grav = 0.45;
+    }
+  }
+
+  // ---- effecten ---------------------------------------------------------------
+
+  /** Toevalsgetal 0..1 voor de effecten (xorshift, los van Math.random). */
+  fx() {
+    let s = this.fxSeed | 0;
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    this.fxSeed = s;
+    return (s >>> 0) / 4294967296;
+  }
+
+  /**
+   * Een deeltje uit de voorraad; de aanroeper zet alle velden. Is de voorraad op, dan
+   * wordt steeds een ander levend deeltje hergebruikt: nooit meer dan FX_MAX_PARTS.
+   */
+  part() {
+    let p = this.partPool.pop();
+    if (!p) {
+      if (this.parts.length >= FX_MAX_PARTS) {
+        this.partSteal = (this.partSteal + 1) % this.parts.length;
+        return this.parts[this.partSteal];
+      }
+      p = fxDeeltje();
+    }
+    this.parts.push(p);
+    return p;
+  }
+
+  /** Zwevende tekst (+1, BLOK, KRAK, COMBO ×3). Ook uit een voorraad, met een grens. */
+  pop(x, y, text, col, font = FX_POP_FONT, rise = POP_RISE, life = 1.1, grow = false) {
+    let p = this.pops.length >= FX_MAX_POPS ? this.pops.shift() : this.popPool.pop();
+    if (!p) p = { x: 0, y: 0, t: 0, text: '', col: '', font: '', rise: 0, life: 0, grow: false };
+    p.x = x; p.y = y; p.t = 0; p.text = text; p.col = col;
+    p.font = font; p.rise = rise; p.life = life; p.grow = grow;
+    this.pops.push(p);
+    return p;
+  }
+
+  /** Confetti: papiertjes in de kleuren `cols`, schuin omhoog uit (x, y). */
+  confetti(x, y, n, cols, spread) {
+    for (let i = 0; i < n; i++) {
+      const p = this.part();
+      const a = -Math.PI / 2 + (this.fx() - 0.5) * 2.2, s = spread * (0.45 + this.fx() * 0.75);
+      p.x = x; p.y = y; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s;
+      p.life = 0.8 + this.fx() * 0.6; p.max = 1.4; p.col = cols[i % cols.length]; p.r = 5 + this.fx() * 4;
+      p.kind = 1; p.rot = this.fx() * 6.283; p.vr = (this.fx() - 0.5) * 18; p.drag = 2.4; p.grav = 0.3;
+    }
+  }
+
+  /** Feest: n vuurwerkjes confetti na elkaar, elk op een vrije plek (zie knal). */
+  feest(n) {
+    if (!this.effects) return;
+    this.feestN = n;
+    this.feestT = 0;
+  }
+
+  /**
+   * Eén vuurwerkje in de bovenste helft, boven de banner. Nooit bovenop een briefje:
+   * licht op een voorwerp maakt het onzichtbaar voor de camera. Nergens plek? Dan niet.
+   */
+  knal() {
+    if (!this.effects) return;                 // vinkje Effecten net uitgezet: rest van het feest ook niet
+    const boxes = this.obstacles.map(ob => polyBox(ob.poly));
+    let bx = 0, by = 0, best = -1;
+    for (let i = 0; i < 10; i++) {
+      const x = this.W * (0.15 + this.fx() * 0.7), y = this.H * (0.16 + this.fx() * 0.18);
+      let room = 400;
+      for (const b of boxes) room = Math.min(room, boxDist(b, x, y));
+      if (room > best) { best = room; bx = x; by = y; }
+      if (room >= 260) break;
+    }
+    if (best < 110) return;
+    // In voorwerpmodus minder en zachter (zie drawParts), zodat de camera rustig blijft.
+    const n = this.lowLight ? 22 : 40, cols = this.fx() < 0.5 ? FX_CONFETTI : FX_GOUD;
+    for (let i = 0; i < n; i++) {
+      const p = this.part(), a = this.fx() * 6.283, s = 180 + this.fx() * 300;
+      p.x = bx; p.y = by; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s - 60;
+      p.life = 0.9 + this.fx() * 0.7; p.max = 1.6; p.col = cols[i % cols.length];
+      if (i % 3 === 0) { p.kind = 2; p.r = 6 + this.fx() * 4; p.vr = 12; }
+      else { p.kind = 1; p.r = 5 + this.fx() * 4; p.vr = (this.fx() - 0.5) * 18; }
+      p.rot = this.fx() * 6.283; p.drag = 2.2; p.grav = 0.3;
+    }
+  }
+
+  /** Sterretjes achter een gouden bal. De laagste voorrang: niet als het al druk is. */
+  sparkle(b, dt) {
+    b.spark -= dt;
+    if (b.spark > 0) return;
+    b.spark = this.lowLight ? 0.09 : 0.04;
+    if (this.parts.length > FX_MAX_PARTS * 0.8) return;
+    const p = this.part();
+    p.x = b.x + (this.fx() - 0.5) * b.r; p.y = b.y + (this.fx() - 0.5) * b.r;
+    p.vx = (this.fx() - 0.5) * 70 - b.vx * 0.06; p.vy = (this.fx() - 0.5) * 70 - b.vy * 0.06;
+    p.life = 0.3 + this.fx() * 0.25; p.max = 0.55; p.col = this.fx() < 0.5 ? '#fff3c4' : '#ffd479';
+    p.r = 4 + this.fx() * 3; p.kind = 2; p.rot = this.fx() * 6.283; p.vr = 14; p.drag = 3; p.grav = 0.05;
+  }
+
+  /**
+   * COMBO ×n boven de bak, of anders onder de score bovenaan; nooit op een briefje.
+   * Past het nergens, dan staat de combo toch al in de HUD.
+   */
+  comboPop(bin) {
+    const text = 'COMBO ×' + this.combo, w = text.length * 56 * 0.74 + 8, h = 56 + 40 + 4;
+    const boxes = this.obstacles.map(ob => polyBox(ob.poly));
+    const spots = [[bin.x, bin.y - bin.r - 150], [this.W / 2, 250]];
+    for (const [cx, cy] of spots) {
+      const x = Math.max(w / 2, Math.min(this.W - w / 2, cx));
+      const r = [x - w / 2, cy - 40, x + w / 2, cy + 56];
+      if (r[1] < 0 || boxes.some(b => boxHit(r, b, 14))) continue;
+      this.pop(x, cy, text, '#ff8a1e', FX_COMBO_FONT, 40, 1.3, true);
+      return;
     }
   }
 
@@ -654,16 +812,34 @@ export class Game {
       if (this.comboT <= 0) this.combo = 0;
     }
 
-    for (let i = this.pops.length - 1; i >= 0; i--) {
-      this.pops[i].t += dt;
-      if (this.pops[i].t > 1.1) this.pops.splice(i, 1);
+    // Verlopen teksten en deeltjes terug naar de voorraad. Aanschuiven in plaats van
+    // splice: dat maakt bij elke aanroep een nieuwe lijst, en dit gebeurt elk beeldje.
+    // (Een tekst of deeltje dat ergens nog op de oude manier met push() wordt
+    // toegevoegd, zonder life, rise of grav, werkt ook: dan gelden de oude waarden.)
+    let n = 0;
+    for (let i = 0; i < this.pops.length; i++) {
+      const p = this.pops[i];
+      p.t += dt;
+      if (p.t > (p.life || 1.1)) this.popPool.push(p); else this.pops[n++] = p;
     }
-    for (let i = this.parts.length - 1; i >= 0; i--) {
+    this.pops.length = n;
+    n = 0;
+    for (let i = 0; i < this.parts.length; i++) {
       const p = this.parts[i];
       p.life -= dt;
-      if (p.life <= 0) { this.parts.splice(i, 1); continue; }
-      p.vy += this.gravity * 0.45 * dt;
+      if (p.life <= 0) { this.partPool.push(p); continue; }
+      p.vy += this.gravity * (p.grav === undefined ? 0.45 : p.grav) * dt;
+      // confetti en sterretjes remmen af in de lucht en dwarrelen dan omlaag
+      if (p.drag) { const k = Math.max(0, 1 - p.drag * dt); p.vx *= k; p.vy *= k; }
       p.x += p.vx * dt; p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+      this.parts[n++] = p;
+    }
+    this.parts.length = n;
+    if (this.feestN > 0 && (this.feestT -= dt) <= 0) {
+      this.feestN--;
+      this.feestT = 0.3;
+      this.knal();
     }
 
     if (this.bonusFade < 1) this.bonusFade = Math.min(1, this.bonusFade + dt * 2.5);
@@ -747,8 +923,22 @@ export class Game {
           : (a + (a === 1 ? ' DOELPUNT' : ' DOELPUNTEN')),
         t: 9999,
       };
-      if (this.sfx) this.sfx.end();
+      if (this.newRecord) this.feest(6);
+      if (this.sfx) {
+        if (this.newRecord && this.sfx.record) this.sfx.record();
+        else this.sfx.end();
+      }
     }
+  }
+
+  /**
+   * Loopt de klok in zijn laatste tien seconden? Dan tikt hij (tickRound), wordt hij op
+   * de muur bij elke tik even groter (drawHud) en gaat de muziek sneller (main.js →
+   * muziek.js).
+   */
+  laatsteTien() {
+    const endless = this.endless && !this.ownSettings;      // een level telt altijd af
+    return this.state === 'play' && !endless && this.time <= 10;
   }
 
   stepBalls(dt, scoring) {
@@ -843,6 +1033,7 @@ export class Game {
     for (const b of this.balls) {
       b.trail.push(b.x, b.y);
       if (b.trail.length > 14) b.trail.splice(0, 2);
+      if (b.gold && this.effects) this.sparkle(b, dt);
       // Klem: weggeschoten, maar niet van zijn plek gekomen (zie JAM_DIST).
       if (b.jamT != null) {
         if (Math.abs(b.x - b.jamX) + Math.abs(b.y - b.jamY) > JAM_DIST) b.jamT = null;
@@ -875,7 +1066,10 @@ export class Game {
         b.hits++;
         this.kicked(b);
         this.burst(b.x, b.y, KIND_STYLE.trampoline.col, 8, 360, b.nx, b.ny);
-        if (this.sfx) this.sfx.bounce(Math.max(900, imp), ob.team);
+        if (this.sfx) {
+          if (this.sfx.boing) this.sfx.boing();          // heeft zijn eigen rem, zie audio.js
+          else this.sfx.bounce(Math.max(900, imp), ob.team);
+        }
       }
       return;
     }
@@ -897,6 +1091,7 @@ export class Game {
       b.vy += ty * dir * BOOST_KICK;
       this.kicked(b);
       this.burst(b.x, b.y, KIND_STYLE.booster.col, 7, 280, b.nx, b.ny);
+      if (this.sfx && this.sfx.whoosh) this.sfx.whoosh();
       return;
     }
     // breekbare muur: tel de echte klappen
@@ -922,7 +1117,7 @@ export class Game {
     const boxes = this.obstacles.map(o => polyBox(o.poly));
     boxes.push(own);
     const spot = this.labelSpot(boxes, boxes.length - 1, text.length * POP_PX * 0.74 + 8, h);
-    if (spot) this.pops.push({ x: spot[0], y: spot[1] - h / 2 + POP_RISE, t: 0, text, col });
+    if (spot) this.pop(spot[0], spot[1] - h / 2 + POP_RISE, text, col);
     if (this.sfx) {
       if (this.sfx.krak) this.sfx.krak();
       else this.sfx.bounce(900, 'block');
@@ -948,18 +1143,35 @@ export class Game {
   }
 
   scored(b, bin = this.goal) {
-    this.combo = Math.min(9, this.combo + 1);
+    // De reeks telt door (voor COMBO ×10), de bonus stopt bij 9 op rij.
+    this.combo = Math.min(99, this.combo + 1);
     this.comboT = 3.2;
     // De bonusbak geeft zijn vaste punten; een gouden bal telt overal drie keer.
-    const base = bin === this.bonus ? bin.pts : 1 + Math.floor(this.combo / 3);
+    const base = bin === this.bonus ? bin.pts : 1 + Math.floor(Math.min(9, this.combo) / 3);
     const pts = base * (b.gold ? 3 : 1);
     this.score.attack += pts;
     if (this.ownSettings) this.levelGoals += pts;
     const extra = b.gold || bin !== this.goal;
     this.burst(bin.x, bin.y - 20, '#ffd479', extra ? 48 : 34, extra ? 480 : 420);
-    this.pops.push({ x: bin.x, y: bin.y - 40, t: 0, text: '+' + pts, col: '#ffd479' });
+    const eff = this.effects;
+    // Met effecten springt de +1 even op, en is een +3 groter.
+    this.pop(bin.x, bin.y - 40, '+' + pts, '#ffd479', eff && pts >= 3 ? FX_POP_GROOT : FX_POP_FONT, POP_RISE, 1.1, eff);
+    // 3, 5, 10 op rij, en daarna elke 5: een eigen tekst en een eigen deuntje.
+    const mijlpaal = this.combo === 3 || this.combo === 5 || (this.combo >= 10 && this.combo % 5 === 0);
+    if (eff) {
+      // Confetti uit de bak; goud voor een gouden bal en de bonusbak. In voorwerpmodus minder.
+      const n = (extra ? 26 : 18) >> (this.lowLight ? 1 : 0);
+      this.confetti(bin.x, bin.y - bin.r * 0.4, n, extra ? FX_GOUD : FX_CONFETTI, extra ? 560 : 480);
+      if (mijlpaal) this.comboPop(bin);
+    }
     this.flash = 0.75; this.flashCol = b.gold ? '#ffd479' : '#ff8a1e';
-    if (this.sfx) this.sfx.score(this.combo);
+    if (this.sfx) {
+      const s = this.sfx;
+      if (bin === this.bonus && s.bonus) s.bonus();
+      else if (b.gold && s.goud) s.goud();
+      else s.score(this.combo);
+      if (mijlpaal && s.combo) s.combo(this.combo);
+    }
   }
 
   missed(b, quiet) {
@@ -969,7 +1181,7 @@ export class Game {
       // aanvaller zelf mis kaatste is niemands verdienste.
       if (!b.blockHits) return;
       this.score.block += 1;
-      this.pops.push({ x: b.x, y: this.H - 60, t: 0, text: 'BLOK', col: '#6ec1ff' });
+      this.pop(b.x, this.H - 60, 'BLOK', '#6ec1ff');
       this.burst(b.x, this.H - 20, '#3aa0ff', 10, 200);
     } else {
       this.misses += 1;
@@ -1009,6 +1221,7 @@ export class Game {
     this.drawBalls(ctx);
     this.drawParts(ctx);
     this.drawHud(ctx);
+    this.rangVak = null;           // waar de ranglijst staat; de QR-code van de telefoon wijkt uit
     if (this.highscores.length && (this.state === 'idle' || this.state === 'over')) this.drawHighscores(ctx);
     ctx.restore();
   }
@@ -1212,22 +1425,56 @@ export class Game {
   }
 
   drawParts(ctx) {
-    for (const p of this.parts) {
-      ctx.globalAlpha = Math.max(0, p.life / p.max);
+    // Confetti en sterretjes zijn in voorwerpmodus zachter: ze vliegen soms even over
+    // een voorwerp heen. Nooit gloed (shadowBlur), die valt op een voorwerp.
+    const dim = this.lowLight ? 0.55 : 1;
+    for (let i = 0; i < this.parts.length; i++) {
+      const p = this.parts[i], a = Math.max(0, p.life / p.max);
       ctx.fillStyle = p.col;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      if (p.kind === 1) {
+        // confetti: een draaiend papiertje dat omslaat (de breedte wiebelt)
+        ctx.globalAlpha = Math.min(1, a * 1.8) * dim;
+        const c = Math.cos(p.rot), s = Math.sin(p.rot);
+        const hw = p.r * Math.abs(Math.cos(p.rot * 1.7)) + 0.8, hh = p.r * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(p.x + c * hw - s * hh, p.y + s * hw + c * hh);
+        ctx.lineTo(p.x - c * hw - s * hh, p.y - s * hw + c * hh);
+        ctx.lineTo(p.x - c * hw + s * hh, p.y - s * hw - c * hh);
+        ctx.lineTo(p.x + c * hw + s * hh, p.y + s * hw - c * hh);
+        ctx.fill();
+      } else if (p.kind === 2) {
+        // sterretje: vier punten, twinkelt
+        ctx.globalAlpha = Math.min(1, a * 1.5) * (0.6 + 0.4 * Math.sin(p.rot)) * dim;
+        const r = p.r, q = p.r * 0.28;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - r); ctx.lineTo(p.x + q, p.y - q); ctx.lineTo(p.x + r, p.y);
+        ctx.lineTo(p.x + q, p.y + q); ctx.lineTo(p.x, p.y + r); ctx.lineTo(p.x - q, p.y + q);
+        ctx.lineTo(p.x - r, p.y); ctx.lineTo(p.x - q, p.y - q);
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = a;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
     // Altijd vanaf de bovenkant. Voorheen hing dat af van wat main.js het laatst had
     // ingesteld, en dan weet shatter() niet waar KRAK precies komt te staan.
     ctx.textBaseline = 'top';
-    for (const p of this.pops) {
-      const k = p.t / 1.1;
+    ctx.textAlign = 'center';
+    for (let i = 0; i < this.pops.length; i++) {
+      const p = this.pops[i], k = p.t / (p.life || 1.1), y = p.y - k * (p.rise == null ? POP_RISE : p.rise);
       ctx.globalAlpha = 1 - k;
       ctx.fillStyle = p.col;
-      ctx.font = '700 ' + POP_PX + 'px ui-sans-serif, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(p.text, p.x, p.y - k * POP_RISE);
+      ctx.font = p.font || FX_POP_FONT;
+      if (p.grow) {
+        // even opspringen: klein, iets te groot, dan gewoon
+        const g = p.t < 0.15 ? 0.55 + p.t / 0.15 * 0.6 : Math.max(1, 1.15 - (p.t - 0.15) * 1.5);
+        ctx.save();
+        ctx.translate(p.x, y);
+        ctx.scale(g, g);
+        ctx.fillText(p.text, 0, 0);
+        ctx.restore();
+      } else ctx.fillText(p.text, p.x, y);
     }
     ctx.globalAlpha = 1;
   }
@@ -1259,7 +1506,16 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.fillStyle = !endless && this.time < 11 && this.state === 'play' ? '#ff5b5b' : '#e8eaf0';
     ctx.font = '700 52px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(m + ':' + String(s).padStart(2, '0'), this.W / 2, pad + 6);
+    if (this.effects && this.laatsteTien()) {
+      // Laatste tien seconden: de klok springt bij elke tik even groter en krimpt dan
+      // terug. Alleen groter, niet feller en zonder gloed.
+      const f = this.time - Math.floor(this.time), g = 1 + 0.25 * f * f * f;
+      ctx.save();
+      ctx.translate(this.W / 2, pad + 32);
+      ctx.scale(g, g);
+      ctx.fillText(m + ':' + String(s).padStart(2, '0'), 0, -26);
+      ctx.restore();
+    } else ctx.fillText(m + ':' + String(s).padStart(2, '0'), this.W / 2, pad + 6);
 
     // Uitdaging: welk level, en hoeveel punten er al zijn van wat er nodig is.
     let comboY = pad + 74;
@@ -1369,6 +1625,7 @@ export class Game {
     }
     if (!best) return;                     // elke hoek hangt vol: dan maar geen ranglijst
     const [x, y] = best;
+    this.rangVak = [x - 14, y - 12, w + 28, h + 18];
     ctx.save();
     // Op een lichte muur is lichtgrijze tekst niet te lezen. In voorwerpmodus geen
     // donker vlak: dat haalt het licht weg van wat daar hangt.

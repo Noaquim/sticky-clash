@@ -136,6 +136,25 @@ niet gespeeld wordt, en als deel van het beeld zelf, zodat de camera het niet vo
 voorwerp aanziet. Het spel merkt dat het beamervlak veranderd is en kalibreert zichzelf dan
 opnieuw.
 
+### Als app installeren
+
+Via de online versie of via `start.bat` (niet vanuit het losse bestand) kun je Sticky Clash
+installeren als los programma, met een eigen venster en een pictogram in het startmenu.
+
+- **Installeren:** klik in Chrome of Edge op het installeer-pictogram rechts in de
+  adresbalk, of op de knop **Installeer als app** bovenaan het paneel. Die knop verschijnt
+  alleen als de browser zegt dat het kan.
+- **Zonder internet:** daarna start het spel ook offline — de browser bewaart een kopie
+  van alle bestanden. Ben je online, dan haalt hij altijd eerst de nieuwste versie: een
+  update op GitHub, of je eigen wijziging na F5, zie je dus meteen. Geïnstalleerd via
+  `start.bat`? Dan start de app ook als de server niet draait (maar wil je je eigen
+  aanpassingen zien, start dan eerst `start.bat`).
+- **Camera en beamer:** de camera blijft gewoon nodig. De app deelt toestemming,
+  kalibratie en instellingen met de browser op hetzelfde adres, en het beamervenster gaat
+  net zo open als in de browser.
+- **Verwijderen:** in het app-venster via het menu (⋮ of …) → *Sticky Clash
+  verwijderen*, of in Windows via Instellingen → Apps.
+
 ### Na een wijziging aan de code
 
 `sticky-clash.html` wordt gemaakt uit `index.html`, `css/` en `js/`. Na een wijziging:
@@ -264,7 +283,8 @@ neergezette voorwerpen mee).
 Onder **Spelregels** in het paneel:
 
 Elke ronde begint met een aftelling van drie op de muur, zodat wie daar staat zijn
-voorwerpen kan klaarzetten. De laatste tien seconden tikken mee. Aan het eind blijft de
+voorwerpen kan klaarzetten. De laatste tien seconden tikken mee: de klok op de muur
+springt bij elke tik even op en de muziek gaat sneller. Aan het eind blijft de
 eindstand staan met **druk op spatie voor een nieuwe ronde** — je hoeft niet terug naar de
 laptop. De hoogste score blijft bewaard per speelmodus en staat op het startscherm; haal
 je hem, dan verschijnt NIEUW RECORD.
@@ -298,11 +318,73 @@ Ook onder **Spelregels**, allemaal los aan of uit te zetten:
 Voor wie het voor het eerst speelt, staan er op het startscherm korte tips op de muur:
 hoe je een baan bouwt en wat de speciale briefjes doen.
 
+**Geluid, muziek en effecten** staan onder *Meer instellingen* → Spel, elk los aan of uit.
+Tijdens een ronde speelt zachte muziek (drums, bas en een loopje, zonder muziekbestanden).
+Bij pauze wordt hij stil en daarna speelt hij verder; na de ronde stopt hij. In de
+Uitdaging gaat hij per level iets sneller. De trampoline zegt *boing*, de turbo *whoosh*,
+een gouden bal in de bak klinkt als een klokje en de bonusbak als een muntje. Bij 3, 5 en
+10 op rij klinkt een deuntje, bij een gehaald level of een nieuw record een fanfare. Op de
+muur: confetti uit de bak (goud bij een gouden bal), sterretjes achter gouden ballen,
+COMBO ×3 en vuurwerk bij een record of een gehaald level. Het blijft bescheiden — nooit
+een flits over de hele muur, en nooit lang licht op een voorwerp, want dan raakt de camera
+het kwijt.
+
 ### Ranglijst
 
 Haal je de ranglijst, dan vraagt het paneel na de ronde je naam. De tien beste scores staan
 onder **Ranglijst**, per speelmodus; bij Uitdaging telt het hoogste level. Ze blijven bewaard in deze browser op deze computer; met
 *Ranglijst wissen* begin je opnieuw.
+
+## Bedienen met je telefoon
+
+Sta je bij de muur, dan hoef je niet steeds naar de laptop te lopen. Klik in het paneel op
+**Telefoon koppelen**. Er verschijnt een QR-code: in het paneel, en zolang er niet gespeeld
+wordt ook in een hoek op de muur. Scan hem met de camera van je telefoon en je hebt een
+afstandsbediening met grote knoppen:
+
+- **Start ronde**, **Pauze**, **Verder** en **Nieuwe ronde**
+- de resterende tijd (die telt de telefoon zelf mee af), en de stand bij pauze en na afloop
+- haal je de ranglijst, dan typ je je naam op de telefoon
+
+Het paneel zegt **Telefoon verbonden** zodra hij er is. Meer telefoons mogen ook: iedereen die
+de code scant. Met **Nieuwe code** of **Stoppen** werkt een oude code niet meer.
+
+Goed om te weten:
+
+- **Laptop én telefoon hebben internet nodig.** Ze kunnen elkaar niet rechtstreeks bereiken,
+  dus gaan de berichten via [ntfy.sh](https://ntfy.sh), een gratis doorgeefluik zonder
+  account. Via ntfy.sh gaan alleen je knoppen, de stand (score en tijd) en de naam die je
+  typt. Met `?cache=no&firebase=no` achter het adres bewaart ntfy.sh niets en stuurt het niets
+  door. De kamercode in de QR-code is 120 bits toeval en geldt alleen zolang het spel
+  openstaat; wie hem niet heeft, kan niet meedoen.
+- **Zuinig met berichten.** ntfy.sh laat zonder account maar weinig berichten door: na een
+  stuk of zestig één per vijf seconden, en 250 per dag per internetaansluiting (laptop en
+  telefoon op dezelfde wifi delen die). De telefoon stuurt alleen iets als je op een knop
+  drukt; de laptop alleen als het spel van stand verandert, hooguit één keer per seconde.
+  Daarom staan de doelpunten tijdens een ronde niet op de telefoon maar op de muur. Een ronde
+  kost zo'n vijf tot tien berichten: je kunt dus tientallen rondes per dag spelen. Wordt het
+  ntfy.sh toch te druk, dan zeggen het paneel en de telefoon dat en proberen ze het vanzelf wat
+  later opnieuw.
+- **De code op de muur** staat er alleen buiten een ronde, nooit tijdens het aftellen of
+  spelen. Hij zoekt een hoek zonder voorwerp, bak of ranglijst (hangt er later iets op, dan
+  schuift hij op), en hij zit in wat het spel van zijn eigen licht verwacht: de camera ziet
+  hem niet als voorwerp. `test/telefoon.mjs` bouwt dat na. Liever niet op de muur? Zet
+  *Code ook op de muur* uit.
+- **Werkt het niet?** Kijk wat het paneel en de telefoon over de verbinding zeggen. Zegt de
+  telefoon "Het spel antwoordt niet" of "Geen antwoord": staat *Telefoon koppelen* nog aan, en
+  heeft de laptop internet? Laat het spelvenster op de laptop open en zichtbaar; een
+  weggeklikt tabblad draait niet door.
+- Speel je online (GitHub Pages), dan wijst de code naar de `telefoon.html` die naast het spel
+  staat. Vanaf `start.bat` of het losse bestand wijst hij naar
+  https://noaquim.github.io/sticky-clash/telefoon.html — die hoort dus online te staan.
+- Een eigen ntfy-server? Zet het adres in `TELEFOON_RELAY` bovenin `js/telefoon.js` én in
+  `RELAY` in `telefoon.html`.
+
+De QR-code maakt het spel zelf, zonder bibliotheek (`js/qr.js`, volgens de norm ISO/IEC
+18004). `test/qr.mjs` leest elke code terug met een los geschreven decoder. Daarnaast is hij
+nagemeten met OpenCV: van 300 codes leest de Aruco-detector er 300, en waar OpenCV's eigen
+encoder hetzelfde masker kiest, is de code blokje voor blokje gelijk (op de restbits na, die
+elke lezer overslaat).
 
 ## Kalibratie is niet optioneel
 
@@ -372,6 +454,10 @@ node test/modi.mjs          # speciale briefjes, gouden ballen, bonusbak, levels
 node test/losbestand.mjs    # sticky-clash.html past bij de broncode
 node test/briefjes.mjs      # zwart/bruin briefje onder warm licht, wat er al hing, twee naast elkaar
 node test/extra.mjs         # soort briefje uit de kleur, camera verschoven, lichtmodel beamer, stille camera
+node test/geluid.mjs        # muziek op de maat (nep-geluidskaart), geluiden niet te vaak, effecten met een grens
+node test/app.mjs           # installeren als app: manifest, pictogrammen, offline, niet in het losse bestand
+node test/qr.mjs            # QR-codes, teruggelezen met een eigen decoder
+node test/telefoon.mjs      # bedienen met je telefoon: berichten, zuinig versturen, QR op de muur
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code
@@ -397,7 +483,13 @@ afgewogen.
 | [js/vision.js](js/vision.js) | achtergrondsubtractie met schaduwonderdrukking, kleurherkenning, convexe omhullende per voorwerp |
 | [js/game.js](js/game.js) | physics: cirkel tegen convexe veelhoek, scoren, tekenen |
 | [js/audio.js](js/audio.js) | gesynthetiseerd geluid, geen audiobestanden |
+| [js/muziek.js](js/muziek.js) | achtergrondmuziek, vooruit ingepland op de klok van de geluidskaart |
 | [js/main.js](js/main.js) | wizard, automatische kalibratie, beamervenster, testmodus |
+| [js/app.js](js/app.js) | installeren als app; meldt de service worker aan (nooit vanaf file://) |
+| [sw.js](sw.js) | zonder internet spelen: altijd eerst het netwerk, anders de bewaarde kopie |
+| [js/qr.js](js/qr.js) | QR-codes maken, zonder bibliotheek |
+| [js/telefoon.js](js/telefoon.js) | bedienen met je telefoon: kamercode, berichten via ntfy.sh, QR-code op de muur |
+| [telefoon.html](telefoon.html) | de pagina op de telefoon, alles in één bestand |
 
 ### Het spel verblindde zichzelf
 

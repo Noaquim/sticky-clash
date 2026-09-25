@@ -6,6 +6,8 @@
 <title>Sticky Clash — projection mapping game</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="sticky-clash.ico">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#101217">
 <!-- los:weg -->
 <script>
   // Dubbelgeklikt als bestand? Dan laadt de browser de losse modules niet (beveiliging
@@ -38,6 +40,10 @@
       </ol>
       <p id="wizHint" class="hint">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
       <button id="btnAbort" class="hidden">Afbreken</button>
+      <div id="appInstall" class="installeer hidden">
+        <button id="btnInstall" class="klein">Installeer als app</button>
+        <p class="hint">Eigen venster en pictogram, en daarna start het spel ook zonder internet.</p>
+      </div>
     </section>
 
     <section>
@@ -70,6 +76,22 @@
         <button id="btnReset">Reset</button>
       </div>
       <label class="check"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
+    </section>
+
+    <section id="telefoon">
+      <h2>Telefoon</h2>
+      <button id="btnTelefoon">Telefoon koppelen</button>
+      <div id="telefoonVak" class="hidden">
+        <canvas id="telefoonQr" width="180" height="180" style="flex:none; width:180px; height:180px; margin:4px auto 0; background:#fff; border:0; border-radius:6px; image-rendering:pixelated"></canvas>
+        <p id="telefoonStatus" class="badge">—</p>
+        <p class="hint">Scan de code met je telefoon. Zolang er niet gespeeld wordt staat hij ook op de muur. Geen scanner? Open op je telefoon: <a id="telefoonLink" target="_blank" rel="noopener noreferrer" style="color:inherit; word-break:break-all"></a></p>
+        <label class="check"><input type="checkbox" id="telefoonMuur" checked> Code ook op de muur</label>
+        <div class="row" style="margin-top:8px">
+          <button id="btnTelefoonNieuw">Nieuwe code</button>
+          <button id="btnTelefoonStop">Stoppen</button>
+        </div>
+      </div>
+      <p class="hint">Starten, pauzeren en je naam voor de ranglijst typen vanaf je telefoon. Laptop én telefoon hebben internet nodig: de knoppen gaan via ntfy.sh, en daar wordt niets bewaard.</p>
     </section>
 
     <section id="ranglijst">
@@ -161,6 +183,8 @@
         <label class="slider">Stuiter <input type="range" id="bounce" min="0" max="95" value="58"><output id="bounceOut">0.58</output></label>
         <label class="slider">Baltempo <input type="range" id="rate" min="2" max="40" value="10"><output id="rateOut">1.0/s</output></label>
         <label class="check"><input type="checkbox" id="sound" checked> Geluid</label>
+        <label class="check"><input type="checkbox" id="muziek" checked> Muziek — zacht, alleen tijdens een ronde</label>
+        <label class="check"><input type="checkbox" id="effecten" checked> Effecten — confetti, sterretjes, COMBO en feest bij een record</label>
         <label class="check"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
         <p class="hint">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
       </section>

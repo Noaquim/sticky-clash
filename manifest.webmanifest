@@ -1,0 +1,16 @@
+{
+  "name": "Sticky Clash",
+  "short_name": "Sticky Clash",
+  "description": "Projection-mapping spel: balletjes vallen over de muur en jij stuurt ze met echte voorwerpen de bak in.",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0d10",
+  "theme_color": "#101217",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

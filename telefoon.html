@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0c0d10">
+<title>Sticky Clash — bediening</title>
+<link rel="icon" href="sticky-clash.ico">
+<!--
+  Bediening van Sticky Clash vanaf je telefoon. Je komt hier door de QR-code te scannen
+  die het spel laat zien (Telefoon koppelen). Het stuk na # in het adres is de kamercode.
+  Alles zit in dit ene bestand, zonder bibliotheken. De knoppen gaan via ntfy.sh naar de
+  laptop; zie js/telefoon.js voor hoe dat werkt.
+-->
+<style>
+:root{
+  --bg:#0c0d10; --panel:#15171c; --line:#252932; --ink:#e8eaf0; --dim:#8b93a5;
+  --acc:#ff8a1e; --ok:#3ddc84; --err:#ff6b6b;
+}
+*{box-sizing:border-box}
+html,body{margin:0; background:var(--bg); color:var(--ink)}
+body{
+  font:16px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; -webkit-text-size-adjust:100%;
+  display:flex; flex-direction:column; min-height:100vh; min-height:100dvh;
+  padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+}
+header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0 6px}
+h1{margin:0; font-size:18px; font-weight:700; letter-spacing:.02em}
+h1 em{font-style:normal; color:var(--acc)}
+.pil{font-size:12px; padding:4px 10px; border-radius:99px; background:#1d2029; color:var(--dim); text-align:right}
+.pil.ok{background:#16301f; color:var(--ok)}
+.pil.fout{background:#3a1c1c; color:#ffab8f}
+main{flex:1; display:flex; flex-direction:column; gap:14px; width:100%; max-width:520px; margin:0 auto}
+.fase{font-size:30px; font-weight:800; text-align:center; margin:14px 0 0}
+.sub{text-align:center; color:var(--dim); margin:-6px 0 0; min-height:1.4em}
+.cijfers{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.cijfer{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 8px; text-align:center}
+.cijfer span{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim)}
+.cijfer b{display:block; font-size:40px; line-height:1.2; font-weight:800; font-variant-numeric:tabular-nums}
+.cijfer b.klein{font-size:16px; line-height:3; font-weight:600; color:var(--dim)}
+.melding{min-height:1.4em; text-align:center; color:#ffd479; margin:0}
+.knoppen{display:flex; flex-direction:column; gap:12px}
+button{
+  font:inherit; font-size:20px; font-weight:700; padding:20px; border-radius:14px;
+  border:1px solid var(--line); background:#1d2029; color:var(--ink); touch-action:manipulation;
+}
+button.hoofd{background:var(--acc); border-color:var(--acc); color:#1a1000}
+button:disabled{opacity:.4}
+.verborgen{display:none !important}
+form{display:flex; flex-direction:column; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
+form label{font-weight:600}
+input{font:inherit; font-size:20px; padding:14px; border-radius:10px; border:1px solid var(--line); background:#1d2029; color:var(--ink); width:100%}
+footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Sticky <em>Clash</em></h1>
+  <span id="verbinding" class="pil">Verbinden…</span>
+</header>
+<main>
+  <p id="fase" class="fase">Even verbinden…</p>
+  <p id="sub" class="sub"></p>
+  <div class="cijfers">
+    <div class="cijfer"><span id="tijdLabel">Tijd</span><b id="tijd">–</b></div>
+    <div class="cijfer"><span id="scoreLabel">Doelpunten</span><b id="score">–</b></div>
+  </div>
+  <p id="melding" class="melding" role="status" aria-live="polite"></p>
+  <div class="knoppen">
+    <button id="kStart" class="hoofd verborgen">Start ronde</button>
+    <button id="kPauze" class="verborgen">Pauze</button>
+    <button id="kVerder" class="hoofd verborgen">Verder</button>
+    <button id="kNieuw" class="verborgen">Nieuwe ronde</button>
+    <button id="kOpnieuw" class="verborgen">Opnieuw verbinden</button>
+  </div>
+  <form id="naamVak" class="verborgen" autocomplete="off">
+    <label for="naam" id="naamVraag">Je haalt de ranglijst! Hoe heet je?</label>
+    <input id="naam" maxlength="16" autocapitalize="words" enterkeyhint="send" placeholder="Naam" spellcheck="false">
+    <button type="submit" class="hoofd">Opslaan</button>
+  </form>
+</main>
+<footer>Laptop en telefoon hebben allebei internet nodig. Via ntfy.sh gaan alleen je knoppen, de stand en de naam die je typt; er wordt niets bewaard.</footer>
+<script>
+(function () {
+  'use strict';
+  // Het doorgeefluik; hetzelfde adres als TELEFOON_RELAY in js/telefoon.js. Tests zetten
+  // vooraf window.SC_RELAY op hun eigen nep-server, en dat mag alleen op deze computer.
+  let RELAY = 'https://ntfy.sh';
+  if (typeof window.SC_RELAY === 'string' && /^http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?$/.test(window.SC_RELAY)) RELAY = window.SC_RELAY;
+  const VERSIE = 1;                                  // moet gelijk zijn aan TEL_VERSIE in js/telefoon.js
+  const FASEN = ['idle', 'count', 'play', 'paused', 'over', 'weg'];
+  const NAAM_OPSLAG = 'stickyclash.telefoon.naam';   // je eigen naam, alleen op deze telefoon
+  const ID_OPSLAG = 'stickyclash.telefoon.id';       // blijft alleen in dit tabblad
+  const $ = (id) => document.getElementById(id);
+
+  const kamer = (location.hash || '').slice(1);
+  const ik = eigenId();                              // om telefoons te tellen, meer niet
+  let es = null, herFouten = 0, herTimer = 0, openGezien = false;
+  let stand = null, ontvangen = 0, contact = false, weg = false, stilte = false;
+  let halloTijd = -1e9, halloTimer = 0;
+  let wacht = false, antwoordTimer = 0;              // knop verstuurd, antwoord nog niet binnen
+  let bezigMet = null;                               // bericht dat (opnieuw) verstuurd wordt
+  let meldingTimer = 0, verstuurdeVraag = 0, getoondeFase = '';
+
+  function willekeurig(n) {
+    const b = new Uint8Array(n);
+    crypto.getRandomValues(b);
+    let s = '';
+    for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /** Hetzelfde nummer na verversen, anders telt de laptop deze telefoon twee keer. */
+  function eigenId() {
+    try {
+      const oud = sessionStorage.getItem(ID_OPSLAG);
+      if (oud && /^[A-Za-z0-9_-]{8}$/.test(oud)) return oud;
+    } catch (x) { /* opslag geblokkeerd */ }
+    const nieuw = willekeurig(6);
+    try { sessionStorage.setItem(ID_OPSLAG, nieuw); } catch (x) { /* dan telt hij na verversen dubbel */ }
+    return nieuw;
+  }
+
+  function verbinding(tekst, soort) {
+    const el = $('verbinding');
+    el.textContent = tekst;
+    el.className = 'pil' + (soort ? ' ' + soort : '');
+  }
+
+  function melding(tekst, lang) {
+    $('melding').textContent = tekst || '';
+    clearTimeout(meldingTimer);
+    if (tekst) meldingTimer = setTimeout(() => { $('melding').textContent = ''; }, lang ? 9000 : 5000);
+  }
+
+  // ---- verbinding met ntfy.sh
+
+  function verbind() {
+    if (weg) return;
+    if (es) es.close();
+    clearTimeout(herTimer);
+    verbinding('Verbinden…');
+    const bron = new EventSource(RELAY + '/sc-' + kamer + '-t/sse');
+    es = bron;
+    // ntfy stuurt na het openen zelf ook een 'open': per verbinding maar één keer hallo zeggen
+    openGezien = false;
+    bron.onopen = () => {
+      if (es !== bron || openGezien) return;
+      openGezien = true;
+      herFouten = 0;
+      verbinding(contact ? 'Verbonden met het spel' : 'Verbonden — spel zoeken…', contact ? 'ok' : '');
+      zegHallo();
+    };
+    bron.onmessage = (e) => { if (es === bron) ontvang(e.data); };
+    bron.onerror = () => {
+      if (es !== bron) return;
+      openGezien = false;
+      if (bron.readyState === 2) {
+        // De browser geeft het op (bijvoorbeeld "te veel verzoeken"): zelf opnieuw, steeds later.
+        bron.close(); es = null;
+        herFouten++;
+        const t = Math.min(30000, 3000 * Math.pow(2, Math.min(4, herFouten - 1)));
+        verbinding('Geen verbinding — opnieuw over ' + Math.round(t / 1000) + ' s', 'fout');
+        herTimer = setTimeout(verbind, t);
+      } else {
+        verbinding('Verbinding weg — opnieuw verbinden…', 'fout');
+      }
+    };
+  }
+
+  /** Na (opnieuw) verbinden de laptop om de stand vragen. Niet vaker dan eens per 5 s. */
+  function zegHallo() {
+    clearTimeout(halloTimer);
+    if (bezigMet) return;                            // een knop is onderweg: daar komt ook de stand op terug
+    const nu = performance.now(), over = halloTijd + 5000 - nu;
+    if (over > 0) { halloTimer = setTimeout(zegHallo, over); return; }
+    halloTijd = nu;
+    stuur('hallo');
+  }
+
+  function ontvang(data) {
+    if (typeof data !== 'string' || data.length > 4000) return;
+    let e;
+    try { e = JSON.parse(data); } catch (x) { return; }
+    if (!e || e.event !== 'message' || typeof e.message !== 'string') return;
+    const s = leesStand(e.message);
+    if (!s) return;
+    if (s.andereVersie) {
+      verbinding('Andere versie', 'fout');
+      melding('Deze bediening past niet bij de versie van het spel op de laptop. Ververs deze pagina, of werk het spel bij.', true);
+      return;
+    }
+    stand = s; ontvangen = performance.now(); contact = true; stilte = false;
+    wacht = false; clearTimeout(antwoordTimer);
+    $('kOpnieuw').classList.add('verborgen');
+    if (s.fase === 'weg') {
+      weg = true;
+      if (es) { es.close(); es = null; }
+      verbinding('Gestopt', 'fout');
+    } else verbinding('Verbonden met het spel', 'ok');
+    if (s.melding) melding(s.melding);
+    toon();
+  }
+
+  /** Een stand van de laptop streng controleren: alleen bekende velden, begrensde getallen. */
+  function leesStand(t) {
+    if (t.length > 2000) return null;
+    let m;
+    try { m = JSON.parse(t); } catch (x) { return null; }
+    if (!m || typeof m !== 'object' || Array.isArray(m) || m.soort !== 'stand') return null;
+    if (m.v !== VERSIE) return typeof m.v === 'number' ? { andereVersie: true } : null;
+    if (FASEN.indexOf(m.fase) < 0) return null;
+    const getal = (x, max) => (typeof x === 'number' && isFinite(x)) ? Math.max(0, Math.min(max, x)) : 0;
+    const tekst = (x) => (typeof x === 'string' ? x.slice(0, 120) : '');
+    return {
+      fase: m.fase, bezig: m.bezig === true,
+      tijd: getal(m.tijd, 86400), telOp: m.telOp === true, aftel: getal(m.aftel, 10),
+      score: Math.floor(getal(m.score, 1e6)), tegen: Math.floor(getal(m.tegen, 1e6)), duel: m.duel === true,
+      level: Math.floor(getal(m.level, 999)),
+      vraag: Number.isInteger(m.vraag) && m.vraag > 0 && m.vraag < 1e9 ? m.vraag : 0,
+      vraagTekst: tekst(m.vraagTekst), melding: tekst(m.melding),
+    };
+  }
+
+  // ---- knoppen versturen
+
+  function post(tekst) {
+    return fetch(RELAY + '/sc-' + kamer + '-l?cache=no&firebase=no', {   // niet bewaren, niet doorsturen
+      method: 'POST', body: tekst,
+      cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer',
+    }).then((r) => r.status, () => 0);
+  }
+
+  /** Versturen; mislukt het, dan nog twee keer, steeds later. Een nieuwere knop wint. */
+  function stuur(wat, extra) {
+    const m = { v: VERSIE, soort: 'knop', wat: wat, van: ik };
+    if (extra) for (const k in extra) m[k] = extra[k];
+    if (bezigMet) clearTimeout(bezigMet.timer);
+    bezigMet = { tekst: JSON.stringify(m), wat: wat, pogingen: 0, timer: 0, sinds: performance.now() };
+    if (wat !== 'hallo') { wacht = true; toon(); }
+    probeer(bezigMet);
+  }
+
+  function probeer(b) {
+    b.pogingen++;
+    post(b.tekst).then((st) => {
+      if (b !== bezigMet) return;
+      if (st >= 200 && st < 300) {
+        bezigMet = null;
+        clearTimeout(antwoordTimer);
+        // Het antwoord kan er al zijn voordat ntfy.sh "verstuurd" meldt: dan niet meer wachten.
+        if (ontvangen < b.sinds) antwoordTimer = setTimeout(geenAntwoord, b.wat === 'hallo' ? 8000 : 9000);
+        return;
+      }
+      const druk = st === 429;
+      if (b.pogingen >= 3) {
+        bezigMet = null; wacht = false;
+        if (b.wat === 'naam') verstuurdeVraag = 0;     // het naamvak weer laten zien
+        melding(druk ? 'ntfy.sh laat even niets door (te veel berichten) — probeer het over een minuut nog eens'
+                     : 'Niet verstuurd — heeft je telefoon internet?', true);
+        if (b.wat === 'hallo') geenAntwoord(); else toon();
+        return;
+      }
+      const t = (druk ? 10000 : 2000) * Math.pow(2, b.pogingen - 1);
+      melding((druk ? 'ntfy.sh is even druk' : 'Geen verbinding') + ' — opnieuw over ' + Math.round(t / 1000) + ' s', true);
+      b.timer = setTimeout(() => { if (b === bezigMet) probeer(b); }, t);
+    });
+  }
+
+  function geenAntwoord() {
+    wacht = false;
+    if (weg) return;
+    stilte = true;
+    verbinding('Geen antwoord', 'fout');
+    if (contact) melding('Geen antwoord van het spel — staat de laptop nog aan?', true);
+    $('kOpnieuw').classList.remove('verborgen');
+    toon();
+  }
+
+  // ---- tonen
+
+  const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+  /** De fase zoals hij nu is: na het aftellen loopt de ronde, ook als dat bericht nog onderweg is. */
+  function faseNu() {
+    if (!stand) return '';
+    if (stand.fase === 'count' && (performance.now() - ontvangen) / 1000 >= stand.aftel) return 'play';
+    return stand.fase;
+  }
+
+  /** Resterende (of bij "geen tijdslimiet": gespeelde) tijd, zelf afgeteld sinds het laatste bericht. */
+  function tijdNu() {
+    const s = stand, verstreken = (performance.now() - ontvangen) / 1000;
+    let t = s.tijd;
+    if (s.fase === 'play') t = s.telOp ? t + verstreken : t - verstreken;
+    else if (s.fase === 'count' && verstreken > s.aftel) t = s.telOp ? t + verstreken - s.aftel : t - (verstreken - s.aftel);
+    t = Math.max(0, t);
+    return s.telOp ? mmss(Math.floor(t)) : mmss(Math.ceil(t - 1e-6));
+  }
+
+  function toon() {
+    const s = stand, f = faseNu();
+    getoondeFase = f;
+    const zichtbaar = { kStart: false, kPauze: false, kVerder: false, kNieuw: false };
+    let fase = 'Wachten op het spel…', sub = '';
+    if (!s && stilte) { fase = 'Het spel antwoordt niet'; sub = 'Staat "Telefoon koppelen" nog aan op de laptop, en heeft die internet?'; }
+    if (s) {
+      if (f === 'weg') { fase = 'Koppeling gestopt'; sub = 'Scan de nieuwe code in het spel om weer te koppelen.'; }
+      else if (f === 'idle') { fase = 'Klaar om te starten'; zichtbaar.kStart = true; }
+      else if (f === 'count') { fase = 'Begint over ' + Math.max(1, Math.ceil(s.aftel - (performance.now() - ontvangen) / 1000)); sub = 'zet je voorwerpen klaar'; }
+      else if (f === 'play') { fase = 'Ronde loopt'; zichtbaar.kPauze = true; }
+      else if (f === 'paused') { fase = 'Pauze'; zichtbaar.kVerder = true; zichtbaar.kNieuw = true; }
+      else if (f === 'over') { fase = 'Afgelopen'; zichtbaar.kNieuw = true; }
+      if (s.level && f !== 'weg') sub = 'Level ' + s.level + (sub ? ' — ' + sub : '');
+      if (s.bezig && f !== 'weg') sub = 'Het spel stelt zich in — even geduld';
+    }
+    $('fase').textContent = fase;
+    $('sub').textContent = sub;
+    for (const id in zichtbaar) {
+      const b = $(id);
+      b.classList.toggle('verborgen', !zichtbaar[id]);
+      b.disabled = wacht || !!(s && s.bezig);
+    }
+    // bij "afgelopen" is Nieuwe ronde de grote knop
+    $('kNieuw').classList.toggle('hoofd', f === 'over');
+    // doelpunten: tijdens de ronde staan ze op de muur, en die telefoon krijgt ze pas bij pauze of einde
+    const sc = $('score');
+    if (!s || f === 'weg') { sc.textContent = '–'; sc.className = ''; }
+    else if (f === 'play' || f === 'count') { sc.textContent = 'op de muur'; sc.className = 'klein'; }
+    else { sc.textContent = s.duel ? s.score + ' – ' + s.tegen : String(s.score); sc.className = ''; }
+    $('scoreLabel').textContent = s && s.duel ? 'Aanvaller – verdediger' : 'Doelpunten';
+    $('tijdLabel').textContent = s && s.telOp ? 'Gespeeld' : 'Tijd';
+    $('tijd').textContent = s && f !== 'weg' ? tijdNu() : '–';
+    // naam voor de ranglijst
+    const vraag = s && f === 'over' && s.vraag && s.vraag !== verstuurdeVraag;
+    const vak = $('naamVak');
+    if (vraag && vak.classList.contains('verborgen')) {
+      $('naamVraag').textContent = s.vraagTekst || 'Je haalt de ranglijst! Hoe heet je?';
+      let bewaard = '';
+      try { bewaard = localStorage.getItem(NAAM_OPSLAG) || ''; } catch (x) { /* opslag geblokkeerd */ }
+      if (!$('naam').value) $('naam').value = bewaard.slice(0, 16);
+    }
+    vak.classList.toggle('verborgen', !vraag);
+  }
+
+  function tik() {
+    if (!stand) return;
+    if (faseNu() !== getoondeFase || stand.fase === 'count') toon();
+    else $('tijd').textContent = stand.fase !== 'weg' ? tijdNu() : '–';
+  }
+
+  // ---- beginnen
+
+  let schermWakker = null;
+  function wakker() {
+    // Scherm aan laten tijdens het spelen, als de telefoon dat kan.
+    try {
+      if (!schermWakker && navigator.wakeLock) {
+        navigator.wakeLock.request('screen').then((w) => {
+          schermWakker = w;
+          w.addEventListener('release', () => { schermWakker = null; });
+        }, () => {});
+      }
+    } catch (x) { /* dan niet */ }
+  }
+  const knop = (id, wat) => $(id).addEventListener('click', () => { wakker(); melding(''); stuur(wat); });
+  knop('kStart', 'start');
+  knop('kPauze', 'pauze');
+  knop('kVerder', 'verder');
+  knop('kNieuw', 'nieuw');
+  $('kOpnieuw').addEventListener('click', () => {
+    $('kOpnieuw').classList.add('verborgen');
+    verbinding('Verbinden…');
+    halloTijd = -1e9;
+    if (!es) verbind(); else zegHallo();
+  });
+  $('naamVak').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const naam = $('naam').value.replace(/\s+/g, ' ').trim().slice(0, 16);
+    if (!stand || !stand.vraag) return;
+    try { if (naam) localStorage.setItem(NAAM_OPSLAG, naam); } catch (x) { /* opslag geblokkeerd */ }
+    verstuurdeVraag = stand.vraag;
+    $('naam').blur();
+    stuur('naam', { naam: naam, vraag: stand.vraag });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || weg) return;
+    // Terug uit de slaapstand: verbinding herstellen en de stand opnieuw vragen.
+    if (!es) { herFouten = 0; verbind(); } else if (es.readyState === 1) zegHallo();
+  });
+  // Nieuwe code gescand terwijl deze pagina nog openstond: dan verandert alleen het stuk
+  // na de #, en laadt de browser niets opnieuw. Dan doen we dat zelf.
+  window.addEventListener('hashchange', () => location.reload());
+
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(kamer)) {
+    weg = true;                                      // nergens mee verbinden, ook niet later
+    verbinding('Geen code', 'fout');
+    $('fase').textContent = 'Geen spelcode gevonden';
+    $('sub').textContent = 'Klik in het spel op "Telefoon koppelen" en scan de QR-code opnieuw.';
+    return;
+  }
+  toon();
+  verbind();
+  setInterval(tik, 250);
+})();
+</script>
+</body>
+</html>

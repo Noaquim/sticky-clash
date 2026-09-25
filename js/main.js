@@ -2,6 +2,8 @@ import { Vision, DEFAULT_CLASSES, inConvex } from './vision.js';
 import { computeHomography, applyH, invertH } from './homography.js';
 import { Game, normalizePoly } from './game.js';
 import { Sfx } from './audio.js';
+import { startApp } from './app.js';
+import { Telefoon } from './telefoon.js';
 
 const $ = (id) => document.getElementById(id);
 const CAL_TARGETS = [[0.08, 0.10], [0.92, 0.10], [0.92, 0.90], [0.08, 0.90]];
@@ -110,6 +112,7 @@ function save() {
       goalSpeed: +$('goalSpeed').value,
       wind: +$('wind').value,
       outline: $('outline').checked,
+      sound: $('sound').checked, muziek: $('muziek').checked, effecten: $('effecten').checked,
       strict: +$('strict').value,
       camId: app.camId || '',
       camChosen: app.camChosen,
@@ -159,6 +162,7 @@ function load() {
     if (s.moveSource != null) $('moveSource').checked = s.moveSource;
     if (s.moveGoal != null) $('moveGoal').checked = s.moveGoal;
     if (s.outline != null) $('outline').checked = s.outline;
+    for (const k of ['sound', 'muziek', 'effecten']) if (s[k] != null) $(k).checked = !!s[k];
     if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0 };
     if (s.camId) app.camId = s.camId;
     if (s.camChosen != null) app.camChosen = !!s.camChosen;
@@ -1098,7 +1102,9 @@ $('resident').onchange = e => {
   status(al ? al + (al === 1 ? ' voorwerp hing' : ' voorwerpen hingen') + ' er al, die tellen nu mee'
             : 'Er hing niets op de muur toen hij geleerd werd', 'ok');
 };
-$('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); };
+$('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
+$('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
+$('effecten').onchange = e => { game.effects = e.target.checked; save(); };
 $('outline').onchange = e => { game.showOutlines = e.target.checked; save(); };
 $('testMode').onchange = e => {
   app.testMode = e.target.checked;
@@ -1207,6 +1213,22 @@ $('btnScoresWis').onclick = () => {
   try { localStorage.setItem(RANG, JSON.stringify(r)); } catch { /* opslag geblokkeerd */ }
   toonRang();
 };
+
+// Bedienen met je telefoon (zie js/telefoon.js): zijn knoppen lopen via dezelfde knoppen
+// als in het paneel, en een naam voor de ranglijst via bewaarNaam.
+const telefoon = new Telefoon(game, {
+  bezig: () => app.busy,
+  vraag: () => app.pendingScore,
+  vraagTekst: () => $('naamVraag').textContent,
+  knop: (id) => $(id).click(),
+  bewaarNaam: (naam) => { $('naam').value = naam; bewaarNaam(); },
+  status,
+  gebaar: () => sfx.resume(),
+  // de waarschuwingsbalk onderin de muur (zie drawScene), als deel van de hoogte
+  onderbalk: () => (!app.H && !app.testMode) ? 0.13
+    : (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready ? 0.11 : 0),
+});
+telefoon.koppelPaneel(document);
 
 /**
  * Diagnosefoto: camerabeeld met omlijningen, wat het spel als voorgrond ziet, wat de
@@ -1767,6 +1789,10 @@ function drawScene(ctx, w, h) {
     ctx.fillText('Muur nog niet geleerd', w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
+
+  // De QR-code voor de telefoon, alleen buiten een ronde. Hier getekend, zodat hij ook in
+  // de lichtvoorspelling zit en de camera hem niet voor een voorwerp aanziet.
+  telefoon.tekenMuur(ctx, w, h);
 }
 
 const maskTmp = document.createElement('canvas');
@@ -1920,6 +1946,8 @@ function frame(now) {
 
   const before = game.state;
   game.update(dt);
+  // Muziek alleen tijdens het spelen; sneller in de laatste tien seconden en per level.
+  sfx.muziek.volg(game.state, game.laatsteTien(), game.level);
   if (before !== game.state) {
     if (game.state === 'over') {
       app.best[vision.mode] = Math.max(app.best[vision.mode] || 0, game.best);
@@ -1932,6 +1960,7 @@ function frame(now) {
       $('btnPlay').textContent = 'Pauze';
     }
   }
+  telefoon.bijwerken(now);
 
   // Als bijna het hele beeld ineens voorgrond is, klopt de geleerde muur niet
   // meer — meestal omdat iemand het licht aan of uit deed.
@@ -1999,6 +2028,9 @@ $('fillAuto').checked = app.fillAuto;
 $('lockExp').checked = app.lockExposure;
 game.fill = app.fill;
 game.showOutlines = $('outline').checked;
+sfx.on = $('sound').checked;
+sfx.muziek.aan = $('muziek').checked;
+game.effects = $('effecten').checked;
 applySpel();
 game.reset();
 game.time = +$('roundLen').value;
@@ -2016,6 +2048,7 @@ if (location.protocol === 'file:') {
     'Wil je dat hij het onthoudt, start dan via start.bat.';
 }
 loadScreens(false);
+startApp();
 vision.insideFn = inProjection;
 vision.onFormatChange = () => {
   debug.width = vision.vw; debug.height = vision.vh;
@@ -2026,4 +2059,4 @@ vision.onFormatChange = () => {
 requestAnimationFrame(frame);
 
 // handig bij het afstellen: in de console beschikbaar als window.sc
-window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam };
+window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon };
