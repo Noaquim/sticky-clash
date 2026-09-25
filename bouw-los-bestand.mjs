@@ -54,6 +54,8 @@ export function bouw() {
   // het pictogram komt er ingebakken in; een verwijzing naar het losse bestand zou
   // falen als iemand alleen sticky-clash.html doorstuurt
   html = html.replace(/[ \t]*<link rel="icon" href="sticky-clash\.ico">\n?/, '');
+  // installeren als app kan niet vanaf file://; de browser zou het manifest vergeefs zoeken
+  html = html.replace(/[ \t]*<link rel="manifest" href="manifest\.webmanifest">\n?/, '');
   const css = read('css/style.css').replace(/<\/style/gi, '<\\/style');
   const cssTag = /<link[^>]+href=["']css\/style\.css["'][^>]*>/;
   const jsTag = /<script\s+type=["']module["'][^>]*src=["']js\/main\.js["'][^>]*><\/script>/;

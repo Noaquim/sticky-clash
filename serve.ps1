@@ -16,6 +16,7 @@ $types = @{
   '.json' = 'application/json; charset=utf-8'; '.ico' = 'image/x-icon'; '.png' = 'image/png'
   '.jpg' = 'image/jpeg'; '.svg' = 'image/svg+xml'; '.wasm' = 'application/wasm'
   '.md' = 'text/plain; charset=utf-8'
+  '.gif' = 'image/gif'; '.webmanifest' = 'application/manifest+json'
 }
 
 $l = New-Object System.Net.HttpListener

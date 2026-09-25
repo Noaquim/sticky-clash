@@ -78,6 +78,7 @@ button.big{padding:12px; font-size:15px; font-weight:600}
 .quick{background:#181b22}
 .camkeuze{display:block; margin-top:10px; font-size:12px; color:var(--dim)}
 .camkeuze select{margin:4px 0 0}
+.installeer{margin-top:10px}
 input[type=text]{flex:1; min-width:0; padding:7px; border-radius:7px; background:#1d2029; color:var(--ink); border:1px solid var(--line); font:inherit}
 .scores{margin:6px 0 8px; padding-left:22px; font-size:13px}
 .scores li{padding:2px 0}
