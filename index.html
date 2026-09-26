@@ -8,6 +8,13 @@
 <link rel="icon" href="sticky-clash.ico">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#101217">
+<meta name="description" content="Stick notes on the wall, the balls bounce off them. A free projection-mapping game in your browser; also plays on a screen, or try it without a camera.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sticky Clash">
+<meta property="og:description" content="Stick notes on the wall, the balls bounce off them. A free projection-mapping game in your browser; also plays on a screen, or try it without a camera.">
+<meta property="og:url" content="https://noaquim.github.io/sticky-clash/">
+<meta property="og:image" content="https://noaquim.github.io/sticky-clash/docs/social.png">
+<meta name="twitter:card" content="summary_large_image">
 <!-- los:weg -->
 <script>
   // Dubbelgeklikt als bestand? Dan laadt de browser de losse modules niet (beveiliging
@@ -16,7 +23,7 @@
 </script>
 <!-- /los:weg -->
 </head>
-<body>
+<body class="plek-muur">
 <header>
   <h1>Sticky <em>Clash</em></h1>
   <div id="status" class="status">Klik op "Alles automatisch instellen"</div>
@@ -28,20 +35,54 @@
 <main>
   <aside class="panel">
 
+    <section id="welkom" class="welkom hidden" aria-labelledby="welkomKop">
+      <h2 id="welkomKop">Welkom! Hoe wil je spelen?</h2>
+      <button class="plekknop" data-plek="muur"><b>Muur + beamer</b><span>Webcam en beamer: de ballen vallen over je muur.</span></button>
+      <button class="plekknop" data-plek="scherm"><b>Scherm, zonder beamer</b><span>De camera kijkt naar een tafel, muur of bord; je speelt op dit scherm.</span></button>
+      <p class="hint camniet hidden"></p>
+      <button class="plekknop demo" data-plek="demo"><b>Probeer zonder camera</b><span>Meteen spelen met je muis of vinger. Niets installeren of toestaan.</span></button>
+    </section>
+
     <section class="quick">
-      <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
-      <label class="camkeuze">Camera
+      <div class="plekkeuze">
+        <span>Speelplek</span>
+        <div class="seg" id="plekSeg" role="group" aria-label="Speelplek">
+          <button data-plek="muur">Beamer</button>
+          <button data-plek="scherm">Scherm</button>
+          <button data-plek="demo">Demo</button>
+        </div>
+      </div>
+      <div class="alleen-muur">
+        <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
+      </div>
+      <div class="alleen-scherm">
+        <button id="btnScherm" class="primary big">Start op dit scherm</button>
+        <p class="hint">Zet de camera boven een tafel of tegenover een muur met briefjes; gebruik eventueel je telefoon als webcam. Handen tellen niet mee, voorwerpen wel.</p>
+      </div>
+      <div class="alleen-demo">
+        <button id="btnDemo" class="primary big">Speel de demo</button>
+        <p class="hint">Met je muis of vinger: sleep de briefjes, teken nieuwe en kijk hoe de ballen kaatsen. Zonder camera.</p>
+        <p class="hint">Heb je een webcam? Speel echt: kies hierboven Beamer of Scherm.</p>
+      </div>
+      <p class="hint camniet alleen-camera hidden"></p>
+      <label class="camkeuze alleen-camera">Camera
         <select id="camSelect"><option value="">Automatisch — losse webcam als die er is</option></select>
       </label>
-      <p class="hint">Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.</p>
-      <ol class="steps" id="steps">
+      <p class="hint alleen-camera">Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.</p>
+      <label class="check alleen-scherm"><input type="checkbox" id="schermSpiegel"> Spiegelen — voor een camera die naar jou kijkt</label>
+      <ol class="steps alleen-muur" id="steps">
         <li data-k="proj">Beamer</li>
         <li data-k="cam">Camera</li>
         <li data-k="cal">Kalibratie</li>
         <li data-k="bg">Muur geleerd</li>
         <li data-k="goal">Doel gevonden</li>
       </ol>
-      <p id="wizHint" class="hint">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
+      <ol class="steps alleen-scherm">
+        <li data-k="cam">Camera</li>
+        <li data-k="bg">Lege ondergrond geleerd</li>
+      </ol>
+      <button id="btnSchermLeer" class="alleen-scherm">Opnieuw leren</button>
+      <p id="wizHint" class="hint alleen-muur">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
       <button id="btnAbort" class="hidden">Afbreken</button>
       <div id="appInstall" class="installeer hidden">
         <button id="btnInstall" class="klein">Installeer als app</button>
@@ -49,7 +90,7 @@
       </div>
     </section>
 
-    <section>
+    <section class="alleen-camera">
       <h2>Speelmodus</h2>
       <div class="seg" id="modeSeg">
         <button data-mode="object" class="on">Elk voorwerp</button>
@@ -58,14 +99,14 @@
       <p id="modeHint" class="hint"></p>
       <label class="slider">Gevoeligheid <input type="range" id="sens" min="0" max="100" value="60"><output id="sensOut">60</output></label>
       <p class="hint">Hoger = pakt ook zwakkere verschillen op. Te hoog en de hele muur licht op.</p>
-      <label class="slider">Muurverlichting <input type="range" id="fill" min="0" max="80" value="25"><output id="fillOut">25%</output></label>
-      <label class="check"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
-      <p class="hint">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
+      <label class="slider alleen-muur">Muurverlichting <input type="range" id="fill" min="0" max="80" value="25"><output id="fillOut">25%</output></label>
+      <label class="check alleen-muur"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
+      <p class="hint alleen-muur">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
       <label class="check"><input type="checkbox" id="noPeople" checked> Mensen negeren</label>
       <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
       <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
       <div class="row">
-        <button id="btnBg" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
+        <button id="btnBg" class="alleen-muur" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
         <button id="btnGoal">Doel aanwijzen</button>
       </div>
       <p id="live" class="live">—</p>
@@ -78,7 +119,7 @@
         <button id="btnPlay" class="primary big">Start ronde</button>
         <button id="btnReset">Reset</button>
       </div>
-      <label class="check"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
+      <label class="check alleen-muur"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
     </section>
 
     <section id="telefoon">
@@ -137,17 +178,17 @@
     <details>
       <summary>Meer instellingen</summary>
 
-      <section>
+      <section class="alleen-camera">
         <h2>Camera</h2>
         <div class="row">
           <button id="btnCam">Camera starten</button>
-          <button id="btnFlip">Spiegelen</button>
+          <button id="btnFlip" class="alleen-muur">Spiegelen</button>
         </div>
-        <label class="check"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
-        <p class="hint">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
+        <label class="check alleen-muur"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
+        <p class="hint alleen-muur">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
       </section>
 
-      <section>
+      <section class="alleen-muur">
         <h2>Beamer</h2>
         <div class="row">
           <button id="btnProj">Venster openen</button>
@@ -158,7 +199,7 @@
         <p class="hint">Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.</p>
       </section>
 
-      <section>
+      <section class="alleen-muur">
         <h2>Kalibratie</h2>
         <div class="row">
           <button id="btnCalAuto">Automatisch</button>
@@ -169,7 +210,7 @@
         <label class="check"><input type="checkbox" id="autoRecal" checked> Vanzelf opnieuw instellen als de camera of beamer verschuift</label>
       </section>
 
-      <section>
+      <section class="alleen-camera">
         <h2>Kleuren <span class="only-color">(duelmodus)</span></h2>
         <div id="classList"></div>
         <p class="hint">Klik "Leren" en klik daarna op het voorwerp in het camerabeeld.</p>
@@ -188,8 +229,8 @@
         <label class="check"><input type="checkbox" id="sound" checked> Geluid</label>
         <label class="check"><input type="checkbox" id="muziek" checked> Muziek — zacht, alleen tijdens een ronde</label>
         <label class="check"><input type="checkbox" id="effecten" checked> Effecten — confetti, sterretjes, COMBO en feest bij een record</label>
-        <label class="check"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
-        <p class="hint">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
+        <label class="check alleen-muur"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
+        <p class="hint alleen-muur">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
       </section>
 
       <section class="foot">
@@ -200,7 +241,7 @@
   </aside>
 
   <div class="stage">
-    <div class="pane">
+    <div class="pane alleen-camera">
       <div class="pane-head">
         <span>Camera</span>
         <div class="tabs">
@@ -211,11 +252,40 @@
       <canvas id="debug" width="320" height="240"></canvas>
     </div>
     <div class="pane">
-      <div class="pane-head"><span>Wat de beamer laat zien</span><span id="fps" class="fps"></span></div>
+      <div class="pane-head"><span class="alleen-muur">Wat de beamer laat zien</span><span class="alleen-scherm">Het speelveld, over het camerabeeld</span><span class="alleen-demo">Het speelveld</span><span id="fps" class="fps"></span></div>
       <canvas id="world" width="640" height="360"></canvas>
     </div>
   </div>
 </main>
+
+<!-- Het speelscherm: de demo en spelen op een scherm, groot, over het hele venster (zie js/main.js). -->
+<div id="speelvenster" class="speelvenster hidden" role="dialog" aria-label="Speelscherm">
+  <div class="sv-balk">
+    <b class="sv-naam"><span class="alleen-demo">Demo</span><span class="alleen-scherm">Op dit scherm</span></b>
+    <span id="svStatus" class="sv-status"></span>
+    <button id="svStart" class="primary">Start ronde</button>
+    <button id="svLeer" class="alleen-scherm">Opnieuw leren</button>
+    <button id="svSpiegel" class="alleen-scherm">Spiegelen</button>
+    <button id="svBegin" class="alleen-demo">Beginstand</button>
+    <button id="svVol" class="sv-icoon" title="Volledig scherm" aria-label="Volledig scherm">⛶</button>
+    <button id="svSluit" class="sv-icoon" title="Sluiten" aria-label="Sluiten">×</button>
+  </div>
+  <div id="svVeld" class="sv-veld"><canvas id="svCanvas" width="640" height="360"></canvas></div>
+  <div class="sv-voet">
+    <div id="svPalet" class="sv-palet alleen-demo" role="group" aria-label="Soort briefje">
+      <button data-soort="los" class="on"><i style="background:#ffd84d"></i>Briefje</button>
+      <button data-soort="trampoline"><i style="background:#ff4d4d"></i>Trampoline</button>
+      <button data-soort="booster"><i style="background:#3ddc84"></i>Turbo</button>
+      <button data-soort="breek"><i style="background:#3aa0ff"></i>Breekt</button>
+    </div>
+    <p class="hint alleen-demo">Sleep een briefje om het te verplaatsen, of sleep op een lege plek voor een nieuw briefje. Weghalen: dubbeltik erop of tik op het ×. De bak en de balbron kun je ook verslepen.</p>
+    <p class="hint alleen-scherm">Zet de camera boven een tafel of tegenover een muur met briefjes; gebruik eventueel je telefoon als webcam. Handen tellen niet mee, voorwerpen wel.</p>
+    <p class="hint alleen-scherm">Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen. De bak en de balbron versleep je met de muis of je vinger.</p>
+    <p class="hint camniet alleen-scherm hidden"></p>
+    <div class="sv-cta alleen-demo"><b>Heb je een webcam? Speel echt:</b><button data-plek="muur">Muur + beamer</button><button data-plek="scherm">Scherm</button></div>
+    <div id="svNaam"></div>
+  </div>
+</div>
 
 <script type="module" src="js/main.js" onerror="var k='';try{k=localStorage.getItem('stickyclash.taal')}catch(e){}if(k!='nl'&&k!='en')k=/^nl/i.test((navigator.languages||[])[0]||navigator.language||'')?'nl':'en';document.getElementById('status').textContent=k=='nl'?'Kon het spel niet laden — open sticky-clash.html, of start via start.bat':'Couldn\'t load the game — open sticky-clash.html, or start it with start.bat'"></script>
 </body>

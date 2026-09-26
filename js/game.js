@@ -311,6 +311,12 @@ export class Game {
     // Eigen toeval voor de effecten, los van Math.random: zo verandert confetti niets aan
     // het spelverloop, en niets aan de tests die Math.random vastzetten.
     this.fxSeed = 0x2545f491;
+    // Spelen zonder beamer (zie js/speelplek.js). onderlaag(ctx, cw, ch) tekent de
+    // achtergrond in plaats van de muurverlichting: op een scherm het camerabeeld. papier:
+    // de obstakels als gekleurde briefjes tekenen (de demo, zonder camera): ob.kleur, of
+    // de kleur van de soort.
+    this.onderlaag = null;
+    this.papier = false;
   }
 
   setAspect(ar) {
@@ -1219,10 +1225,14 @@ export class Game {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Achtergrond is de muurverlichting. In een donkere kamer is de beamer de enige
-    // lichtbron op de muur: bij zwart ziet de camera de voorwerpen niet.
-    const f = Math.round(Math.max(0, Math.min(1, this.fill || 0)) * 255);
-    ctx.fillStyle = 'rgb(' + f + ',' + f + ',' + f + ')';
-    ctx.fillRect(0, 0, cw, ch);
+    // lichtbron op de muur: bij zwart ziet de camera de voorwerpen niet. Op een scherm
+    // (zonder beamer) tekent onderlaag hier het camerabeeld.
+    if (this.onderlaag) this.onderlaag(ctx, cw, ch);
+    else {
+      const f = Math.round(Math.max(0, Math.min(1, this.fill || 0)) * 255);
+      ctx.fillStyle = 'rgb(' + f + ',' + f + ',' + f + ')';
+      ctx.fillRect(0, 0, cw, ch);
+    }
     ctx.translate((cw - this.W * sc) / 2, 0);
     ctx.scale(sc, sc);
 
@@ -1239,6 +1249,7 @@ export class Game {
     if (this.bonusOn && (this.bonusLive() || this.state === 'paused')) this.drawBonus(ctx);
     this.drawSource(ctx);
     if (this.wind) this.drawWind(ctx);
+    if (this.papier) this.drawPapier(ctx);
     if (this.showOutlines !== false) this.drawObstacles(ctx);
     if (this.special) this.drawSpecials(ctx);
     this.drawBalls(ctx);
@@ -1280,6 +1291,54 @@ export class Game {
       ctx.globalAlpha = 1;
       ctx.setLineDash([]);
     }
+  }
+
+  /**
+   * De briefjes zelf, als gekleurd papier met een schaduwtje eronder (de demo: daar is
+   * geen echte muur met echte briefjes). Een kapotte blauwe muur is even een vage
+   * stippellijn. Nooit op een beamer met camera: licht op een voorwerp verstopt het.
+   */
+  drawPapier(ctx) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    for (const ob of this.obstacles) {
+      const kind = this.kindOf(ob), p = ob.poly;
+      const st = kind === 'breek' ? this.breakState(ob, false) : null;
+      const broken = !!(st && st.left > 0);
+      const col = ob.kleur || (kind ? KIND_STYLE[kind].col : '#ffd84d');
+      if (broken) {
+        this.papierPad(ctx, p, 0, 0);
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = col; ctx.lineWidth = 3;
+        ctx.setLineDash([10, 9]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      ctx.globalAlpha = ob.pending ? 0.45 : 1;
+      // Schaduw: dezelfde vorm iets lager, donker. (Een wazige schaduw is op een telefoon
+      // elk beeldje veel rekenwerk.)
+      this.papierPad(ctx, p, 3, 7);
+      ctx.fillStyle = 'rgba(0,0,0,.4)';
+      ctx.fill();
+      this.papierPad(ctx, p, 0, 0);
+      ctx.fillStyle = col;
+      ctx.fill();
+      // een donkerder randje, zodat twee briefjes van dezelfde kleur los blijven
+      ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  /** De omtrek van een briefje als pad, dx, dy verschoven. */
+  papierPad(ctx, p, dx, dy) {
+    ctx.beginPath();
+    ctx.moveTo(p[0][0] + dx, p[0][1] + dy);
+    for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0] + dx, p[i][1] + dy);
+    ctx.closePath();
   }
 
   /**

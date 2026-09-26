@@ -29,6 +29,7 @@ WAT STAAT WAAR
   js/game.js            het spel zelf: ballen, zwaartekracht, punten, de bak, kleuren,
                         en de effecten op de muur (confetti, sterretjes, COMBO, vuurwerk)
   js/main.js            het paneel, de knoppen, de wizard, wat er op de beamer komt
+  js/speelplek.js       waar je speelt: muur + beamer, scherm, of de demo zonder camera
   js/vision.js          de camera en het herkennen van voorwerpen (lastig, pas op)
   js/homography.js      het omrekenen van camerabeeld naar beamerbeeld (wiskunde)
   js/audio.js           de geluidjes
@@ -79,6 +80,12 @@ MAKKELIJKE AANPASSINGEN
     Tempo                       const MUZIEK_TEMPO = 120;    (tellen per minuut)
     Sneller op het eind         const MUZIEK_SPURT = 1.25;   (1.25 = een kwart sneller)
     Het deuntje zelf            const MUZIEK_AKKOORDEN       (vier maten, als MIDI-noten)
+  De demo zonder camera (in js/speelplek.js):
+    Kleur gewone briefjes       export const DEMO_KLEUREN
+                                (geen rood, groen of blauw: die zijn voor de
+                                 speciale briefjes)
+    Meeste briefjes tegelijk    export const DEMO_MAX = 20;
+    De beginopstelling          export function demoOpstelling(  (bron, bak, briefjes)
   Verander je een getal dat ook in een tekst staat (5 tikken, 20 seconden), pas dan
   ook die tekst aan: zie TEKSTEN VERANDEREN.
   Geluid, muziek en effecten zet je los uit onder Meer instellingen > Spel.

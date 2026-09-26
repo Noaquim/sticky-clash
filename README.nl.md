@@ -10,9 +10,9 @@ muur; jij stuurt ze met echte voorwerpen de bak in.
 Draait volledig in de browser. Geen installatie, geen libraries.
 
 **Speel meteen online: https://noaquim.github.io/sticky-clash/** — open de link in Chrome of
-Edge, sta de camera toe, klaar. Niets downloaden of installeren. Liever zonder internet?
-Download `sticky-clash.html` (het hele spel in één bestand) of de hele map via
-*Code → Download ZIP*.
+Edge, sta de camera toe, klaar. Niets downloaden of installeren. Geen beamer, of zelfs geen
+camera? Dan kan het ook, zie hieronder. Liever zonder internet? Download `sticky-clash.html`
+(het hele spel in één bestand) of de hele map via *Code → Download ZIP*.
 
 ![Ballen stuiteren over briefjes op een muur naar de bak](docs/demo.gif)
 
@@ -21,15 +21,42 @@ Download `sticky-clash.html` (het hele spel in één bestand) of de hele map via
 Iedereen mag het spel gebruiken, aanpassen en delen (MIT-licentie, zie `LICENSE`). Zelf
 sleutelen: lees **ZELF AANPASSEN.txt**.
 
+## Drie manieren om te spelen
+
+Bij je eerste bezoek vraagt het spel hoe je wilt spelen. Later wissel je bovenaan het paneel,
+bij **Speelplek** (Beamer · Scherm · Demo). Het spel onthoudt je keuze.
+
+- **Muur + beamer** — de echte ervaring. Je hebt een beamer, een webcam en een effen muur
+  nodig. De ballen vallen over je muur, en briefjes en voorwerpen die je ertegen houdt
+  kaatsen ze terug.
+- **Scherm, zonder beamer** — je hebt alleen een webcam nodig, of je telefoon als webcam.
+  De camera kijkt naar een tafel, een muur of een bord; het spel staat op je scherm, over
+  het camerabeeld heen. Leg briefjes of voorwerpen neer: dat zijn de obstakels. Handen
+  tellen niet mee. Zet de camera het liefst recht boven de tafel. Kijkt hij naar jou (de
+  camera in je laptop), dan spiegelt het spel het beeld vanzelf; zijn links en rechts toch
+  om, klik dan op **Spiegelen**.
+- **Probeer zonder camera** — je hebt niets nodig. Meteen spelen met je muis of je vinger:
+  sleep de briefjes, teken nieuwe (rood = trampoline, groen = turbo, blauw = breekt),
+  dubbeltik of tik op het × om er een weg te halen. Werkt ook op een telefoon of tablet,
+  en op een andere site ingesloten (zoals op itch.io): de demo vraagt nooit om de camera.
+
+Staat het spel ingesloten op een andere site, dan mag de camera daar vaak niet, en een
+beamervenster ook niet. Het spel zegt dat dan, met een link om het in een eigen tabblad te
+openen.
+
 ## In het kort
 
-1. Dubbelklik **`sticky-clash.html`** (of op Windows de snelkoppeling / `start.bat`)
-2. Klik op **Alles automatisch instellen** en sta de camera toe
-3. Volg de aanwijzingen die op de muur verschijnen
+1. Dubbelklik **`sticky-clash.html`** (of op Windows de snelkoppeling / `start.bat`), of
+   open de link hierboven
+2. Kies hoe je speelt. De demo begint meteen.
+3. Met een beamer: klik op **Alles automatisch instellen**, sta de camera toe en volg de
+   aanwijzingen op de muur. Op een scherm: sta de camera toe en haal je handen even uit
+   beeld terwijl het spel de lege tafel leert.
 4. **Start ronde**
 
-Dat is alles. De kalibratie gaat vanzelf: het spel projecteert een wit vlak en vier
-stippen en zoekt ze zelf terug in het camerabeeld.
+Dat is alles. Met een beamer gaat de kalibratie vanzelf: het spel projecteert een wit vlak
+en vier stippen en zoekt ze zelf terug in het camerabeeld. Op een scherm is er niets te
+kalibreren: het camerabeeld is het speelveld.
 
 ## Nederlands of Engels
 
@@ -87,11 +114,13 @@ waarin je speelt.
 
 ## Wat je nodig hebt
 
-- Een beamer op een effen muur
-- Een webcam die het hele beamervlak ziet
+- **Met een beamer:** een beamer op een effen muur, een webcam die het hele beamervlak ziet,
+  en een emmer, prullenbak of doos als doel
+- **Op een scherm:** alleen een webcam (of je telefoon als webcam) die de tafel, muur of het
+  bord ziet. De bak staat op het scherm.
+- **Zonder camera (de demo):** niets. Met `sticky-clash.html` zelfs geen internet.
 - Voor de voorwerpmodus: spullen die je bij de hand hebt
 - Voor de duelmodus: post-its in twee duidelijk verschillende kleuren
-- Een emmer, prullenbak of doos als doel
 
 ## Starten — op elke computer
 
@@ -273,6 +302,9 @@ nog vastgezette belichting van een vorige keer terug op automatisch.
 Vink **Testmodus** aan. Sleep met de muis in de rechter weergave om een obstakel te maken
 (`Shift` = blauw), `Alt` + klik zet het doel, `Ctrl` + klik de balbron, rechtermuisknop
 wist alles.
+
+Of kies bij **Speelplek** de **Demo**: dan speel je zonder camera, met gekleurde briefjes
+die je sleept en tekent, ook met je vinger op een telefoon.
 
 ## Mensen tellen niet mee, het voorwerp in je hand wel
 
@@ -529,6 +561,7 @@ node test/qr.mjs            # QR-codes, teruggelezen met een eigen decoder
 node test/telefoon.mjs      # bedienen met je telefoon: berichten, zuinig versturen, QR op de muur
 node test/taal.mjs          # Engelse versie: alles vertaald, geen Nederlands buiten t(), telefoon.html
 node test/gids.mjs          # ZELF AANPASSEN.txt en CUSTOMIZE.txt: elk stukje code staat echt in dat bestand
+node test/speelplek.mjs     # drie speelplekken: welkomstkeuze, demo-opstelling (en speelt hij?), briefjes, scherm, camera ingesloten
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code
@@ -555,7 +588,8 @@ afgewogen.
 | [js/game.js](js/game.js) | physics: cirkel tegen convexe veelhoek, scoren, tekenen |
 | [js/audio.js](js/audio.js) | gesynthetiseerd geluid, geen audiobestanden |
 | [js/muziek.js](js/muziek.js) | achtergrondmuziek, vooruit ingepland op de klok van de geluidskaart |
-| [js/main.js](js/main.js) | wizard, automatische kalibratie, beamervenster, testmodus |
+| [js/main.js](js/main.js) | wizard, automatische kalibratie, beamervenster, testmodus, welkomstkaartje en speelscherm |
+| [js/speelplek.js](js/speelplek.js) | muur, scherm of demo: de keuze bij het opstarten, de briefjes van de demo, het speelveld op een scherm |
 | [js/app.js](js/app.js) | installeren als app; meldt de service worker aan (nooit vanaf file://) |
 | [sw.js](sw.js) | zonder internet spelen: altijd eerst het netwerk, anders de bewaarde kopie |
 | [js/qr.js](js/qr.js) | QR-codes maken, zonder bibliotheek |
@@ -563,6 +597,22 @@ afgewogen.
 | [telefoon.html](telefoon.html) | de pagina op de telefoon, alles in één bestand |
 | [js/taal.js](js/taal.js) | de taalkeuze NL \| EN, en `t()` dat een Nederlandse zin vertaalt |
 | [js/taal-en.js](js/taal-en.js) | het Engelse woordenboek: links Nederlands, rechts Engels |
+
+### Zonder beamer: op een scherm en de demo
+
+Op een scherm is het hele camerabeeld het speelveld. Er valt dus niets te kalibreren: de
+omrekening van camera naar spel laat alles zoals het is (gespiegeld: links en rechts om),
+en het spelveld krijgt de verhouding van het camerabeeld. Het camerabeeld wordt, iets
+donkerder, onder het spel getekend. Omdat er geen beamer is, valt er ook geen licht van het
+spel op de tafel: geen wit vlak bij het leren, geen muurverlichting, geen lichtvoorspelling.
+Voor de herkenning is dat het makkelijke geval. Het mensenfilter werkt precies als op de
+muur: een hand die van de rand van het beeld komt, telt nooit.
+
+De demo gebruikt geen camera. De briefjes zijn gewone obstakels die je met de muis of je
+vinger sleept en tekent; het spel tekent ze als gekleurd papier. De beginopstelling
+(`demoOpstelling` in `js/speelplek.js`) is een baan die al half werkt: test/speelplek.mjs
+laat hem een minuut spelen en kijkt of een deel van de ballen de bak haalt, en of de
+trampoline, de turbo en de blauwe muur allemaal meedoen.
 
 ### Het spel verblindde zichzelf
 

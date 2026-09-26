@@ -5,6 +5,8 @@ import { Sfx } from './audio.js';
 import { startApp } from './app.js';
 import { Telefoon } from './telefoon.js';
 import { t, tAantal, tHerkomst, huidigeTaal, zetTaal, opTaal, vertaalPagina, TaalTeller } from './taal.js';
+import { SPEELPLEKKEN, DEMO_KLEUREN, DEMO_SPECIAAL, DEMO_MAX, SPEL_ADRES, bepaalSpeelplek, bewaarSpeelplek, schermHomografie, pasVeld, demoOpstelling,
+  briefjeUitSleep, briefjeOp, kruisjeVan, schuifBriefje, briefjesMee, demoMee, dubbeltik, cameraReden, eigenTabblad } from './speelplek.js';
 
 const $ = (id) => document.getElementById(id);
 const CAL_TARGETS = [[0.08, 0.10], [0.92, 0.10], [0.92, 0.90], [0.08, 0.90]];
@@ -55,7 +57,7 @@ const app = {
   reasons: {},
   projCells: 0,
   projCellsFor: null,
-  best: { object: 0, color: 0 },
+  best: { object: 0, color: 0, demo: 0 },
   steps: { proj: 0, cam: 0, cal: 0, bg: 0, goal: 0 },
   lastVideoTime: -1,
   videoStill: 0,
@@ -70,6 +72,21 @@ const app = {
   lockExposure: false,    // camerabelichting vastzetten (standaard uit, zie vision.js)
   ingesteld: false,       // al eens alles automatisch ingesteld (de knop heet dan anders)
   camLuma: -1,            // hoe helder de camera het beamervlak ziet
+  // Waar je speelt (zie js/speelplek.js): 'muur' (webcam en beamer), 'scherm' (de camera
+  // kijkt naar een tafel, het spel staat op dit scherm) of 'demo' (zonder camera).
+  speelplek: 'muur',
+  plekGekozen: false,     // zelf gekozen? Anders staat het welkomstkaartje er
+  muurH: null,            // de kalibratie van de beamer, bewaard zolang je op een scherm speelt
+  schermSpiegel: null,    // op een scherm: links en rechts om (null = nog nooit gekozen)
+  svOpen: false,          // het speelscherm over het hele venster
+  demoBriefjes: [],       // de briefjes van de demo, in wereldcoördinaten
+  demoW: 0,               // hoe breed het veld was toen ze neergelegd werden (0 = nog niet)
+  demoKleur: 'los',       // wat je in de demo tekent: 'los' (gewone kleur) of een soort
+  sleep: null,            // wat je in het speelveld vasthoudt met de muis of je vinger
+  tik: null,              // de vorige tik op een briefje, voor een dubbeltik
+  camReden: null,         // waarom de camera hier niet kan (zie cameraReden), of null
+  camGeweigerd: false,    // de browser weigerde de camera al eens
+  popupNiet: false,       // het beamervenster mocht hier niet open (ingesloten venster)
 };
 
 const debug = $('debug');
@@ -90,7 +107,10 @@ const PRED_H = 144;   // resolutie van de lichtvoorspelling; te laag mist dunne 
 function save() {
   try {
     localStorage.setItem(STORE, JSON.stringify({
-      H: app.H,
+      // op een scherm is app.H het camerabeeld zelf; de kalibratie van de beamer is muurH
+      H: app.speelplek === 'scherm' ? app.muurH : app.H,
+      speelplek: bewaarSpeelplek(app.speelplek, app.plekGekozen),
+      schermSpiegel: app.schermSpiegel,
       classes: vision.classes,
       mirror: vision.mirror,
       mode: vision.mode,
@@ -165,7 +185,8 @@ function load() {
     if (s.moveGoal != null) $('moveGoal').checked = s.moveGoal;
     if (s.outline != null) $('outline').checked = s.outline;
     for (const k of ['sound', 'muziek', 'effecten']) if (s[k] != null) $(k).checked = !!s[k];
-    if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0 };
+    if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0, demo: s.best.demo | 0 };
+    if (typeof s.schermSpiegel === 'boolean') app.schermSpiegel = s.schermSpiegel;
     if (s.camId) app.camId = s.camId;
     if (s.camChosen != null) app.camChosen = !!s.camChosen;
     if (typeof s.fill === 'number') app.fill = s.fill;
@@ -173,6 +194,21 @@ function load() {
     if (s.lockExposure != null) app.lockExposure = s.lockExposure;
     if (s.calCam) app.calCam = s.calCam;
   } catch { /* stille val-terug op standaardwaarden */ }
+}
+
+/**
+ * Welke speelplek, nog vóór load(): wie niets bewaard heeft krijgt het welkomstkaartje, wie
+ * al met een beamer speelde niet (zie bepaalSpeelplek in js/speelplek.js).
+ */
+function laadSpeelplek() {
+  let s = null, oud = false;
+  try {
+    s = JSON.parse(localStorage.getItem(STORE) || 'null');
+    oud = !!(localStorage.getItem(STORE_OLD) || localStorage.getItem('stickyclash.v2'));
+  } catch { /* opslag geblokkeerd of kapot: dan als een nieuwe speler */ }
+  const k = bepaalSpeelplek(s, oud);
+  app.speelplek = k.plek || 'muur';
+  app.plekGekozen = !k.welkom;
 }
 
 // De laatste melding in de statusregel: uit welke zin, om hem na het wisselen van taal
@@ -184,16 +220,21 @@ function status(msg, kind) {
   const el = $('status');
   el.textContent = msg;
   el.className = 'status' + (kind ? ' ' + kind : '');
+  // ook bovenin het speelscherm, dat het paneel afdekt
+  const sv = $('svStatus');
+  sv.textContent = msg;
+  sv.className = 'sv-status' + (kind ? ' ' + kind : '');
   const h = tHerkomst(msg);
   statusBron = h ? { nl: h.nl, vars: h.vars, kind } : null;
 }
 
 function step(k, v) {
   app.steps[k] = v;
-  const li = document.querySelector('.steps li[data-k="' + k + '"]');
-  if (!li) return;
-  li.classList.toggle('on', v === 1);
-  li.classList.toggle('busy', v === 2);
+  // Camera en geleerd staan ook in het lijstje van spelen op een scherm.
+  document.querySelectorAll('.steps li[data-k="' + k + '"]').forEach(li => {
+    li.classList.toggle('on', v === 1);
+    li.classList.toggle('busy', v === 2);
+  });
 }
 
 function refreshSteps() { for (const k in app.steps) step(k, app.steps[k]); }
@@ -225,10 +266,12 @@ async function runExclusive(fn) {
 }
 
 function setBusyUi(on) {
-  for (const id of ['btnAuto', 'btnCalAuto', 'btnCal', 'btnBg', 'btnGoal', 'btnCam', 'btnScreens']) {
+  for (const id of ['btnAuto', 'btnCalAuto', 'btnCal', 'btnBg', 'btnGoal', 'btnCam', 'btnScreens', 'btnScherm', 'btnSchermLeer', 'svLeer']) {
     const el = $(id);
     if (el) el.disabled = on;
   }
+  // niet van speelplek wisselen midden in het instellen
+  document.querySelectorAll('#plekSeg button').forEach(b => { b.disabled = on; });
   $('btnAbort').classList.toggle('hidden', !on);
 }
 
@@ -239,6 +282,7 @@ function syncStepsFromState() {
   step('cal', app.H ? 1 : 0);
   step('bg', vision.hasBackground ? 1 : 0);
   if (app.steps.goal === 2) step('goal', 0);
+  toonSchermKnop();
 }
 
 /**
@@ -311,6 +355,9 @@ async function gewensteCamera() {
 /** De hele melding als de camera niet wil starten. */
 function cameraFout(e) {
   const n = e && e.name;
+  if ((n === 'NotAllowedError' || n === 'SecurityError') && ingesloten()) {
+    return t('Camera mislukt: in een ingesloten venster mag het spel de camera niet gebruiken — open het spel in een eigen tabblad');
+  }
   if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan');
   if (n === 'NotReadableError' || n === 'AbortError') return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
   if (n === 'NotFoundError' || n === 'OverconstrainedError') return t('Camera mislukt: geen camera gevonden — sluit je webcam aan');
@@ -319,6 +366,13 @@ function cameraFout(e) {
 }
 
 async function startCamera() {
+  // De demo vraagt nooit om de camera: daar is hij juist voor.
+  if (app.speelplek === 'demo') return false;
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    bekijkCamera();
+    status(camRedenTekst(app.camReden || 'geen-api'), 'err');
+    return false;
+  }
   step('cam', 2);
   try {
     const wil = await gewensteCamera();
@@ -341,8 +395,9 @@ async function startCamera() {
     if (wil && id && wil !== id) {
       status(t('De gekozen camera deed het niet (bezet?) — nu: {naam}', { naam: label }), 'err');
     }
-    // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie.
-    if (app.H) {
+    // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie. (Op een
+    // scherm is er geen kalibratie en geen uitsnede: het hele beeld is het speelveld.)
+    if (app.H && app.speelplek === 'muur') {
       applyRoi();
       if (app.calCam && id && app.calCam !== id) {
         status(t('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"'), 'err');
@@ -371,11 +426,13 @@ async function startCamera() {
     app.lastVideoTime = -1; app.videoStill = 0;
     step('cam', 1);
     save();
-    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
+    if (!(wil && id && wil !== id) && !(app.speelplek === 'muur' && app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
     bekendeCams = new Set((await vision.devices()).map(d => d.deviceId));
+    if (app.camGeweigerd) { app.camGeweigerd = false; bekijkCamera(); }
     return true;
   } catch (e) {
     step('cam', 0);
+    if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) { app.camGeweigerd = true; bekijkCamera(); }
     status(cameraFout(e), 'err');
     return false;
   }
@@ -402,14 +459,18 @@ async function cameraGewisseld() {
     app.camChosen = true; app.camId = d.deviceId;
     $('camSelect').value = d.deviceId;
     save();
+    const scherm = app.speelplek === 'scherm';
     if (!vision.ready) {
-      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
+      status(scherm ? t('Webcam gevonden en gekozen: {naam} — klik op "Start op dit scherm"', { naam })
+        : t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
       return;
     }
     await runExclusive(startCamera);
     const tr = vision.stream && vision.stream.getVideoTracks()[0];
     if (tr && tr.getSettings && tr.getSettings().deviceId === d.deviceId) {
-      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
+      // (een andere camera ziet de tafel anders: opnieuw leren)
+      status(scherm ? t('Webcam gevonden en gekozen: {naam} — klik op Opnieuw leren', { naam })
+        : t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
     }
     return;
   }
@@ -427,15 +488,22 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   });
 }
 
+/** De geleerde muur weggooien. Zonder dat de camera ooit aan stond is er niets te vergeten. */
+function vergeetMuur() {
+  if (vision.mask) vision.clearBackground();
+  step('bg', 0);
+}
+
 $('btnCam').onclick = () => runExclusive(startCamera);
-$('btnFlip').onclick = () => { vision.mirror = !vision.mirror; vision.clearBackground(); step('bg', 0); save(); };
+$('btnFlip').onclick = () => { vision.mirror = !vision.mirror; vergeetMuur(); save(); };
 $('camSelect').onchange = () => {
   const v = $('camSelect').value;
   app.camChosen = !!v;
   if (v) app.camId = v;
   save();
   if (vision.ready) runExclusive(startCamera);
-  else status(v ? t('Camera gekozen — klik op "Alles automatisch instellen"') : t('Camera: automatisch'), 'ok');
+  else if (!v) status(t('Camera: automatisch'), 'ok');
+  else status(app.speelplek === 'scherm' ? t('Camera gekozen — klik op "Start op dit scherm"') : t('Camera gekozen — klik op "Alles automatisch instellen"'), 'ok');
 };
 
 // ---------------------------------------------------------------- beamer
@@ -451,13 +519,21 @@ async function openProjector(auto) {
   const feat = scr
     ? 'left=' + scr.availLeft + ',top=' + scr.availTop + ',width=' + scr.availWidth + ',height=' + scr.availHeight
     : 'width=1280,height=720';
-  const w = window.open('', 'stickyclash_projector', feat);
-  if (!w) {
+  let w = null;
+  try { w = window.open('', 'stickyclash_projector', feat); } catch { w = null; }
+  // In een ingesloten venster (zoals op itch.io) mag een pop-up vaak niet, of kunnen we
+  // er niet in tekenen. Dan zeggen we waarom, in plaats van stil niets te doen.
+  const mislukt = () => {
     step('proj', 0);
-    status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
+    if (ingesloten()) {
+      status(t('Het beamervenster kan hier niet open: dit is een ingesloten venster — open het spel in een eigen tabblad'), 'err');
+      app.popupNiet = true;
+      toonCamReden();
+    } else status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
     return false;
-  }
-  w.document.open();
+  };
+  if (!w) return mislukt();
+  try { w.document.open(); } catch { try { w.close(); } catch { /* dan niet */ } return mislukt(); }
   w.document.write(
     '<!doctype html><html><head><meta charset="utf-8"><title>' + t('Sticky Clash — beamer') + '</title>' +
     '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
@@ -750,16 +826,20 @@ function updateCal() {
 
 async function learnWall(withCountdown) {
   if (!vision.ready) return false;
+  // Op een scherm is er geen beamer: geen wit beeld, geen muurverlichting, niets vast te
+  // zetten. Het spel leert gewoon hoe de lege tafel (of muur, of bord) eruitziet.
+  const scherm = app.speelplek === 'scherm';
   step('bg', 2);
   if (withCountdown) {
     for (let n = 3; n > 0; n--) {
       if (app.abort) return false;
-      app.wiz = { title: 'Ga even uit beeld', sub: 'ik leer hoe de lege muur eruitziet', count: n };
+      app.wiz = scherm ? { title: 'Handen uit beeld', sub: 'ik leer hoe de lege ondergrond eruitziet', count: n }
+        : { title: 'Ga even uit beeld', sub: 'ik leer hoe de lege muur eruitziet', count: n };
       await sleep(900);
     }
   }
   app.wiz = { title: 'Momentje', sub: '' };
-  if (typeof vision.beginResponse === 'function' && projOk()) {
+  if (!scherm && typeof vision.beginResponse === 'function' && projOk()) {
     // Eerst heel even vol wit: zo leert het spel hoe fel elk stukje muur oplicht onder
     // de beamer, en kan het zijn eigen ballen en letters voorspellen in plaats van er
     // alleen omheen te kijken. Snel meten, voordat de camera zijn belichting aanpast.
@@ -770,12 +850,12 @@ async function learnWall(withCountdown) {
     vision.endResponse();
   }
   // Leren onder dezelfde verlichting als waarmee gespeeld wordt.
-  app.calPattern = { kind: 'fill' };
+  if (!scherm) app.calPattern = { kind: 'fill' };
   // Lang genoeg wachten tot de camera gewend is: anders leert hij een muur die net
-  // iets te donker of te licht is.
-  await sleep(1200);
+  // iets te donker of te licht is. Zonder beamer verandert er niets aan het licht.
+  await sleep(scherm ? 400 : 1200);
   let vast = [];
-  if (app.lockExposure) {
+  if (app.lockExposure && !scherm) {
     // Alleen op verzoek, en gecontroleerd: wordt het beeld er merkbaar donkerder van,
     // dan meteen terug naar automatisch.
     vision.grab();
@@ -808,7 +888,11 @@ async function learnWall(withCountdown) {
   step('bg', 1);
   // vision.lockCamera noemt wat hij vastzette: 'belichting', 'witbalans'
   const wat = () => vast.map(w => t(w)).join(', ');
-  if (!vast.length) {
+  if (scherm) {
+    status(al ? tAantal(al, 'Geleerd — {n} voorwerp lag er al, dat telt gewoon mee. Handen tellen niet mee.',
+      'Geleerd — {n} voorwerpen lagen er al, die tellen gewoon mee. Handen tellen niet mee.')
+      : t('Geleerd — alles wat je nu neerlegt, kaatst de ballen. Handen tellen niet mee.'), 'ok');
+  } else if (!vast.length) {
     status(al ? tAantal(al, 'Muur geleerd — {n} voorwerp hing er al, dat telt gewoon mee',
       'Muur geleerd — {n} voorwerpen hingen er al, die tellen gewoon mee')
       : t('Muur geleerd — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
@@ -902,6 +986,9 @@ $('btnGoal').onclick = () => {
 
 function autoSetup() {
   sfx.resume();
+  // Kan de camera hier helemaal niet (ingesloten venster, geen https)? Dan zeggen we dat
+  // meteen, zonder eerst een beamervenster te openen dat toch niets kan.
+  if (app.camReden && app.camReden !== 'geweigerd') { status(camRedenTekst(app.camReden), 'err'); return false; }
   // Het venster moet binnen de klik open, vóór alles wat wacht.
   const opened = projOk() || openProjector(true);
   return runExclusive(async () => {
@@ -952,9 +1039,7 @@ $('btnAbort').onclick = () => { app.abort = true; status(t('Afgebroken')); };
 
 function setMode(m) {
   vision.mode = m;
-  game.duel = (m === 'color');
-  game.lowLight = (m === 'object');
-  game.best = app.best[m] || 0;
+  pasSpeelplekToe();              // duel, zuinig met licht en het record hangen ook af van de speelplek
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   toonModeHint();
   document.querySelectorAll('.steps li[data-k="bg"], .steps li[data-k="goal"]')
@@ -964,9 +1049,12 @@ function setMode(m) {
 }
 
 function toonModeHint() {
-  $('modeHint').textContent = vision.mode === 'object'
-    ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
-    : t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".');
+  // op een scherm ligt het op een tafel, en daar tellen handen juist niet
+  const muur = app.speelplek !== 'scherm';
+  $('modeHint').textContent = vision.mode !== 'object'
+    ? t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".')
+    : muur ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
+      : t('Alles wat je neerlegt kaatst de ballen — briefje, boek, doos. Handen tellen niet mee. Leer eerst de lege ondergrond.');
 }
 
 document.querySelectorAll('#modeSeg button').forEach(b => {
@@ -1144,9 +1232,9 @@ $('resident').onchange = e => {
 $('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
 $('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
 $('effecten').onchange = e => { game.effects = e.target.checked; save(); };
-$('outline').onchange = e => { game.showOutlines = e.target.checked; save(); };
-$('testMode').onchange = e => {
-  app.testMode = e.target.checked;
+$('outline').onchange = () => { pasSpeelplekToe(); save(); };
+$('testMode').onchange = () => {
+  pasSpeelplekToe();
   status(app.testMode ? t('Testmodus: sleep met de muis in de rechter weergave') : t('Testmodus uit'));
 };
 
@@ -1154,8 +1242,11 @@ $('testMode').onchange = e => {
 
 /** Korte tips die op de muur rouleren zolang er niet gespeeld wordt. */
 function updateTips() {
-  const tips = [t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen'),
-                t('Bouw een baan naar de groene bak')];
+  const p = app.speelplek;
+  const eerste = p === 'demo' ? t('Sleep de briefjes of teken nieuwe: de ballen kaatsen ertegen')
+    : p === 'scherm' ? t('Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen')
+      : t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen');
+  const tips = [eerste, t('Bouw een baan naar de groene bak')];
   if (app.special) tips.push(t('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken'));
   if (app.gold) tips.push(t('Een gouden bal in de bak is 3 punten waard'));
   if (app.bonus) tips.push(t('De kleine gouden bak geeft 3 punten, en verspringt steeds'));
@@ -1191,7 +1282,13 @@ function leesRang() {
   try { const r = JSON.parse(localStorage.getItem(RANG) || '{}'); return r && typeof r === 'object' ? r : {}; }
   catch { return {}; }
 }
-function rangSoort() { return game.levelMode ? 'levels' : vision.mode; }
+// De demo heeft een eigen ranglijst: met de muis is het een ander spel.
+function rangSoort() {
+  if (app.speelplek === 'demo') return game.levelMode ? 'demo-levels' : 'demo';
+  return game.levelMode ? 'levels' : vision.mode;
+}
+/** Onder welke naam het record van deze speelmodus bewaard wordt (app.best). */
+function bestSleutel() { return app.speelplek === 'demo' ? 'demo' : vision.mode; }
 function rangLijst(soort = rangSoort()) {
   const l = leesRang()[soort];
   return Array.isArray(l) ? l.filter(e => e && typeof e.name === 'string' && Number.isFinite(e.score)) : [];
@@ -1269,8 +1366,7 @@ const telefoon = new Telefoon(game, {
   status,
   gebaar: () => sfx.resume(),
   // de waarschuwingsbalk onderin de muur (zie drawScene), als deel van de hoogte
-  onderbalk: () => (!app.H && !app.testMode) ? 0.13
-    : (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready ? 0.11 : 0),
+  onderbalk: () => { const s = onderbalkSoort(); return s === 'kalibratie' ? 0.13 : s === 'leren' ? 0.11 : 0; },
 });
 telefoon.koppelPaneel(document);
 
@@ -1359,6 +1455,10 @@ function checkVerschuiving(dt) {
   herstelNaVerschuiving();
 }
 async function herstelNaVerschuiving() {
+  if (app.speelplek === 'scherm') {
+    status(t('De camera is verschoven — klik op Opnieuw leren'), 'err');
+    return;
+  }
   if (!projOk()) {
     status(t('De camera of beamer is verschoven — klik op "Alles automatisch instellen"'), 'err');
     return;
@@ -1382,6 +1482,7 @@ async function herstelNaVerschuiving() {
 function toonPlayKnop() {
   const s = game.state;
   $('btnPlay').textContent = s === 'paused' ? t('Pauze opheffen') : (s === 'play' || s === 'count') ? t('Pauze') : t('Start ronde');
+  $('svStart').textContent = $('btnPlay').textContent;
 }
 
 $('btnPlay').onclick = () => {
@@ -1428,6 +1529,8 @@ function noteFromDrag(a, b, team) {
 
 world.addEventListener('pointerdown', (e) => {
   if (e.button === 2) return;
+  // Demo en scherm: briefjes, bak en bron zoals in het speelscherm (zie wijzerNeer).
+  if (app.speelplek !== 'muur') { wijzerNeer(e, world); return; }
   const p = worldFromEvent(e);
 
   // Doel en bron mag je altijd verslepen, ook zonder testmodus — dat is veel
@@ -1447,15 +1550,17 @@ world.addEventListener('pointerdown', (e) => {
   world.setPointerCapture(e.pointerId);
 });
 world.addEventListener('pointermove', (e) => {
+  if (app.sleep) { wijzerBeweeg(e, world); return; }
   const p = worldFromEvent(e);
   if (app.dragGoal) { game.setGoal(p[0], p[1]); return; }
   if (app.dragSource) { game.setSource(p[0], p[1]); return; }
   if (app.drag) app.drag.b = p;
 });
-const stopDrag = () => { app.dragGoal = false; app.dragSource = false; app.drag = null; };
+const stopDrag = () => { app.dragGoal = false; app.dragSource = false; app.drag = null; app.sleep = null; };
 world.addEventListener('pointercancel', stopDrag);
 world.addEventListener('lostpointercapture', () => { app.dragGoal = false; app.dragSource = false; });
 world.addEventListener('pointerup', () => {
+  if (app.sleep) { wijzerLos(); return; }
   app.dragGoal = false; app.dragSource = false;
   if (!app.drag) return;
   const d = app.drag; app.drag = null;
@@ -1753,7 +1858,11 @@ function drawPattern(ctx, w, h) {
 }
 
 function drawWizard(ctx, w, h) {
-  ctx.fillStyle = '#05070a';
+  if (app.speelplek === 'scherm') {
+    // op een scherm: over het camerabeeld heen, dan zie je meteen wat de camera ziet
+    tekenCameraBeeld(ctx, w, h);
+    ctx.fillStyle = 'rgba(5,7,10,.55)';
+  } else ctx.fillStyle = '#05070a';
   ctx.fillRect(0, 0, w, h);
   const s = h / 1000;
   ctx.textAlign = 'center';
@@ -1804,11 +1913,24 @@ function drawCalibration(ctx, w, h) {
   ctx.textBaseline = 'top';
 }
 
+/**
+ * Welke waarschuwingsbalk er onderin de muur staat: 'kalibratie' (niet gekalibreerd),
+ * 'leren' (muur nog niet geleerd) of null. Niet zolang het welkomstkaartje er staat: dan
+ * is er nog niets gekozen om in te stellen.
+ */
+function onderbalkSoort() {
+  if (!app.plekGekozen) return null;
+  if (!app.H && !app.testMode) return 'kalibratie';
+  if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) return 'leren';
+  return null;
+}
+
 function drawScene(ctx, w, h) {
   if (app.calPattern) { drawPattern(ctx, w, h); return; }
   if (app.wiz) { drawWizard(ctx, w, h); return; }
   if (app.calibrating) { drawCalibration(ctx, w, h); return; }
   game.render(ctx, w, h);
+  if (app.speelplek === 'demo') tekenKruisjes(ctx, w, h);
 
   if (app.projHint) {
     ctx.save();
@@ -1822,7 +1944,8 @@ function drawScene(ctx, w, h) {
 
   // Zonder kalibratie weet het spel niet waar de voorwerpen liggen, en raken de
   // ballen dus niets. Dat mag je nooit per ongeluk over het hoofd zien.
-  if (!app.H && !app.testMode) {
+  const balk = onderbalkSoort();
+  if (balk === 'kalibratie') {
     const bh = h * 0.13;
     ctx.fillStyle = '#b3261e';
     ctx.fillRect(0, h - bh, w, bh);
@@ -1834,7 +1957,7 @@ function drawScene(ctx, w, h) {
     ctx.font = '500 ' + Math.round(bh * 0.2) + 'px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(t('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"'), w / 2, h - bh * 0.25);
     ctx.textBaseline = 'top';
-  } else if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) {
+  } else if (balk === 'leren') {
     const bh = h * 0.11;
     ctx.fillStyle = '#7a4a10';
     ctx.fillRect(0, h - bh, w, bh);
@@ -1842,7 +1965,7 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 ' + Math.round(bh * 0.3) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
+    ctx.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
 
@@ -1865,7 +1988,7 @@ function drawDebug(tracks) {
     c.drawImage(maskTmp, 0, 0, debug.width, debug.height);
     if (vision.mode === 'object' && !vision.hasBackground) {
       c.fillStyle = '#ffab8f'; c.font = '13px system-ui'; c.textAlign = 'center';
-      c.fillText(t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
+      c.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
     }
   } else if (vision.ready) {
     c.drawImage(vision.cv, 0, 0);
@@ -1917,7 +2040,8 @@ function drawDebug(tracks) {
 }
 
 function updateProjectionMask() {
-  if (vision.mode !== 'object' || !vision.hasBackground || !app.H || !vision.ready) {
+  // Op een scherm valt er geen licht van ons op de tafel: niets te voorspellen.
+  if (vision.mode !== 'object' || !vision.hasBackground || !app.H || !vision.ready || app.speelplek !== 'muur') {
     if (vision.ready) vision.setProjection(null, 0, 0, null);
     return;
   }
@@ -1970,9 +2094,11 @@ function frame(now) {
   if (fpsAcc > 0.5) { $('fps').textContent = Math.round(fpsN / fpsAcc) + ' fps'; fpsAcc = 0; fpsN = 0; }
 
   fitCanvas(world);
+  if (app.svOpen) svMaat();
   if (app.proj && app.proj.closed) { app.proj = null; app.projCtx = null; step('proj', 0); }
-  if (projOk()) game.setAspect(app.projCtx.canvas.width / app.projCtx.canvas.height);
-  else game.setAspect(world.width / world.height);
+  const ar = veldVerhouding();
+  if (app.speelplek === 'demo') demoVeld(ar);
+  game.setAspect(ar);
 
   // Alleen verwerken als de camera echt een nieuw beeld heeft. Dubbele beelden gaven
   // schokkerige snelheden; en blijft het beeld staan, dan zeggen we dat.
@@ -1994,9 +2120,11 @@ function frame(now) {
   checkVerschuiving(dt);
   if (app.syncTip) app.syncTip();
   app.projHint = projOk() && !app.projFull && !app.busy && game.state !== 'play' && game.state !== 'count';
-  game.fill = app.fill;
+  game.fill = app.speelplek === 'muur' ? app.fill : 0;
 
-  if (app.testMode) {
+  if (app.speelplek === 'demo') {
+    game.setObstacles(demoObstakels());
+  } else if (app.testMode) {
     const obs = app.testNotes.slice();
     if (app.drag) obs.push(noteFromDrag(app.drag.a, app.drag.b, app.drag.team));
     game.setObstacles(obs);
@@ -2008,11 +2136,15 @@ function frame(now) {
 
   const before = game.state;
   game.update(dt);
+  // Een versleept briefje beweegt alleen in het beeldje waarin je het verschoof (zie wijzerBeweeg).
+  if (app.speelplek === 'demo') {
+    for (let i = 0; i < app.demoBriefjes.length; i++) { app.demoBriefjes[i].vx = 0; app.demoBriefjes[i].vy = 0; }
+  }
   // Muziek alleen tijdens het spelen; sneller in de laatste tien seconden en per level.
   sfx.muziek.volg(game.state, game.laatsteTien(), game.level);
   if (before !== game.state) {
     if (game.state === 'over') {
-      app.best[vision.mode] = Math.max(app.best[vision.mode] || 0, game.best);
+      app.best[bestSleutel()] = Math.max(app.best[bestSleutel()] || 0, game.best);
       save();
       toonPlayKnop();
       status(game.levelMode ? t('Uitdaging voorbij: je haalde level {n}', { n: game.levelReached || 1 })
@@ -2037,12 +2169,17 @@ function frame(now) {
   if (liveAcc > 0.25) {
     liveAcc = 0;
     const el = $('live');
+    // op een scherm heet het anders: geen muur en geen muurverlichting
+    const scherm = app.speelplek === 'scherm';
     if (app.testMode) el.textContent = tAantal(game.obstacles.length, '{n} obstakel (testmodus)', '{n} obstakels (testmodus)');
     else if (!app.H) el.textContent = t('Niet gekalibreerd — voorwerpen raken de ballen niet');
-    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = t('Muur nog niet geleerd');
-    else if (staleBg > 2) el.textContent = t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
-    else if (vision.floodGuard && vision.mode === 'object') el.textContent = t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
-    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
+    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = scherm ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd');
+    else if (staleBg > 2) el.textContent = scherm ? t('Bijna alles wordt als voorwerp gezien — licht veranderd? Klik op Opnieuw leren')
+      : t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
+    else if (vision.floodGuard && vision.mode === 'object') el.textContent = scherm ? t('Het licht is flink veranderd — herkenning werkt beperkt. Klik op Opnieuw leren')
+      : t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
+    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = scherm ? t('De camera ziet te weinig licht ({n}/255) — doe een lamp aan', { n: Math.round(app.camLuma) })
+      : t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
     else {
       const uitleg = Object.keys(app.reasons || {})
         .map(k => app.reasons[k] + '× ' + (REDENEN[k] ? t(REDENEN[k]) : k)).join(', ');
@@ -2063,12 +2200,552 @@ function frame(now) {
   }
 
   if (projOk()) drawScene(app.projCtx, app.projCtx.canvas.width, app.projCtx.canvas.height);
-  drawScene(wctx, world.width, world.height);
+  // Het speelscherm dekt het paneel af: dan hoeft de weergave rechts niet getekend.
+  if (app.svOpen) drawScene(svCtx, svCanvas.width, svCanvas.height);
+  else drawScene(wctx, world.width, world.height);
   updateProjectionMask();
   drawDebug(tracks);
 
   requestAnimationFrame(frame);
 }
+
+// ---------------------------------------------------------------- speelplek: muur, scherm of demo
+//
+// Drie manieren van spelen (zie js/speelplek.js). Muur + beamer is alles hierboven. Op een
+// scherm is het hele camerabeeld het speelveld: geen beamer, niets te kalibreren, en het
+// spel staat over het camerabeeld heen. De demo heeft geen camera nodig: de briefjes zijn
+// obstakels die je met de muis of je vinger sleept en tekent. Scherm en demo spelen in het
+// speelscherm, over het hele venster; de weergave rechts laat hetzelfde zien.
+
+const svCanvas = $('svCanvas');
+const svCtx = svCanvas.getContext('2d');
+const demoLijst = [];           // de obstakels van de demo, elk beeldje opnieuw gevuld
+const svVak = { b: -1, h: -1, ar: -1 };   // waarvoor het speelscherm zijn maat het laatst kreeg
+
+/** Staat de pagina in een ingesloten venster (een iframe, zoals op itch.io)? */
+function ingesloten() {
+  try { return window.top !== window.self; } catch { return true; }
+}
+
+/** Kan de camera hier? Zonder iets te vragen: de browser laat niets zien. */
+function bekijkCamera() {
+  let beleid = null;
+  const fp = document.permissionsPolicy || document.featurePolicy;
+  try { if (fp && fp.allowsFeature) beleid = fp.allowsFeature('camera'); } catch { /* onbekend */ }
+  app.camReden = cameraReden({
+    api: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+    veilig: !!window.isSecureContext, ingesloten: ingesloten(), beleid, geweigerd: app.camGeweigerd,
+  });
+  toonCamReden();
+}
+
+/** Staat de camera voor deze pagina op geblokkeerd? Ook dat vragen kost geen venster. */
+async function vraagCameraStand() {
+  try {
+    if (!navigator.permissions) return;
+    const st = await navigator.permissions.query({ name: 'camera' });
+    const volg = () => { app.camGeweigerd = st.state === 'denied'; bekijkCamera(); };
+    volg();
+    st.onchange = volg;
+  } catch { /* deze browser kent dat niet */ }
+}
+
+/** Waarom de camera hier niet kan, in gewone woorden. */
+function camRedenTekst(r) {
+  if (r === 'ingesloten') return t('In dit ingesloten venster mag het spel de camera niet gebruiken. De demo werkt hier wel.');
+  if (r === 'onveilig') return t('Via dit adres geeft de browser de camera niet vrij (geen https). De demo werkt hier wel.');
+  if (r === 'geen-api') return t('Deze browser kan de camera niet gebruiken: probeer Chrome of Edge. De demo werkt hier wel.');
+  if (r === 'popup') return t('Het beamervenster kan hier niet open: dit is een ingesloten venster.');
+  return t('De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon en kies Toestaan.');
+}
+
+/** De uitleg bij de camerakeuzes, met een link naar een eigen tabblad als dat helpt. */
+function toonCamReden() {
+  // (dat het beamervenster niet open mag, doet er alleen bij muur + beamer toe)
+  const r = app.camReden || (app.popupNiet && app.speelplek === 'muur' ? 'popup' : null);
+  for (const p of document.querySelectorAll('.camniet')) {
+    p.textContent = '';
+    p.classList.toggle('hidden', !r);
+    if (!r) continue;
+    p.append(camRedenTekst(r));
+    if (r === 'ingesloten' || r === 'onveilig' || r === 'popup') {
+      const a = document.createElement('a');
+      a.href = r === 'onveilig' ? SPEL_ADRES : eigenTabblad(location.href);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = t('Open het spel in een eigen tabblad');
+      p.append(' ', a);
+    }
+  }
+}
+
+/**
+ * Naar een andere speelplek. Muur en scherm delen de camera, maar niet wat ze geleerd
+ * hebben: een muur onder beamerlicht is iets anders dan een tafel zonder. De kalibratie
+ * van de beamer blijft bewaard (app.muurH) zolang je op een scherm speelt.
+ */
+function zetSpeelplek(plek) {
+  if (!SPEELPLEKKEN.includes(plek)) return;
+  const was = app.speelplek;
+  app.plekGekozen = true;
+  if (plek !== was) {
+    if (was === 'scherm') {
+      app.H = app.muurH; app.Hinv = app.H ? invertH(app.H) : null; app.muurH = null;
+      vergeetMuur();
+      if (vision.ready && app.H) applyRoi();
+    }
+    if (plek === 'scherm') {
+      app.muurH = app.H;
+      // Een open beamervenster gooit licht op de tafel dat het spel hier niet voorspelt.
+      if (projOk()) app.proj.close();
+      app.proj = null; app.projCtx = null; step('proj', 0);
+      if (vision.ready) setRoi(null);
+      vergeetMuur();
+      zetSchermVeld();
+    }
+    if (plek === 'demo') {
+      // De demo gebruikt geen camera: uit, dan brandt ook het lampje niet.
+      vision.stop(); tracks = []; step('cam', 0); step('bg', 0);
+    }
+    app.goalTrack = null;
+    app.speelplek = plek;
+    game.reset();
+  }
+  pasSpeelplekToe();
+  toonPlayKnop();
+  save();
+}
+
+/** Op een scherm: het hele camerabeeld is het speelveld, eventueel gespiegeld. */
+function zetSchermVeld() {
+  app.H = schermHomografie(!!app.schermSpiegel);
+  app.Hinv = invertH(app.H);
+  app.projCellsFor = null;
+  $('schermSpiegel').checked = !!app.schermSpiegel;
+}
+
+function zetSchermSpiegel(aan) {
+  app.schermSpiegel = !!aan;
+  if (app.speelplek === 'scherm') zetSchermVeld();
+  save();
+  status(app.schermSpiegel ? t('Gespiegeld: links en rechts zijn om') : t('Niet gespiegeld'), 'ok');
+}
+
+/** Alles wat van de speelplek afhangt: wat het paneel laat zien, en hoe het spel tekent. */
+function pasSpeelplekToe() {
+  const p = app.speelplek, b = document.body.classList;
+  b.toggle('plek-muur', p === 'muur');
+  b.toggle('plek-scherm', p === 'scherm');
+  b.toggle('plek-demo', p === 'demo');
+  b.toggle('welkom-open', !app.plekGekozen);
+  $('welkom').classList.toggle('hidden', app.plekGekozen);
+  document.querySelectorAll('#plekSeg button').forEach(k => k.classList.toggle('on', k.dataset.plek === p));
+  game.duel = vision.mode === 'color' && p !== 'demo';
+  // Zuinig met licht alleen waar de camera naar ons eigen beeld kijkt: op de muur.
+  game.lowLight = vision.mode === 'object' && p === 'muur';
+  game.papier = p === 'demo';
+  game.showOutlines = p === 'scherm' || (p === 'muur' && $('outline').checked);
+  game.onderlaag = p === 'scherm' ? tekenCameraBeeld : null;
+  app.testMode = p === 'demo' || (p === 'muur' && $('testMode').checked);
+  game.best = app.best[bestSleutel()] || 0;
+  updateTips();
+  toonRang();
+  toonSchermKnop();
+  toonModeHint();
+  toonCamReden();
+}
+
+/** Staat alles klaar om op een scherm te spelen: camera aan en de lege ondergrond geleerd? */
+function schermKlaar() {
+  return app.speelplek === 'scherm' && vision.ready && (vision.hasBackground || vision.mode !== 'object');
+}
+
+/** De grote knop bij Scherm: eerst instellen, daarna terug naar het speelscherm. */
+function toonSchermKnop() {
+  $('btnScherm').textContent = schermKlaar() ? t('Naar het speelscherm') : t('Start op dit scherm');
+}
+
+/** Wat de statusregel zegt bij het opstarten. */
+function toonStartStatus() {
+  if (!app.plekGekozen) { status(t('Welkom! Kies hieronder hoe je wilt spelen')); return; }
+  if (app.speelplek === 'demo') { status(t('Klik op "Speel de demo"')); return; }
+  if (!window.isSecureContext) status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
+  else if (!chromium && app.speelplek === 'muur') status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
+  else if (app.speelplek === 'scherm') status(t('Klik op "Start op dit scherm"'));
+}
+
+/**
+ * De achtergrond op een scherm: het camerabeeld, iets donkerder, zodat de ballen en de
+ * teksten erop opvallen. Precies op het speelveld; gespiegeld als dat aan staat.
+ */
+function tekenCameraBeeld(ctx, cw, ch) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, cw, ch);
+  const v = vision.video;
+  if (!vision.ready || v.readyState < 2) return;
+  const sc = ch / game.H, w = game.W * sc, x0 = (cw - w) / 2;
+  ctx.save();
+  if (app.schermSpiegel) { ctx.translate(x0 + w, 0); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0, w, ch); }
+  else ctx.drawImage(v, x0, 0, w, ch);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(6,8,12,.36)';
+  ctx.fillRect(x0, 0, w, ch);
+}
+
+/** Hoe breed het speelveld is (breedte gedeeld door hoogte). */
+function veldVerhouding() {
+  const v = vision.video;
+  // op een scherm is het camerabeeld het speelveld
+  if (app.speelplek === 'scherm' && vision.ready && v.videoWidth) return v.videoWidth / v.videoHeight;
+  if (app.svOpen) return svCanvas.width / svCanvas.height;
+  if (projOk()) return app.projCtx.canvas.width / app.projCtx.canvas.height;
+  return world.width / world.height;
+}
+
+// ---- het speelscherm
+
+function openSpeelvenster() {
+  if (app.svOpen) return;
+  app.svOpen = true;
+  $('speelvenster').classList.remove('hidden');
+  document.body.classList.add('sv-open');
+  // Volledig scherm kan niet overal (een ingesloten venster zonder toestemming, een iPhone):
+  // dan geen knop die alleen maar "kan niet" zegt.
+  $('svVol').classList.toggle('hidden', !document.fullscreenEnabled);
+  // Haal je een plek op de ranglijst, dan typ je je naam hier: het paneel zit eronder.
+  $('svNaam').appendChild($('naamInvoer'));
+  svVak.b = -1;
+  svMaat();
+}
+
+function sluitSpeelvenster() {
+  if (!app.svOpen) return;
+  app.svOpen = false;
+  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); }
+  $('speelvenster').classList.add('hidden');
+  document.body.classList.remove('sv-open');
+  $('ranglijst').insertBefore($('naamInvoer'), $('scoreLijst'));
+  app.sleep = null;
+}
+
+/**
+ * Het speelveld zo groot als past: in de verhouding van het camerabeeld (scherm), of
+ * vrij maar niet te smal (demo, zie pasVeld). Alleen opnieuw als er iets veranderde.
+ */
+function svMaat() {
+  const vak = $('svVeld'), bw = vak.clientWidth - 16, bh = vak.clientHeight - 16;
+  const v = vision.video;
+  const ar = app.speelplek === 'scherm' && vision.ready && v.videoWidth ? v.videoWidth / v.videoHeight : 0;
+  if (bw === svVak.b && bh === svVak.h && ar === svVak.ar) return;
+  svVak.b = bw; svVak.h = bh; svVak.ar = ar;
+  const m = pasVeld(bw, bh, ar);
+  // scherp op een telefoon, maar niet meer dan dubbel: dat kost alleen maar rekenwerk
+  const k = Math.min(2, window.devicePixelRatio || 1);
+  svCanvas.width = Math.round(m.w * k); svCanvas.height = Math.round(m.h * k);
+  svCanvas.style.width = m.w + 'px'; svCanvas.style.height = m.h + 'px';
+}
+
+function volledigScherm() {
+  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); return; }
+  const el = $('speelvenster');
+  const niet = () => status(t('Volledig scherm kan hier niet — in een ingesloten venster mag dat soms niet'), 'err');
+  if (!el.requestFullscreen) { niet(); return; }
+  try {
+    const p = el.requestFullscreen();
+    if (p && p.catch) p.catch(niet);
+  } catch { niet(); }
+}
+
+// ---- de demo
+
+/** De beginopstelling neerleggen: bak, bron en zes briefjes (zie demoOpstelling). */
+function legDemoNeer() {
+  const o = demoOpstelling(game.W, game.H);
+  app.demoBriefjes = o.briefjes;
+  game.goal.r = o.doel.r;
+  game.setGoal(o.doel.x, o.doel.y);
+  game.setSource(o.bron.x, o.bron.y);
+  game.breakables.clear();
+  app.demoW = game.W;
+  app.sleep = null;
+}
+
+/**
+ * Het veld wordt breder of smaller (speelscherm open of dicht, telefoon gedraaid): bak, bron
+ * en briefjes schuiven mee als één geheel, zodat de baan blijft werken (zie demoMee).
+ */
+function demoVeld(ar) {
+  if (!app.demoW) { game.setAspect(ar); legDemoNeer(); return; }
+  const W = game.H * ar;
+  if (Math.abs(W - game.W) >= 0.5) {
+    const gx = demoMee(game.goal.x, game.W, W), bx = demoMee(game.source.x, game.W, W);
+    game.setAspect(ar);
+    game.setGoal(gx, game.goal.y);
+    game.setSource(bx, game.source.y);
+  }
+  // De briefjes horen bij het veld van app.demoW: dat kan ook van vóór een uitstapje
+  // naar de muur of het scherm zijn.
+  if (Math.abs(game.W - app.demoW) >= 0.5) {
+    briefjesMee(app.demoBriefjes, app.demoW, game.W, game.H);
+    app.demoW = game.W;
+  }
+}
+
+/** De demo spelen: speelscherm open, en de ballen vallen meteen (na 3, 2, 1). */
+function demoStart() {
+  sfx.resume();
+  if (app.speelplek !== 'demo') zetSpeelplek('demo');
+  openSpeelvenster();
+  if (game.state === 'idle' || game.state === 'over') {
+    $('btnPlay').click();
+    game.spawnAcc = 1;          // de eerste bal valt meteen bij GO, niet pas een tel later
+  }
+  status(t('Demo: sleep de briefjes zo dat de ballen in de groene bak vallen'), 'ok');
+}
+
+/** De obstakels van de demo: de briefjes, en het briefje dat je nu tekent (dat raakt nog niets). */
+function demoObstakels() {
+  demoLijst.length = 0;
+  for (let i = 0; i < app.demoBriefjes.length; i++) demoLijst.push(app.demoBriefjes[i]);
+  const s = app.sleep;
+  if (s && s.soort === 'nieuw' && s.briefje) demoLijst.push(s.briefje);
+  return demoLijst;
+}
+
+/** Hoeveel CSS-pixels één wereldeenheid is op canvas cv. */
+function pixPerEenheid(cv) {
+  return Math.max(0.05, cv.getBoundingClientRect().height / game.H);
+}
+
+/** Plek in het speelveld (wereldcoördinaten) onder de muis of vinger, op canvas cv. */
+function veldVan(e, cv) {
+  const r = cv.getBoundingClientRect();
+  const k = cv.width / Math.max(1, r.width);          // canvaspixels per CSS-pixel
+  const sc = cv.height / game.H;
+  return [((e.clientX - r.left) * k - (cv.width - game.W * sc) / 2) / sc, (e.clientY - r.top) * k / sc];
+}
+
+/** Het kruisje van een briefje, binnen het veld gehouden (zo tekent tekenKruisjes het ook). */
+function kruisjeIn(poly, r) {
+  const k = kruisjeVan(poly);
+  return [Math.min(k[0], game.W - r), Math.max(k[1], r)];
+}
+const kruisStraal = (ppe) => Math.max(15, 11 / ppe);   // hoe groot het kruisje getekend wordt
+
+/**
+ * Muis of vinger omlaag in het speelveld (demo en scherm). In de demo eerst: het kruisje
+ * van een briefje (weghalen), een briefje (verslepen, of bij een dubbeltik weghalen). Dan
+ * overal: de bak en de balbron verslepen. En op een lege plek in de demo: een nieuw
+ * briefje tekenen. Geeft true als er iets gepakt werd.
+ */
+function wijzerNeer(e, cv) {
+  if (e.button === 2) return false;
+  const p = veldVan(e, cv), ppe = pixPerEenheid(cv);
+  const demo = app.speelplek === 'demo', lijst = app.demoBriefjes;
+  if (demo) {
+    const r = kruisStraal(ppe), raak = Math.max(r * 1.4, 18 / ppe);
+    for (let i = lijst.length - 1; i >= 0; i--) {
+      const k = kruisjeIn(lijst[i].poly, r);
+      if (Math.hypot(p[0] - k[0], p[1] - k[1]) < raak) { lijst.splice(i, 1); app.tik = null; return true; }
+    }
+    const i = briefjeOp(lijst, p[0], p[1], Math.max(4, 8 / ppe));
+    if (i >= 0) {
+      const b = lijst[i], nu = performance.now();
+      if (dubbeltik(app.tik, nu, p[0], p[1], b)) { lijst.splice(i, 1); app.tik = null; return true; }
+      app.tik = { t: nu, x: p[0], y: p[1], doel: b };
+      lijst.splice(i, 1); lijst.push(b);               // bovenop: als laatste getekend
+      app.sleep = { soort: 'briefje', briefje: b, x: p[0], y: p[1], t: nu };
+      cv.setPointerCapture(e.pointerId);
+      return true;
+    }
+  }
+  const g = game.goal, s = game.source;
+  if (Math.hypot(p[0] - g.x, p[1] - g.y) < g.r) {
+    app.sleep = { soort: 'doel', dx: p[0] - g.x, dy: p[1] - g.y };
+    app.goalTrack = null;
+    cv.setPointerCapture(e.pointerId);
+    return true;
+  }
+  if (Math.hypot(p[0] - s.x, p[1] - s.y) < Math.max(50, 22 / ppe)) {
+    app.sleep = { soort: 'bron', dx: p[0] - s.x, dy: p[1] - s.y };
+    cv.setPointerCapture(e.pointerId);
+    return true;
+  }
+  if (!demo) return false;
+  const soort = app.demoKleur, kind = soort === 'los' ? undefined : soort;
+  const kleur = kind ? DEMO_SPECIAAL[kind] : DEMO_KLEUREN[Math.floor(Math.random() * DEMO_KLEUREN.length) % DEMO_KLEUREN.length];
+  app.sleep = { soort: 'nieuw', a: p, kind, kleur, briefje: null };
+  cv.setPointerCapture(e.pointerId);
+  return true;
+}
+
+function wijzerBeweeg(e, cv) {
+  const s = app.sleep;
+  if (!s) return;
+  const p = veldVan(e, cv);
+  if (s.soort === 'doel') { game.setGoal(p[0] - s.dx, p[1] - s.dy); step('goal', 1); return; }
+  if (s.soort === 'bron') { game.setSource(p[0] - s.dx, p[1] - s.dy); return; }
+  if (s.soort === 'nieuw') {
+    s.briefje = briefjeUitSleep(s.a, p, s.kind, s.kleur);
+    if (s.briefje) s.briefje.pending = true;          // pas als je loslaat raakt het de ballen
+    return;
+  }
+  if (s.soort === 'briefje') {
+    const nu = performance.now(), dt = Math.max(1 / 120, (nu - s.t) / 1000);
+    const d = schuifBriefje(s.briefje, p[0] - s.x, p[1] - s.y, game.W, game.H);
+    // Zo snel beweeg je het: dan geeft een geschoven briefje een bal ook echt een klap.
+    const v = clampSpeed(d[0] / dt, d[1] / dt);
+    s.briefje.vx = v[0]; s.briefje.vy = v[1];
+    s.x += d[0]; s.y += d[1]; s.t = nu;
+  }
+}
+
+function wijzerLos() {
+  const s = app.sleep;
+  app.sleep = null;
+  if (!s || s.soort !== 'nieuw' || !s.briefje) return;
+  if (app.demoBriefjes.length >= DEMO_MAX) {
+    status(t('Genoeg briefjes — haal er eerst een weg (dubbeltik of ×)'), 'err');
+    return;
+  }
+  s.briefje.pending = false;
+  app.demoBriefjes.push(s.briefje);
+}
+
+svCanvas.addEventListener('pointerdown', (e) => { if (wijzerNeer(e, svCanvas)) e.preventDefault(); });
+svCanvas.addEventListener('pointermove', (e) => wijzerBeweeg(e, svCanvas));
+svCanvas.addEventListener('pointerup', wijzerLos);
+svCanvas.addEventListener('pointercancel', () => { app.sleep = null; });
+svCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/** In de demo: een klein kruisje rechtsboven elk briefje, om het weg te halen. */
+function tekenKruisjes(ctx, w, h) {
+  const sc = h / game.H, ox = (w - game.W * sc) / 2;
+  const hoog = ctx.canvas.clientHeight || h;
+  const r = kruisStraal(hoog / game.H) * sc, d = r * 0.42;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1.5, r * 0.2);
+  for (let i = 0; i < app.demoBriefjes.length; i++) {
+    const poly = app.demoBriefjes[i].poly;
+    let x1 = -Infinity, y0 = Infinity;
+    for (let j = 0; j < poly.length; j++) { if (poly[j][0] > x1) x1 = poly[j][0]; if (poly[j][1] < y0) y0 = poly[j][1]; }
+    const x = ox + Math.min(x1 * sc, game.W * sc - r), y = Math.max(y0 * sc, r);
+    ctx.fillStyle = 'rgba(12,14,19,.8)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e8eaf0';
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
+    ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---- spelen op een scherm
+
+/**
+ * Spelen op een scherm: camera aan, het hele beeld wordt het speelveld, en het spel leert
+ * hoe de lege ondergrond eruitziet. Geen beamer, dus geen kalibratie en geen wit licht.
+ */
+function schermStart() {
+  sfx.resume();
+  if (app.speelplek !== 'scherm') zetSpeelplek('scherm');
+  // Kan de camera hier niet? Dan zeggen we waarom, in het paneel: daar staat de demo naast.
+  if (app.camReden && app.camReden !== 'geweigerd') { sluitSpeelvenster(); status(camRedenTekst(app.camReden), 'err'); return false; }
+  openSpeelvenster();
+  return runExclusive(async () => {
+    if (!vision.ready) {
+      status(t('Camera starten — klik op Toestaan als de browser erom vraagt'));
+      app.wiz = { title: 'Momentje', sub: 'klik op Toestaan als de browser om de camera vraagt' };
+      // Geen camera (geweigerd, bezet, niet gevonden)? Terug naar het paneel, met de melding:
+      // een zwart speelscherm zegt niemand iets.
+      if (!(await startCamera())) { sluitSpeelvenster(); return false; }
+    }
+    if (app.abort) return false;
+    if (app.schermSpiegel === null) {
+      // Een ingebouwde camera kijkt naar jou: dan is gespiegeld wat je verwacht.
+      const tr = vision.stream && vision.stream.getVideoTracks()[0];
+      app.schermSpiegel = !!(tr && INGEBOUWD.test(tr.label || ''));
+    }
+    zetSchermVeld();
+    setRoi(null);
+    toonSchermKnop();
+    if (vision.mode === 'object' && !(await learnWall(true))) return false;
+    if (app.abort) return false;
+    app.wiz = { title: 'Klaar', sub: 'leg je briefjes neer en start de ronde' };
+    await sleep(1100);
+    app.wiz = null;
+    save();
+    return true;
+  });
+}
+
+/** Opnieuw leren hoe de lege ondergrond eruitziet (op een scherm). */
+function schermLeer() {
+  if (!vision.ready) { schermStart(); return; }
+  if (app.busy) return;
+  // Tijdens het leren telt geen enkel voorwerp: een lopende ronde gaat eerst op pauze.
+  if (game.state === 'play') { game.togglePause(); toonPlayKnop(); }
+  runExclusive(() => learnWall(true));
+}
+
+// ---- knoppen
+
+document.querySelectorAll('#welkom .plekknop').forEach(k => {
+  k.onclick = () => {
+    const plek = k.dataset.plek;
+    if (plek === 'demo') { demoStart(); return; }
+    zetSpeelplek(plek);
+    if (plek === 'scherm') schermStart();
+    else status(t('Klik op "Alles automatisch instellen"'));
+  };
+});
+document.querySelectorAll('#plekSeg button').forEach(k => {
+  k.onclick = () => {
+    k.blur();
+    const plek = k.dataset.plek;
+    if (app.busy || plek === app.speelplek) return;
+    zetSpeelplek(plek);
+    status(plek === 'demo' ? t('Klik op "Speel de demo"') : plek === 'scherm' ? t('Klik op "Start op dit scherm"')
+      : t('Klik op "Alles automatisch instellen"'));
+  };
+});
+// Vanuit de demo meteen echt spelen: op een scherm blijft het speelscherm open.
+document.querySelectorAll('.sv-cta button').forEach(k => {
+  k.onclick = () => {
+    if (k.dataset.plek === 'scherm') { schermStart(); return; }
+    sluitSpeelvenster();
+    zetSpeelplek('muur');
+    status(t('Klik op "Alles automatisch instellen"'));
+  };
+});
+$('btnDemo').onclick = demoStart;
+$('btnScherm').onclick = () => {
+  if (schermKlaar()) { openSpeelvenster(); return; }
+  schermStart();
+};
+$('btnSchermLeer').onclick = schermLeer;
+$('schermSpiegel').onchange = (e) => zetSchermSpiegel(e.target.checked);
+
+// Na een klik de knop weer loslaten: anders drukt spatie hem nog eens in.
+const svKnop = (id, f) => { $(id).onclick = () => { $(id).blur(); f(); }; };
+svKnop('svStart', () => $('btnPlay').click());
+svKnop('svLeer', schermLeer);
+svKnop('svSpiegel', () => zetSchermSpiegel(!app.schermSpiegel));
+svKnop('svBegin', () => { legDemoNeer(); status(t('De briefjes liggen weer zoals in het begin'), 'ok'); });
+svKnop('svVol', volledigScherm);
+svKnop('svSluit', sluitSpeelvenster);
+document.querySelectorAll('#svPalet button').forEach(k => {
+  k.onclick = () => {
+    k.blur();
+    app.demoKleur = k.dataset.soort;
+    document.querySelectorAll('#svPalet button').forEach(x => x.classList.toggle('on', x === k));
+  };
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.svOpen && !document.fullscreenElement) sluitSpeelvenster();
+});
 
 // ---------------------------------------------------------------- taal (NL | EN)
 
@@ -2099,6 +2776,8 @@ function nieuweTaal() {
   if (statusBron) status(t(statusBron.nl, statusBron.vars), statusBron.kind);
   toonAutoKnop();
   toonPlayKnop();
+  toonSchermKnop();
+  toonCamReden();
   toonModeHint();
   toonLosHint();
   renderClasses();
@@ -2119,7 +2798,9 @@ function nieuweTaal() {
 vertaalPagina(document.body);
 document.title = t('Sticky Clash — projection mapping game');
 toonTaalKnoppen();
+laadSpeelplek();
 load();
+if (app.speelplek === 'scherm') { app.muurH = app.H; zetSchermVeld(); }
 renderClasses();
 applySliders();
 setMode(vision.mode);
@@ -2132,7 +2813,7 @@ $('fillOut').textContent = Math.round(app.fill * 100) + '%';
 $('fillAuto').checked = app.fillAuto;
 $('lockExp').checked = app.lockExposure;
 game.fill = app.fill;
-game.showOutlines = $('outline').checked;
+pasSpeelplekToe();
 sfx.on = $('sound').checked;
 sfx.muziek.aan = $('muziek').checked;
 game.effects = $('effecten').checked;
@@ -2143,11 +2824,9 @@ fillDevices();
 // Chromium herkennen. userAgentData bestaat alleen daar, maar ook alleen in een
 // beveiligde omgeving — dus de gewone browserstring als reserve.
 const chromium = !!navigator.userAgentData || /Chrome\/|Edg\//.test(navigator.userAgent);
-if (!window.isSecureContext) {
-  status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
-} else if (!chromium) {
-  status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
-}
+toonStartStatus();
+bekijkCamera();
+vraagCameraStand();
 toonLosHint();
 loadScreens(false);
 startApp();
@@ -2156,7 +2835,8 @@ vision.onFormatChange = () => {
   debug.width = vision.vw; debug.height = vision.vh;
   applySliders();
   step('bg', 0);
-  status(t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
+  status(app.speelplek === 'scherm' ? t('De camera wisselde van beeldformaat — klik op Opnieuw leren')
+    : t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
 };
 opTaal(nieuweTaal);
 // Na het kiezen de knop weer loslaten: anders drukt spatie daarna die knop in, in plaats
@@ -2165,4 +2845,5 @@ document.querySelectorAll('#taalKeuze button').forEach(b => { b.onclick = () => 
 requestAnimationFrame(frame);
 
 // handig bij het afstellen: in de console beschikbaar als window.sc
-window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon };
+window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon,
+  zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster };
