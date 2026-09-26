@@ -141,11 +141,96 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
 .slider.sub.off{opacity:.35; pointer-events:none}
 #world{touch-action:none}
 
+/* ---- speelplek: muur + beamer, scherm, of de demo (zie js/speelplek.js en js/main.js) */
+/* Wat maar bij één manier van spelen hoort. main.js zet plek-muur, plek-scherm of plek-demo op <body>. */
+body:not(.plek-muur) .alleen-muur{display:none !important}
+body:not(.plek-scherm) .alleen-scherm{display:none !important}
+body:not(.plek-demo) .alleen-demo{display:none !important}
+body.plek-demo .alleen-camera{display:none !important}
+/* zolang het welkomstkaartje er staat, geen knoppen van een opstelling die nog niet gekozen is,
+   en rechts alleen het speelveld (nog geen camera, nog geen beamer) */
+body.welkom-open .quick{display:none}
+body.welkom-open .pane.alleen-camera{display:none}
+body.welkom-open .pane-head .alleen-muur{display:none}
+body.welkom-open .pane-head .alleen-demo{display:inline !important}
+
+.welkom{background:#1b1f28; display:flex; flex-direction:column; gap:8px}
+.welkom h2{font-size:15px; text-transform:none; letter-spacing:0; color:var(--ink); margin-bottom:4px}
+.plekknop{display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; padding:11px 12px; border-radius:9px; background:#232835; border-color:#303646}
+.plekknop b{font-size:15px; color:#fff}
+.plekknop span{font-size:12px; color:var(--dim)}
+.plekknop:hover{background:#2b3140; border-color:var(--acc)}
+.plekknop.demo{background:#2a2112; border-color:#6b4a17}
+.plekknop.demo b{color:var(--acc)}
+.plekknop.demo:hover{background:#342914}
+.plekkeuze{display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12px; color:var(--dim)}
+.plekkeuze .seg{flex:1; margin:0}
+.plekkeuze .seg button{padding:6px 4px}
+.camniet{background:#2a1f1f; color:#ffab8f; padding:7px 9px; border-radius:7px}
+.camniet a{color:#fff; font-weight:600}
+
+/* het speelscherm, over het hele venster */
+body.sv-open{overflow:hidden}
+.speelvenster{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:#07080b}
+.sv-balk{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:8px 12px; background:#101217; border-bottom:1px solid var(--line)}
+.sv-balk button{flex:none; padding:7px 12px}
+.sv-naam{font-size:14px; white-space:nowrap}
+.sv-status{flex:1 1 120px; min-width:0; font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.sv-status.err{color:#ff6b6b}
+.sv-status.ok{color:var(--ok)}
+.sv-icoon{font-size:17px; line-height:1; padding:6px 10px !important}
+.sv-veld{flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:8px; overflow:hidden}
+#svCanvas{flex:none; width:auto; border-radius:8px; touch-action:none; cursor:crosshair}
+.sv-voet{padding:8px 12px 12px; background:#101217; border-top:1px solid var(--line)}
+.sv-voet .hint{margin:6px 0 0}
+.sv-palet{display:flex; flex-wrap:wrap; gap:6px}
+.sv-palet button{flex:none; display:flex; align-items:center; gap:6px; padding:6px 10px; font-size:12px}
+.sv-palet button.on{background:#2f3542; border-color:#6a7386; color:#fff}
+.sv-palet i{display:inline-block; width:12px; height:12px; border-radius:3px}
+.sv-cta{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px; font-size:13px}
+.sv-cta button{flex:none; padding:6px 12px}
+.sv-voet .row{margin:8px 0 0}
+
+/* laag scherm (een telefoon die ligt): het speelveld krijgt de ruimte. De uitleg valt weg (de
+   statusregel bovenin zegt wat er moet), het palet en "Speel echt" staan naast elkaar. */
+@media (max-height: 500px){
+  .sv-balk{padding:4px 8px}
+  .sv-balk button{padding:5px 10px}
+  .sv-veld{padding:4px}
+  .sv-voet{display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; padding:4px 8px 6px}
+  .sv-voet > .hint:not(.camniet){display:none}
+  .sv-palet button{padding:4px 8px}
+  .sv-cta{margin-top:0}
+  .sv-cta button{padding:4px 10px}
+}
+
+/* smal scherm (telefoon, of een klein ingesloten venster): het paneel boven, het speelveld eronder */
+@media (max-width: 760px){
+  html,body{height:auto}
+  header{flex-wrap:wrap; gap:4px 12px; padding:10px 14px}
+  .status{order:3; flex-basis:100%}
+  main{flex-direction:column}
+  .panel{width:auto; overflow:visible; border-right:0; border-bottom:1px solid var(--line); padding-bottom:8px}
+  .stage{padding:10px}
+  .pane{flex:none; height:62vw; min-height:190px}
+  .sv-balk{padding:6px 8px}
+  .sv-status{order:9; flex-basis:100%}
+  .sv-veld{padding:4px}
+  .sv-voet{padding:6px 8px 10px}
+}
+
 </style>
 <link rel="icon" href="data:image/x-icon;base64,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//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9DhcX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8qkf//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//QqD//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/Lj9T/06o//82mf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9DhcX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//yqR//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8qkf//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/0OFxf9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Lj9T/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9CoP//Npn//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//QqD//6bT//+Rjoz/kY6M/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//9OqP//Tqj//06o//9OqP//Npn//zaZ//8qkf//Hor//x6K//8eiv//Hor//1an/////////////////////////////1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/85Yoz/OWKM/06o//9OqP//Tqj//06o//9OqP//Tqj//zaZ//82mf//////////////////////////////////yMbF/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/OWKM/0OFxf9OqP//Tqj//3q9////////////////////////////////////////JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/ZXiM//////////////////////////////////////8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/////////////////////////////////yMbF/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9aVVP///////////////////////////9aVVP/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9aVVP/kY6M/5GOjP+Rjoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAASDg1/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8SDg1/AAAAAAAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/CQcGPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASDg1/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Eg4NfwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAMAAAAGAAAAABACAAAAAAAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPxIODX8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8bFRO/Eg4NfwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8bFRO/CQcGPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJBwY/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/CQcGPwAAAAAAAAAAAAAAABsVE78kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Lj9T/zlijP8uP1P/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Q4XF/06o//9OqP//Tqj//06o//85Yoz/OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAEg4NfyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Q4XF/zlijP85Yoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xIODX8AAAAAGxUTvyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8uP1P/Tqj//06o//9CoP//Npn//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9DhcX/OWKM/y4/U/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//8qkf//Hor//x6K//8eiv//KpH//zaZ//9CoP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//zlijP85Yoz/Lj9T/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//Npn//0Kg//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9DhcX/OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//KpH//zaZ//82mf//Tqj//06o//9OqP//Tqj//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8qkf//QqD//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//9OqP//Lj9T/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//yqR//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//9OqP//JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Tqj//06o//9OqP//JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/06o//9OqP//QqD//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Tqj//06o//85Yoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/06o//9OqP//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//Tqj//06o//85Yoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/OWKM/06o//9OqP//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//Tqj//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/OWKM/06o//9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9CoP//Tqj//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Q4XF/06o//9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//0OFxf8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9CoP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//82mf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//8qkf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//0Kg//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//KpH//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//9OqP//Lj9T/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//06o//9OqP//Tqj//zaZ//82mf//KpH//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//6bT//////////////////+Rjoz/WlVT/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9CoP//Npn//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9Wp////////////////////////////////////////1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Lj9T/zlijP85Yoz/Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//0Kg//82mf//Npn//x6K//8eiv//Hor//x6K//////////////////////////////////////////////////9aVVP/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8uP1P/OWKM/zlijP9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Npn//5rM///////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP85Yoz/Q4XF/06o//9OqP//Tqj//06o//9OqP//Tqj/////////////////////////////////////////////////////////////JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/OWKM/zlijP9OqP//Tqj/////////////////////////////////////////////////////////////JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a////////////////////////////////////////////////////////////JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/5GOjP/////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv////////////////////////////////////////////////9aVVP/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9aVVP//////////////////////////////////////1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAGxUTvyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/WlVT/8jGxf/////////////////IxsX/WlVT/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78AAAAAEg4NfyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xIODX8AAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAAAAAABsVE78kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/CQcGPwAAAAAAAAAAAAAAAAAAAAAJBwY/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8bFRO/CQcGPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPxIODX8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8bFRO/Eg4NfwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKAAAAEAAAACAAAAAAQAgAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJBwY/Eg4NfxsVE78kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8bFRO/Eg4NfwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPxsVE78kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/CQcGPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAABsVE78kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQd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Gv8kHRr/OWKM/06o//9OqP//Tqj//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/0OFxf9OqP//Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//06o//8uP1P/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//06o//82mf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//Tqj//06o//9OqP//JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9OqP//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//QqD//06o//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/OWKM/06o//9OqP//Tqj//yqR//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//06o//85Yoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9DhcX/Tqj//06o//9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//Tqj//06o//9OqP//Lj9T/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9OqP//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Lj9T/06o//9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//0Kg//9OqP//Tqj//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP9OqP//Tqj//06o//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//06o//85Yoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8qkf//Tqj//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9OqP//QqD//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Npn//06o//9OqP//Tqj//yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/06o//9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/9OqP//Tqj//06o//82mf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9OqP//Tqj//06o//9DhcX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//9OqP//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Tqj//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Q4XF/06o//9OqP//Tqj//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//KpH//06o//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/06o//9OqP//Tqj//zaZ//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//06o//8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//06o//82mf//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9CoP//Tqj//06o//9OqP//JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/Tqj//06o//9OqP//KpH//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Tqj//06o//9OqP//OWKM/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/OWKM/06o//9OqP//Tqj//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//06o//9OqP//Tqj//zlijP8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/0OFxf9OqP//Tqj//06o//82mf//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//zaZ//9OqP//Tqj//06o//+csMX/WlVT/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//0Kg//82mf//Npn//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//82mf//ptP/////////////////////////////yMbF/1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//zaZ//82mf//KpH//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//9Wp///xuH/////////////////////////////////////////////yMbF/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv85Yoz/OWKM/0OFxf9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//zaZ//82mf//KpH//x6K//8eiv//Hor//x6K//8eiv//Hor//x6K//8eiv/////////////////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/85Yoz/OWKM/06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//QqD//zaZ//82mf//Hor//x6K//8eiv//xuH//////////////////////////////////////////////////////////////////1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/y4/U/85Yoz/OWKM/06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//QqD////////////////////////////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP85Yoz/Q4XF/06o//9OqP//Tqj//06o//9OqP//Tqj//06o//9OqP//Tqj//6bT/////////////////////////////////////////////////////////////////////////////yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/zlijP85Yoz/Tqj//06o//9OqP//Tqj//06o//+m0/////////////////////////////////////////////////////////////////////////////8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/Lj9T/zlijP85Yoz/ptP/////////////////////////////////////////////////////////////////////////////JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/5GOjP///////////////////////////////////////////////////////////////////////////yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr//////////////////////////////////////////////////////////////////////8jGxf8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAkHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/8jGxf////////////////////////////////////////////////////////////////9aVVP/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8AAAAAJB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv9aVVP////////////////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/AAAAACQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/1pVU//////////////////////////////////////////////////IxsX/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wAAAAAbFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/8jGxf////////////////////////////////+Rjoz/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78AAAAAEg4NfyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/5GOjP+Rjoz/kY6M/1pVU/8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8SDg1/AAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/CQcGPwAAAAAAAAAAGxUTvyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/wkHBj8AAAAAAAAAAAAAAAAAAAAAGxUTvyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78AAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQcGPyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJBwY/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78JBwY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8bFRO/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/GxUTvwkHBj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkHBj8SDg1/GxUTvyQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/yQdGv8kHRr/JB0a/xsVE78SDg1/CQcGPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
 <meta name="theme-color" content="#101217">
+<meta name="description" content="Stick notes on the wall, the balls bounce off them. A free projection-mapping game in your browser; also plays on a screen, or try it without a camera.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sticky Clash">
+<meta property="og:description" content="Stick notes on the wall, the balls bounce off them. A free projection-mapping game in your browser; also plays on a screen, or try it without a camera.">
+<meta property="og:url" content="https://noaquim.github.io/sticky-clash/">
+<meta property="og:image" content="https://noaquim.github.io/sticky-clash/docs/social.png">
+<meta name="twitter:card" content="summary_large_image">
 </head>
-<body>
+<body class="plek-muur">
 <header>
   <h1>Sticky <em>Clash</em></h1>
   <div id="status" class="status">Klik op "Alles automatisch instellen"</div>
@@ -157,20 +242,54 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
 <main>
   <aside class="panel">
 
+    <section id="welkom" class="welkom hidden" aria-labelledby="welkomKop">
+      <h2 id="welkomKop">Welkom! Hoe wil je spelen?</h2>
+      <button class="plekknop" data-plek="muur"><b>Muur + beamer</b><span>Webcam en beamer: de ballen vallen over je muur.</span></button>
+      <button class="plekknop" data-plek="scherm"><b>Scherm, zonder beamer</b><span>De camera kijkt naar een tafel, muur of bord; je speelt op dit scherm.</span></button>
+      <p class="hint camniet hidden"></p>
+      <button class="plekknop demo" data-plek="demo"><b>Probeer zonder camera</b><span>Meteen spelen met je muis of vinger. Niets installeren of toestaan.</span></button>
+    </section>
+
     <section class="quick">
-      <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
-      <label class="camkeuze">Camera
+      <div class="plekkeuze">
+        <span>Speelplek</span>
+        <div class="seg" id="plekSeg" role="group" aria-label="Speelplek">
+          <button data-plek="muur">Beamer</button>
+          <button data-plek="scherm">Scherm</button>
+          <button data-plek="demo">Demo</button>
+        </div>
+      </div>
+      <div class="alleen-muur">
+        <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
+      </div>
+      <div class="alleen-scherm">
+        <button id="btnScherm" class="primary big">Start op dit scherm</button>
+        <p class="hint">Zet de camera boven een tafel of tegenover een muur met briefjes; gebruik eventueel je telefoon als webcam. Handen tellen niet mee, voorwerpen wel.</p>
+      </div>
+      <div class="alleen-demo">
+        <button id="btnDemo" class="primary big">Speel de demo</button>
+        <p class="hint">Met je muis of vinger: sleep de briefjes, teken nieuwe en kijk hoe de ballen kaatsen. Zonder camera.</p>
+        <p class="hint">Heb je een webcam? Speel echt: kies hierboven Beamer of Scherm.</p>
+      </div>
+      <p class="hint camniet alleen-camera hidden"></p>
+      <label class="camkeuze alleen-camera">Camera
         <select id="camSelect"><option value="">Automatisch — losse webcam als die er is</option></select>
       </label>
-      <p class="hint">Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.</p>
-      <ol class="steps" id="steps">
+      <p class="hint alleen-camera">Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.</p>
+      <label class="check alleen-scherm"><input type="checkbox" id="schermSpiegel"> Spiegelen — voor een camera die naar jou kijkt</label>
+      <ol class="steps alleen-muur" id="steps">
         <li data-k="proj">Beamer</li>
         <li data-k="cam">Camera</li>
         <li data-k="cal">Kalibratie</li>
         <li data-k="bg">Muur geleerd</li>
         <li data-k="goal">Doel gevonden</li>
       </ol>
-      <p id="wizHint" class="hint">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
+      <ol class="steps alleen-scherm">
+        <li data-k="cam">Camera</li>
+        <li data-k="bg">Lege ondergrond geleerd</li>
+      </ol>
+      <button id="btnSchermLeer" class="alleen-scherm">Opnieuw leren</button>
+      <p id="wizHint" class="hint alleen-muur">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
       <button id="btnAbort" class="hidden">Afbreken</button>
       <div id="appInstall" class="installeer hidden">
         <button id="btnInstall" class="klein">Installeer als app</button>
@@ -178,7 +297,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
       </div>
     </section>
 
-    <section>
+    <section class="alleen-camera">
       <h2>Speelmodus</h2>
       <div class="seg" id="modeSeg">
         <button data-mode="object" class="on">Elk voorwerp</button>
@@ -187,14 +306,14 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
       <p id="modeHint" class="hint"></p>
       <label class="slider">Gevoeligheid <input type="range" id="sens" min="0" max="100" value="60"><output id="sensOut">60</output></label>
       <p class="hint">Hoger = pakt ook zwakkere verschillen op. Te hoog en de hele muur licht op.</p>
-      <label class="slider">Muurverlichting <input type="range" id="fill" min="0" max="80" value="25"><output id="fillOut">25%</output></label>
-      <label class="check"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
-      <p class="hint">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
+      <label class="slider alleen-muur">Muurverlichting <input type="range" id="fill" min="0" max="80" value="25"><output id="fillOut">25%</output></label>
+      <label class="check alleen-muur"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
+      <p class="hint alleen-muur">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
       <label class="check"><input type="checkbox" id="noPeople" checked> Mensen negeren</label>
       <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
       <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
       <div class="row">
-        <button id="btnBg" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
+        <button id="btnBg" class="alleen-muur" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
         <button id="btnGoal">Doel aanwijzen</button>
       </div>
       <p id="live" class="live">—</p>
@@ -207,7 +326,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
         <button id="btnPlay" class="primary big">Start ronde</button>
         <button id="btnReset">Reset</button>
       </div>
-      <label class="check"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
+      <label class="check alleen-muur"><input type="checkbox" id="testMode"> Testmodus (muis, geen camera)</label>
     </section>
 
     <section id="telefoon">
@@ -266,17 +385,17 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
     <details>
       <summary>Meer instellingen</summary>
 
-      <section>
+      <section class="alleen-camera">
         <h2>Camera</h2>
         <div class="row">
           <button id="btnCam">Camera starten</button>
-          <button id="btnFlip">Spiegelen</button>
+          <button id="btnFlip" class="alleen-muur">Spiegelen</button>
         </div>
-        <label class="check"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
-        <p class="hint">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
+        <label class="check alleen-muur"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
+        <p class="hint alleen-muur">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
       </section>
 
-      <section>
+      <section class="alleen-muur">
         <h2>Beamer</h2>
         <div class="row">
           <button id="btnProj">Venster openen</button>
@@ -287,7 +406,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
         <p class="hint">Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.</p>
       </section>
 
-      <section>
+      <section class="alleen-muur">
         <h2>Kalibratie</h2>
         <div class="row">
           <button id="btnCalAuto">Automatisch</button>
@@ -298,7 +417,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
         <label class="check"><input type="checkbox" id="autoRecal" checked> Vanzelf opnieuw instellen als de camera of beamer verschuift</label>
       </section>
 
-      <section>
+      <section class="alleen-camera">
         <h2>Kleuren <span class="only-color">(duelmodus)</span></h2>
         <div id="classList"></div>
         <p class="hint">Klik "Leren" en klik daarna op het voorwerp in het camerabeeld.</p>
@@ -317,8 +436,8 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
         <label class="check"><input type="checkbox" id="sound" checked> Geluid</label>
         <label class="check"><input type="checkbox" id="muziek" checked> Muziek — zacht, alleen tijdens een ronde</label>
         <label class="check"><input type="checkbox" id="effecten" checked> Effecten — confetti, sterretjes, COMBO en feest bij een record</label>
-        <label class="check"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
-        <p class="hint">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
+        <label class="check alleen-muur"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
+        <p class="hint alleen-muur">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
       </section>
 
       <section class="foot">
@@ -329,7 +448,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
   </aside>
 
   <div class="stage">
-    <div class="pane">
+    <div class="pane alleen-camera">
       <div class="pane-head">
         <span>Camera</span>
         <div class="tabs">
@@ -340,11 +459,40 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
       <canvas id="debug" width="320" height="240"></canvas>
     </div>
     <div class="pane">
-      <div class="pane-head"><span>Wat de beamer laat zien</span><span id="fps" class="fps"></span></div>
+      <div class="pane-head"><span class="alleen-muur">Wat de beamer laat zien</span><span class="alleen-scherm">Het speelveld, over het camerabeeld</span><span class="alleen-demo">Het speelveld</span><span id="fps" class="fps"></span></div>
       <canvas id="world" width="640" height="360"></canvas>
     </div>
   </div>
 </main>
+
+<!-- Het speelscherm: de demo en spelen op een scherm, groot, over het hele venster (zie js/main.js). -->
+<div id="speelvenster" class="speelvenster hidden" role="dialog" aria-label="Speelscherm">
+  <div class="sv-balk">
+    <b class="sv-naam"><span class="alleen-demo">Demo</span><span class="alleen-scherm">Op dit scherm</span></b>
+    <span id="svStatus" class="sv-status"></span>
+    <button id="svStart" class="primary">Start ronde</button>
+    <button id="svLeer" class="alleen-scherm">Opnieuw leren</button>
+    <button id="svSpiegel" class="alleen-scherm">Spiegelen</button>
+    <button id="svBegin" class="alleen-demo">Beginstand</button>
+    <button id="svVol" class="sv-icoon" title="Volledig scherm" aria-label="Volledig scherm">⛶</button>
+    <button id="svSluit" class="sv-icoon" title="Sluiten" aria-label="Sluiten">×</button>
+  </div>
+  <div id="svVeld" class="sv-veld"><canvas id="svCanvas" width="640" height="360"></canvas></div>
+  <div class="sv-voet">
+    <div id="svPalet" class="sv-palet alleen-demo" role="group" aria-label="Soort briefje">
+      <button data-soort="los" class="on"><i style="background:#ffd84d"></i>Briefje</button>
+      <button data-soort="trampoline"><i style="background:#ff4d4d"></i>Trampoline</button>
+      <button data-soort="booster"><i style="background:#3ddc84"></i>Turbo</button>
+      <button data-soort="breek"><i style="background:#3aa0ff"></i>Breekt</button>
+    </div>
+    <p class="hint alleen-demo">Sleep een briefje om het te verplaatsen, of sleep op een lege plek voor een nieuw briefje. Weghalen: dubbeltik erop of tik op het ×. De bak en de balbron kun je ook verslepen.</p>
+    <p class="hint alleen-scherm">Zet de camera boven een tafel of tegenover een muur met briefjes; gebruik eventueel je telefoon als webcam. Handen tellen niet mee, voorwerpen wel.</p>
+    <p class="hint alleen-scherm">Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen. De bak en de balbron versleep je met de muis of je vinger.</p>
+    <p class="hint camniet alleen-scherm hidden"></p>
+    <div class="sv-cta alleen-demo"><b>Heb je een webcam? Speel echt:</b><button data-plek="muur">Muur + beamer</button><button data-plek="scherm">Scherm</button></div>
+    <div id="svNaam"></div>
+  </div>
+</div>
 
 <script type="module">
 // ---- js/vision.js
@@ -2846,7 +2994,74 @@ const TAAL_EN = {
   'Wat de beamer laat zien': 'What the projector shows',
   'Kon het spel niet laden — open sticky-clash.html, of start via start.bat': "Couldn't load the game — open sticky-clash.html, or start it with start.bat",
 
+  // ---- de speelplek: muur + beamer, scherm, of de demo zonder camera (index.html)
+  'Welkom! Hoe wil je spelen?': 'Welcome! How do you want to play?',
+  'Muur + beamer': 'Wall + projector',
+  'Webcam en beamer: de ballen vallen over je muur.': 'Webcam and projector: the balls fall down your wall.',
+  'Scherm, zonder beamer': 'Screen, no projector',
+  'De camera kijkt naar een tafel, muur of bord; je speelt op dit scherm.': 'The camera looks at a table, wall or board; you play on this screen.',
+  'Probeer zonder camera': 'Try it without a camera',
+  'Meteen spelen met je muis of vinger. Niets installeren of toestaan.': 'Play right away with your mouse or finger. Nothing to install or allow.',
+  'Speelplek': 'Play setup',
+  'Scherm': 'Screen',
+  'Demo': 'Demo',
+  'Start op dit scherm': 'Start on this screen',
+  'Zet de camera boven een tafel of tegenover een muur met briefjes; gebruik eventueel je telefoon als webcam. Handen tellen niet mee, voorwerpen wel.':
+    "Point the camera down at a table, or at a wall with notes on it; your phone can be the webcam. Hands don't count, objects do.",
+  'Speel de demo': 'Play the demo',
+  'Met je muis of vinger: sleep de briefjes, teken nieuwe en kijk hoe de ballen kaatsen. Zonder camera.':
+    'With your mouse or finger: drag the notes, draw new ones and watch the balls bounce. No camera needed.',
+  'Heb je een webcam? Speel echt: kies hierboven Beamer of Scherm.': 'Got a webcam? Play for real: pick Projector or Screen above.',
+  'Spiegelen — voor een camera die naar jou kijkt': 'Mirror — for a camera that faces you',
+  'Lege ondergrond geleerd': 'Empty surface learned',
+  'Opnieuw leren': 'Learn again',
+  'Het speelveld, over het camerabeeld': 'The playing field, over the camera image',
+  'Het speelveld': 'The playing field',
+  'Speelscherm': 'Game screen',
+  'Op dit scherm': 'On this screen',
+  'Beginstand': 'Reset notes',
+  'Volledig scherm': 'Full screen',
+  'Soort briefje': 'Kind of note',
+  'Briefje': 'Note',
+  'Trampoline': 'Trampoline',
+  'Turbo': 'Turbo',
+  'Breekt': 'Breaks',
+  'Sleep een briefje om het te verplaatsen, of sleep op een lege plek voor een nieuw briefje. Weghalen: dubbeltik erop of tik op het ×. De bak en de balbron kun je ook verslepen.':
+    'Drag a note to move it, or drag on an empty spot for a new one. To remove one: double-tap it or tap its ×. You can drag the bin and the ball source too.',
+  'Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen. De bak en de balbron versleep je met de muis of je vinger.':
+    'Put down notes or objects: the balls bounce off them. Drag the bin and the ball source with your mouse or finger.',
+  'Heb je een webcam? Speel echt:': 'Got a webcam? Play for real:',
+
   // ---- knoppen en meldingen (main.js)
+  // de speelplek, en of de camera hier kan
+  'Welkom! Kies hieronder hoe je wilt spelen': 'Welcome! Choose below how you want to play',
+  'Klik op "Speel de demo"': 'Click "Play the demo"',
+  'Klik op "Start op dit scherm"': 'Click "Start on this screen"',
+  'Naar het speelscherm': 'Back to the game screen',
+  'Camera starten — klik op Toestaan als de browser erom vraagt': 'Starting the camera — click Allow if the browser asks',
+  'Webcam gevonden en gekozen: {naam} — klik op "Start op dit scherm"': 'Webcam found and selected: {naam} — click "Start on this screen"',
+  'Webcam gevonden en gekozen: {naam} — klik op Opnieuw leren': 'Webcam found and selected: {naam} — click Learn again',
+  'Camera gekozen — klik op "Start op dit scherm"': 'Camera selected — click "Start on this screen"',
+  'Demo: sleep de briefjes zo dat de ballen in de groene bak vallen': 'Demo: drag the notes so the balls land in the green bin',
+  'Genoeg briefjes — haal er eerst een weg (dubbeltik of ×)': "That's plenty of notes — remove one first (double-tap or ×)",
+  'De briefjes liggen weer zoals in het begin': 'The notes are back where they started',
+  'Gespiegeld: links en rechts zijn om': 'Mirrored: left and right are swapped',
+  'Niet gespiegeld': 'Not mirrored',
+  'Volledig scherm kan hier niet — in een ingesloten venster mag dat soms niet': "Full screen isn't possible here — embedded windows sometimes don't allow it",
+  'Geleerd — {n} voorwerp lag er al, dat telt gewoon mee. Handen tellen niet mee.': "Learned — {n} object was already there, it simply counts. Hands don't count.",
+  'Geleerd — {n} voorwerpen lagen er al, die tellen gewoon mee. Handen tellen niet mee.': "Learned — {n} objects were already there, they simply count. Hands don't count.",
+  'Geleerd — alles wat je nu neerlegt, kaatst de ballen. Handen tellen niet mee.': "Learned — anything you put down now bounces the balls. Hands don't count.",
+  'De camera is verschoven — klik op Opnieuw leren': 'The camera moved — click Learn again',
+  'In dit ingesloten venster mag het spel de camera niet gebruiken. De demo werkt hier wel.': "In this embedded window the game isn't allowed to use the camera. The demo does work here.",
+  'Via dit adres geeft de browser de camera niet vrij (geen https). De demo werkt hier wel.': "At this address the browser won't give out the camera (no https). The demo does work here.",
+  'Deze browser kan de camera niet gebruiken: probeer Chrome of Edge. De demo werkt hier wel.': "This browser can't use the camera: try Chrome or Edge. The demo does work here.",
+  'Het beamervenster kan hier niet open: dit is een ingesloten venster.': "The projector window can't open here: this is an embedded window.",
+  'De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon en kies Toestaan.': 'The camera is blocked for this page — click the camera icon in the address bar and choose Allow.',
+  'Open het spel in een eigen tabblad': 'Open the game in its own tab',
+  'Camera mislukt: in een ingesloten venster mag het spel de camera niet gebruiken — open het spel in een eigen tabblad':
+    "Camera failed: in an embedded window the game isn't allowed to use the camera — open the game in its own tab",
+  'Het beamervenster kan hier niet open: dit is een ingesloten venster — open het spel in een eigen tabblad':
+    "The projector window can't open here: this is an embedded window — open the game in its own tab",
   'Er ging iets mis: {fout}': 'Something went wrong: {fout}',
   'Camera {n}': 'Camera {n}',
   '{naam} (ingebouwd)': '{naam} (built-in)',
@@ -2909,6 +3124,8 @@ const TAAL_EN = {
   'Afgebroken': 'Cancelled',
   'Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.':
     'Anything you hold in front of the wall bounces the balls — a book, a box, your hand, whatever you grab. Learn the empty wall first.',
+  'Alles wat je neerlegt kaatst de ballen — briefje, boek, doos. Handen tellen niet mee. Leer eerst de lege ondergrond.':
+    "Anything you put down bounces the balls — a note, a book, a box. Hands don't count. Learn the empty surface first.",
   'Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".':
     'Orange post-its steer the balls to the bin, blue ones block them. Teach it the two colors under "More settings".',
   'Klik…': 'Click…',
@@ -2963,15 +3180,21 @@ const TAAL_EN = {
   'Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij': "Open sticky-clash.html or start.bat — opened like this, the browser won't allow the camera",
   'Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen': 'Works best in Chrome or Edge — in this browser the projector window may stutter',
   'De camera wisselde van beeldformaat — leer de muur opnieuw': 'The camera changed its image format — relearn the wall',
+  'De camera wisselde van beeldformaat — klik op Opnieuw leren': 'The camera changed its image format — click Learn again',
 
   // ---- de teller onder "Doel aanwijzen"
   '{n} obstakel (testmodus)': '{n} obstacle (test mode)',
   '{n} obstakels (testmodus)': '{n} obstacles (test mode)',
   'Niet gekalibreerd — voorwerpen raken de ballen niet': "Not calibrated — objects don't touch the balls",
   'Muur nog niet geleerd': 'Wall not learned yet',
+  'Nog niet geleerd — klik op Opnieuw leren': 'Not learned yet — click Learn again',
   'Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw': 'Almost everything is seen as an object — did the light change? Relearn the wall',
   'Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw': 'The light has changed a lot — detection is limited. Relearn the wall',
   'De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan': 'The camera sees too little light ({n}/255) — turn Wall light up or switch on a lamp',
+  // op een scherm: geen muur en geen muurverlichting
+  'Bijna alles wordt als voorwerp gezien — licht veranderd? Klik op Opnieuw leren': 'Almost everything is seen as an object — did the light change? Click Learn again',
+  'Het licht is flink veranderd — herkenning werkt beperkt. Klik op Opnieuw leren': 'The light has changed a lot — detection is limited. Click Learn again',
+  'De camera ziet te weinig licht ({n}/255) — doe een lamp aan': 'The camera sees too little light ({n}/255) — switch on a lamp',
   '{n} voorwerp actief': '{n} object active',
   '{n} voorwerpen actief': '{n} objects active',
   'genegeerd: {lijst}': 'ignored: {lijst}',
@@ -3025,6 +3248,10 @@ const TAAL_EN = {
   'even niet voor de beamer gaan staan': "please don't stand in front of the projector",
   'Ga even uit beeld': 'Step out of view',
   'ik leer hoe de lege muur eruitziet': "I'm learning what the empty wall looks like",
+  'Handen uit beeld': 'Hands out of view',
+  'klik op Toestaan als de browser om de camera vraagt': 'click Allow if the browser asks for the camera',
+  'ik leer hoe de lege ondergrond eruitziet': "I'm learning what the empty surface looks like",
+  'leg je briefjes neer en start de ronde': 'put down your notes and start the round',
   'Momentje': 'One moment',
   'Zet nu de bak neer': 'Now place the bin',
   'en ga daarna zelf uit beeld': 'then step out of view yourself',
@@ -3040,6 +3267,8 @@ const TAAL_EN = {
 
   // ---- tips op de muur zolang er niet gespeeld wordt (main.js)
   'Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen': 'Stick notes or hold objects against the wall: the balls bounce off them',
+  'Sleep de briefjes of teken nieuwe: de ballen kaatsen ertegen': 'Drag the notes or draw new ones: the balls bounce off them',
+  'Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen': 'Put down notes or objects: the balls bounce off them',
   'Bouw een baan naar de groene bak': 'Build a path to the green bin',
   'Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken': 'Red note = trampoline · green = turbo · blue = breaks after 5 hits',
   'Een gouden bal in de bak is 3 punten waard': 'A gold ball in the bin is worth 3 points',
@@ -3604,6 +3833,12 @@ class Game {
     // Eigen toeval voor de effecten, los van Math.random: zo verandert confetti niets aan
     // het spelverloop, en niets aan de tests die Math.random vastzetten.
     this.fxSeed = 0x2545f491;
+    // Spelen zonder beamer (zie js/speelplek.js). onderlaag(ctx, cw, ch) tekent de
+    // achtergrond in plaats van de muurverlichting: op een scherm het camerabeeld. papier:
+    // de obstakels als gekleurde briefjes tekenen (de demo, zonder camera): ob.kleur, of
+    // de kleur van de soort.
+    this.onderlaag = null;
+    this.papier = false;
   }
 
   setAspect(ar) {
@@ -4512,10 +4747,14 @@ class Game {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Achtergrond is de muurverlichting. In een donkere kamer is de beamer de enige
-    // lichtbron op de muur: bij zwart ziet de camera de voorwerpen niet.
-    const f = Math.round(Math.max(0, Math.min(1, this.fill || 0)) * 255);
-    ctx.fillStyle = 'rgb(' + f + ',' + f + ',' + f + ')';
-    ctx.fillRect(0, 0, cw, ch);
+    // lichtbron op de muur: bij zwart ziet de camera de voorwerpen niet. Op een scherm
+    // (zonder beamer) tekent onderlaag hier het camerabeeld.
+    if (this.onderlaag) this.onderlaag(ctx, cw, ch);
+    else {
+      const f = Math.round(Math.max(0, Math.min(1, this.fill || 0)) * 255);
+      ctx.fillStyle = 'rgb(' + f + ',' + f + ',' + f + ')';
+      ctx.fillRect(0, 0, cw, ch);
+    }
     ctx.translate((cw - this.W * sc) / 2, 0);
     ctx.scale(sc, sc);
 
@@ -4532,6 +4771,7 @@ class Game {
     if (this.bonusOn && (this.bonusLive() || this.state === 'paused')) this.drawBonus(ctx);
     this.drawSource(ctx);
     if (this.wind) this.drawWind(ctx);
+    if (this.papier) this.drawPapier(ctx);
     if (this.showOutlines !== false) this.drawObstacles(ctx);
     if (this.special) this.drawSpecials(ctx);
     this.drawBalls(ctx);
@@ -4573,6 +4813,54 @@ class Game {
       ctx.globalAlpha = 1;
       ctx.setLineDash([]);
     }
+  }
+
+  /**
+   * De briefjes zelf, als gekleurd papier met een schaduwtje eronder (de demo: daar is
+   * geen echte muur met echte briefjes). Een kapotte blauwe muur is even een vage
+   * stippellijn. Nooit op een beamer met camera: licht op een voorwerp verstopt het.
+   */
+  drawPapier(ctx) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    for (const ob of this.obstacles) {
+      const kind = this.kindOf(ob), p = ob.poly;
+      const st = kind === 'breek' ? this.breakState(ob, false) : null;
+      const broken = !!(st && st.left > 0);
+      const col = ob.kleur || (kind ? KIND_STYLE[kind].col : '#ffd84d');
+      if (broken) {
+        this.papierPad(ctx, p, 0, 0);
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = col; ctx.lineWidth = 3;
+        ctx.setLineDash([10, 9]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      ctx.globalAlpha = ob.pending ? 0.45 : 1;
+      // Schaduw: dezelfde vorm iets lager, donker. (Een wazige schaduw is op een telefoon
+      // elk beeldje veel rekenwerk.)
+      this.papierPad(ctx, p, 3, 7);
+      ctx.fillStyle = 'rgba(0,0,0,.4)';
+      ctx.fill();
+      this.papierPad(ctx, p, 0, 0);
+      ctx.fillStyle = col;
+      ctx.fill();
+      // een donkerder randje, zodat twee briefjes van dezelfde kleur los blijven
+      ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  /** De omtrek van een briefje als pad, dx, dy verschoven. */
+  papierPad(ctx, p, dx, dy) {
+    ctx.beginPath();
+    ctx.moveTo(p[0][0] + dx, p[0][1] + dy);
+    for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0] + dx, p[i][1] + dy);
+    ctx.closePath();
   }
 
   /**
@@ -6319,7 +6607,279 @@ class Telefoon {
   }
 }
 
+// ---- js/speelplek.js
+// Waar je speelt. Drie manieren:
+//   muur    een webcam en een beamer: de ballen vallen over je muur (de gewone opstelling)
+//   scherm  geen beamer: de camera kijkt naar een tafel, muur of bord, en het spel staat
+//           op dit scherm, over het camerabeeld heen
+//   demo    geen camera: meteen spelen met de muis of je vinger, met briefjes op het scherm
+// Hier staat alleen wat los te testen is (test/speelplek.mjs): de keuze bij het opstarten,
+// de beginopstelling van de demo, de briefjes zelf, en het speelveld op een scherm. Het
+// welkomstkaartje, het paneel en het speelscherm staan in js/main.js.
+
+const SPEELPLEKKEN = ['muur', 'scherm', 'demo'];
+
+// Kleuren van de briefjes in de demo. Gewone briefjes krijgen een van deze kleuren;
+// rood, groen en blauw zijn voor de speciale (zie KIND_STYLE in js/game.js).
+const DEMO_KLEUREN = ['#ffd84d', '#ff9f43', '#ff7eb9', '#c9a0ff', '#f1eee4'];
+const DEMO_SPECIAAL = { trampoline: '#ff4d4d', booster: '#3ddc84', breek: '#3aa0ff' };
+// Meer briefjes tegelijk in de demo is alleen maar rommel.
+const DEMO_MAX = 20;
+// Kleiner dan dit (in wereldeenheden, het beeld is 1000 hoog) is een tik, geen briefje.
+const DEMO_MIN = 26;
+// Een briefje van een streep is minstens zo dik.
+const DEMO_DIK = 44;
+// De beginopstelling is ontworpen op een veld van zo breed (en 1000 hoog). Een breder
+// veld krijgt hem in het midden, zodat de baan op elk scherm precies zo loopt.
+const DEMO_BREED = 1200;
+
+// Hier staat het spel online: voor "Open het spel in een eigen tabblad" als de pagina
+// zelf geen gewoon adres heeft.
+const SPEL_ADRES = 'https://noaquim.github.io/sticky-clash/';
+
+/**
+ * Welke speelplek bij het opstarten, en of het welkomstkaartje moet komen.
+ * opgeslagen: de bewaarde instellingen (stickyclash.v5), of null. oud: is er nog een
+ * oudere opslag (v4, v2)?
+ *   - bewaard met een keuze: die keuze, zonder kaartje
+ *   - bewaard, maar nog niets gekozen (speelplek: null): het kaartje weer
+ *   - bewaard van vóór de speelplekken (geen veld speelplek), of alleen een oude opslag:
+ *     wie toen al speelde, speelde met een beamer. Muur, zonder kaartje.
+ *   - niets bewaard: een nieuwe speler, dus het kaartje
+ * Let op: de oude versie bewaarde bij elk bezoek, ook als je meteen weer wegging. Wie
+ * nooit een camera startte, niets kalibreerde en nooit scoorde, speelde dus nog niet:
+ * die krijgt het kaartje ook (zie alGespeeld).
+ * Geeft { plek, welkom }; plek is null zolang er gekozen moet worden.
+ */
+function bepaalSpeelplek(opgeslagen, oud) {
+  const s = opgeslagen && typeof opgeslagen === 'object' ? opgeslagen : null;
+  if (s && 'speelplek' in s) {
+    return SPEELPLEKKEN.includes(s.speelplek) ? { plek: s.speelplek, welkom: false } : { plek: null, welkom: true };
+  }
+  if (alGespeeld(s) || oud) return { plek: 'muur', welkom: false };
+  return { plek: null, welkom: true };
+}
+
+/** Speelde iemand al met de oude versie? Een kalibratie, een camera, of een score. */
+function alGespeeld(s) {
+  if (!s) return false;
+  const b = s.best && typeof s.best === 'object' ? s.best : {};
+  return !!(s.H || s.camId || s.calCam || b.object > 0 || b.color > 0);
+}
+
+/**
+ * Wat er bewaard wordt (het veld speelplek in stickyclash.v5): de keuze, of null zolang er
+ * niets gekozen is. Zo komt het welkomstkaartje terug bij wie de pagina sloot zonder te
+ * kiezen, en niet bij wie al koos.
+ */
+function bewaarSpeelplek(plek, gekozen) {
+  return gekozen && SPEELPLEKKEN.includes(plek) ? plek : null;
+}
+
+// ---------------------------------------------------------------- spelen op een scherm
+
+/**
+ * Van camerabeeld naar speelveld op een scherm. Het hele camerabeeld is het speelveld,
+ * dus er valt niets te kalibreren: (0..1, 0..1) blijft (0..1, 0..1). Gespiegeld (een
+ * camera die naar jou kijkt) gaan links en rechts om. Een 3×3-matrix, net als de
+ * kalibratie van de beamer (zie js/homography.js).
+ */
+function schermHomografie(spiegel) {
+  return spiegel ? [-1, 0, 1, 0, 1, 0, 0, 0, 1] : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+}
+
+/** Waar kolom u (0..1) van het camerabeeld op het scherm komt te staan. */
+function schermBeeldX(u, spiegel) {
+  return spiegel ? 1 - u : u;
+}
+
+/**
+ * Hoe groot het speelveld op het scherm wordt: zo groot mogelijk binnen b × h pixels.
+ * Met ar de vaste verhouding (breed gedeeld door hoog, zoals die van het camerabeeld);
+ * zonder (0) volgt het de ruimte, maar nooit smaller dan min of breder dan max. Op een
+ * telefoon die rechtop staat wordt het dus een liggend veld: in een smal veld passen
+ * de teksten op de muur niet.
+ */
+function pasVeld(b, h, ar = 0, min = 1.2, max = 2.4) {
+  const want = ar > 0 ? ar : Math.max(min, Math.min(max, b / Math.max(1, h)));
+  let w = Math.max(2, b), hh = w / want;
+  if (hh > h) { hh = Math.max(2, h); w = hh * want; }
+  return { w: Math.max(2, Math.floor(w)), h: Math.max(2, Math.floor(hh)) };
+}
+
+// ---------------------------------------------------------------- de briefjes van de demo
+
+/**
+ * Een briefje: een rechthoek van w bij h rond (cx, cy), hoek graden gedraaid (met de klok
+ * mee). kind is 'trampoline', 'booster', 'breek' of niets; kleur de kleur van het papier.
+ * Het is meteen een obstakel voor het spel (poly, vx, vy, team).
+ */
+function maakBriefje(cx, cy, w, h, hoek = 0, kind, kleur) {
+  const a = hoek * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), hw = w / 2, hh = h / 2;
+  const hoeken = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+  const poly = hoeken.map(([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]);
+  return { team: 'object', kind: kind || undefined, kleur: kleur || (kind ? DEMO_SPECIAAL[kind] : DEMO_KLEUREN[0]),
+    vx: 0, vy: 0, poly: normalizePoly(poly) };
+}
+
+/**
+ * De beginopstelling van de demo, voor een veld van W breed en H hoog: waar de ballen
+ * vandaan komen, waar de bak staat, en zes briefjes. Een baan die al half werkt: een
+ * deel van de ballen haalt de bak, de rest mag je zelf de goede kant op sturen. Met één
+ * trampoline (rood), één turbo (groen) en één blauwe muur die na vijf tikken breekt.
+ * Uitgeprobeerd met test/speelplek.mjs: zo'n derde van de ballen haalt de bak.
+ */
+function demoOpstelling(W, H = 1000) {
+  // (smaller dan DEMO_BREED: alles iets kleiner, dan past het nog)
+  const k = Math.min(1, W / DEMO_BREED);
+  const x = (v) => demoMee(v, DEMO_BREED, W), y = (v) => v * H / 1000;
+  const briefje = (cx, cy, w, h, hoek, kind, kleur) => maakBriefje(x(cx), y(cy), w * k, h * k, hoek, kind, kleur);
+  return {
+    bron: { x: x(170), y: y(70) },
+    doel: { x: x(940), y: y(800), r: 110 },
+    briefjes: [
+      briefje(150, 330, 120, 120, 20, undefined, DEMO_KLEUREN[0]),  // geel, vlak onder de bron
+      briefje(330, 430, 220, 56, 10, 'booster'),                    // turbo: schiet ze naar rechts
+      briefje(690, 420, 56, 220, 0, 'breek'),                       // blauwe muur: vijf tikken
+      briefje(370, 880, 200, 56, 25, 'trampoline'),                 // trampoline: omhoog, naar de bak
+      briefje(110, 700, 110, 110, 25, undefined, DEMO_KLEUREN[1]),  // oranje: vangt wat links valt
+      briefje(1115, 640, 110, 110, -30, undefined, DEMO_KLEUREN[2]), // roze, tegen de rechterkant
+    ],
+  };
+}
+
+/** Een nieuw briefje uit een sleep van a naar b (wereldcoördinaten), of null bij een tik. */
+function briefjeUitSleep(a, b, kind, kleur) {
+  let x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]);
+  let y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+  if (x1 - x0 < DEMO_MIN && y1 - y0 < DEMO_MIN) return null;
+  // een streep wordt een smal briefje, geen onzichtbaar lijntje
+  if (x1 - x0 < DEMO_DIK) { const m = (x0 + x1) / 2; x0 = m - DEMO_DIK / 2; x1 = m + DEMO_DIK / 2; }
+  if (y1 - y0 < DEMO_DIK) { const m = (y0 + y1) / 2; y0 = m - DEMO_DIK / 2; y1 = m + DEMO_DIK / 2; }
+  return maakBriefje((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, 0, kind, kleur);
+}
+
+/** Omhullende rechthoek [x0, y0, x1, y1] van een veelhoek. */
+function briefjeVak(poly) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of poly) {
+    if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+  }
+  return [x0, y0, x1, y1];
+}
+
+/** Afstand van (x, y) tot een bolle veelhoek; 0 als het punt erin ligt. */
+function afstandTotBriefje(poly, x, y) {
+  const n = poly.length;
+  let binnen = true, best = Infinity;
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n];
+    const ex = b[0] - a[0], ey = b[1] - a[1], len2 = ex * ex + ey * ey || 1e-9;
+    // normalizePoly: de binnenkant ligt links van elke rand (zie collide in js/game.js)
+    if (ex * (y - a[1]) - ey * (x - a[0]) < 0) binnen = false;
+    let t = ((x - a[0]) * ex + (y - a[1]) * ey) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const d = Math.hypot(x - (a[0] + ex * t), y - (a[1] + ey * t));
+    if (d < best) best = d;
+  }
+  return binnen ? 0 : best;
+}
+
+/** Welk briefje ligt op (x, y), met marge speling? Het bovenste (het laatst getekende), of -1. */
+function briefjeOp(briefjes, x, y, marge = 0) {
+  for (let i = briefjes.length - 1; i >= 0; i--) {
+    if (afstandTotBriefje(briefjes[i].poly, x, y) <= marge) return i;
+  }
+  return -1;
+}
+
+/** Waar het kruisje om een briefje weg te halen staat: rechtsboven. */
+function kruisjeVan(poly) {
+  const v = briefjeVak(poly);
+  return [v[2], v[1]];
+}
+
+/**
+ * Een briefje dx, dy verschuiven, maar nooit buiten het veld van W bij H. Geeft de
+ * verschuiving die het echt werd.
+ */
+function schuifBriefje(briefje, dx, dy, W, H) {
+  const v = briefjeVak(briefje.poly);
+  dx = Math.max(-v[0], Math.min(W - v[2], dx));
+  dy = Math.max(-v[1], Math.min(H - v[3], dy));
+  if (dx || dy) briefje.poly = briefje.poly.map(p => [p[0] + dx, p[1] + dy]);
+  return [dx, dy];
+}
+
+/**
+ * Waar x in een demoveld van oudW breed terechtkomt in een veld van nieuwW breed. Het
+ * midden van de opstelling blijft in het midden, en de afstanden blijven gelijk: dan
+ * loopt de baan nog precies zo. Alleen een veld smaller dan DEMO_BREED (de kleine
+ * weergave rechts op een smal scherm) knijpt hem wat samen.
+ */
+function demoMee(x, oudW, nieuwW) {
+  const k0 = Math.min(1, oudW / DEMO_BREED), o0 = Math.max(0, (oudW - DEMO_BREED) / 2);
+  const k1 = Math.min(1, nieuwW / DEMO_BREED), o1 = Math.max(0, (nieuwW - DEMO_BREED) / 2);
+  return o1 + (x - o0) * k1 / k0;
+}
+
+/**
+ * Het veld werd breder of smaller (speelscherm open of dicht, telefoon gedraaid): de
+ * briefjes schuiven mee zoals demoMee zegt, zonder van vorm te veranderen, en blijven
+ * binnen het veld.
+ */
+function briefjesMee(briefjes, oudW, nieuwW, H) {
+  if (!(oudW > 0) || !(nieuwW > 0)) return;
+  for (const b of briefjes) {
+    const v = briefjeVak(b.poly), mx = (v[0] + v[2]) / 2;
+    schuifBriefje(b, demoMee(mx, oudW, nieuwW) - mx, 0, nieuwW, H);
+  }
+}
+
+/**
+ * Een dubbeltik op hetzelfde briefje: binnen een halve seconde (zo lang als een dubbelklik
+ * in Windows), en niet ver van de eerste tik. vorig = { t, x, y, doel } van de eerste tik
+ * (of null).
+ */
+function dubbeltik(vorig, t, x, y, doel) {
+  return !!vorig && vorig.doel === doel && t - vorig.t < 500 && Math.hypot(x - vorig.x, y - vorig.y) < 40;
+}
+
+// ---------------------------------------------------------------- kan de camera hier?
+
+/**
+ * Waarom de camera hier niet kan, of null als hij (waarschijnlijk) wel kan. Zonder iets
+ * te vragen: de browser laat nog geen venster zien. env:
+ *   api        bestaat navigator.mediaDevices.getUserMedia?
+ *   veilig     window.isSecureContext
+ *   ingesloten staat de pagina in een iframe (zoals op itch.io)?
+ *   beleid     mag de camera volgens de iframe-regels (allow="camera")? true, false, of null (onbekend)
+ *   geweigerd  werd de camera al eens geweigerd?
+ * Antwoord: 'ingesloten' (een eigen tabblad helpt), 'onveilig' (geen https: de site
+ * helpt), 'geen-api' (deze browser kan het niet) of 'geweigerd' (zelf weer toestaan).
+ */
+function cameraReden(env) {
+  if (env.ingesloten && (env.beleid === false || env.geweigerd)) return 'ingesloten';
+  if (!env.api) return env.veilig ? 'geen-api' : 'onveilig';
+  if (env.geweigerd) return 'geweigerd';
+  return null;
+}
+
+/**
+ * Het adres voor "Open het spel in een eigen tabblad": deze pagina zelf (zonder # erachter),
+ * of de site als deze pagina geen gewoon adres heeft (about:srcdoc, blob:).
+ */
+function eigenTabblad(href) {
+  try {
+    const u = new URL(href);
+    if (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'file:') { u.hash = ''; return u.href; }
+  } catch { /* geen geldig adres */ }
+  return SPEL_ADRES;
+}
+
 // ---- js/main.js
+
 
 
 
@@ -6376,7 +6936,7 @@ const app = {
   reasons: {},
   projCells: 0,
   projCellsFor: null,
-  best: { object: 0, color: 0 },
+  best: { object: 0, color: 0, demo: 0 },
   steps: { proj: 0, cam: 0, cal: 0, bg: 0, goal: 0 },
   lastVideoTime: -1,
   videoStill: 0,
@@ -6391,6 +6951,21 @@ const app = {
   lockExposure: false,    // camerabelichting vastzetten (standaard uit, zie vision.js)
   ingesteld: false,       // al eens alles automatisch ingesteld (de knop heet dan anders)
   camLuma: -1,            // hoe helder de camera het beamervlak ziet
+  // Waar je speelt (zie js/speelplek.js): 'muur' (webcam en beamer), 'scherm' (de camera
+  // kijkt naar een tafel, het spel staat op dit scherm) of 'demo' (zonder camera).
+  speelplek: 'muur',
+  plekGekozen: false,     // zelf gekozen? Anders staat het welkomstkaartje er
+  muurH: null,            // de kalibratie van de beamer, bewaard zolang je op een scherm speelt
+  schermSpiegel: null,    // op een scherm: links en rechts om (null = nog nooit gekozen)
+  svOpen: false,          // het speelscherm over het hele venster
+  demoBriefjes: [],       // de briefjes van de demo, in wereldcoördinaten
+  demoW: 0,               // hoe breed het veld was toen ze neergelegd werden (0 = nog niet)
+  demoKleur: 'los',       // wat je in de demo tekent: 'los' (gewone kleur) of een soort
+  sleep: null,            // wat je in het speelveld vasthoudt met de muis of je vinger
+  tik: null,              // de vorige tik op een briefje, voor een dubbeltik
+  camReden: null,         // waarom de camera hier niet kan (zie cameraReden), of null
+  camGeweigerd: false,    // de browser weigerde de camera al eens
+  popupNiet: false,       // het beamervenster mocht hier niet open (ingesloten venster)
 };
 
 const debug = $('debug');
@@ -6411,7 +6986,10 @@ const PRED_H = 144;   // resolutie van de lichtvoorspelling; te laag mist dunne 
 function save() {
   try {
     localStorage.setItem(STORE, JSON.stringify({
-      H: app.H,
+      // op een scherm is app.H het camerabeeld zelf; de kalibratie van de beamer is muurH
+      H: app.speelplek === 'scherm' ? app.muurH : app.H,
+      speelplek: bewaarSpeelplek(app.speelplek, app.plekGekozen),
+      schermSpiegel: app.schermSpiegel,
       classes: vision.classes,
       mirror: vision.mirror,
       mode: vision.mode,
@@ -6486,7 +7064,8 @@ function load() {
     if (s.moveGoal != null) $('moveGoal').checked = s.moveGoal;
     if (s.outline != null) $('outline').checked = s.outline;
     for (const k of ['sound', 'muziek', 'effecten']) if (s[k] != null) $(k).checked = !!s[k];
-    if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0 };
+    if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0, demo: s.best.demo | 0 };
+    if (typeof s.schermSpiegel === 'boolean') app.schermSpiegel = s.schermSpiegel;
     if (s.camId) app.camId = s.camId;
     if (s.camChosen != null) app.camChosen = !!s.camChosen;
     if (typeof s.fill === 'number') app.fill = s.fill;
@@ -6494,6 +7073,21 @@ function load() {
     if (s.lockExposure != null) app.lockExposure = s.lockExposure;
     if (s.calCam) app.calCam = s.calCam;
   } catch { /* stille val-terug op standaardwaarden */ }
+}
+
+/**
+ * Welke speelplek, nog vóór load(): wie niets bewaard heeft krijgt het welkomstkaartje, wie
+ * al met een beamer speelde niet (zie bepaalSpeelplek in js/speelplek.js).
+ */
+function laadSpeelplek() {
+  let s = null, oud = false;
+  try {
+    s = JSON.parse(localStorage.getItem(STORE) || 'null');
+    oud = !!(localStorage.getItem(STORE_OLD) || localStorage.getItem('stickyclash.v2'));
+  } catch { /* opslag geblokkeerd of kapot: dan als een nieuwe speler */ }
+  const k = bepaalSpeelplek(s, oud);
+  app.speelplek = k.plek || 'muur';
+  app.plekGekozen = !k.welkom;
 }
 
 // De laatste melding in de statusregel: uit welke zin, om hem na het wisselen van taal
@@ -6505,16 +7099,21 @@ function status(msg, kind) {
   const el = $('status');
   el.textContent = msg;
   el.className = 'status' + (kind ? ' ' + kind : '');
+  // ook bovenin het speelscherm, dat het paneel afdekt
+  const sv = $('svStatus');
+  sv.textContent = msg;
+  sv.className = 'sv-status' + (kind ? ' ' + kind : '');
   const h = tHerkomst(msg);
   statusBron = h ? { nl: h.nl, vars: h.vars, kind } : null;
 }
 
 function step(k, v) {
   app.steps[k] = v;
-  const li = document.querySelector('.steps li[data-k="' + k + '"]');
-  if (!li) return;
-  li.classList.toggle('on', v === 1);
-  li.classList.toggle('busy', v === 2);
+  // Camera en geleerd staan ook in het lijstje van spelen op een scherm.
+  document.querySelectorAll('.steps li[data-k="' + k + '"]').forEach(li => {
+    li.classList.toggle('on', v === 1);
+    li.classList.toggle('busy', v === 2);
+  });
 }
 
 function refreshSteps() { for (const k in app.steps) step(k, app.steps[k]); }
@@ -6546,10 +7145,12 @@ async function runExclusive(fn) {
 }
 
 function setBusyUi(on) {
-  for (const id of ['btnAuto', 'btnCalAuto', 'btnCal', 'btnBg', 'btnGoal', 'btnCam', 'btnScreens']) {
+  for (const id of ['btnAuto', 'btnCalAuto', 'btnCal', 'btnBg', 'btnGoal', 'btnCam', 'btnScreens', 'btnScherm', 'btnSchermLeer', 'svLeer']) {
     const el = $(id);
     if (el) el.disabled = on;
   }
+  // niet van speelplek wisselen midden in het instellen
+  document.querySelectorAll('#plekSeg button').forEach(b => { b.disabled = on; });
   $('btnAbort').classList.toggle('hidden', !on);
 }
 
@@ -6560,6 +7161,7 @@ function syncStepsFromState() {
   step('cal', app.H ? 1 : 0);
   step('bg', vision.hasBackground ? 1 : 0);
   if (app.steps.goal === 2) step('goal', 0);
+  toonSchermKnop();
 }
 
 /**
@@ -6632,6 +7234,9 @@ async function gewensteCamera() {
 /** De hele melding als de camera niet wil starten. */
 function cameraFout(e) {
   const n = e && e.name;
+  if ((n === 'NotAllowedError' || n === 'SecurityError') && ingesloten()) {
+    return t('Camera mislukt: in een ingesloten venster mag het spel de camera niet gebruiken — open het spel in een eigen tabblad');
+  }
   if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan');
   if (n === 'NotReadableError' || n === 'AbortError') return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
   if (n === 'NotFoundError' || n === 'OverconstrainedError') return t('Camera mislukt: geen camera gevonden — sluit je webcam aan');
@@ -6640,6 +7245,13 @@ function cameraFout(e) {
 }
 
 async function startCamera() {
+  // De demo vraagt nooit om de camera: daar is hij juist voor.
+  if (app.speelplek === 'demo') return false;
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    bekijkCamera();
+    status(camRedenTekst(app.camReden || 'geen-api'), 'err');
+    return false;
+  }
   step('cam', 2);
   try {
     const wil = await gewensteCamera();
@@ -6662,8 +7274,9 @@ async function startCamera() {
     if (wil && id && wil !== id) {
       status(t('De gekozen camera deed het niet (bezet?) — nu: {naam}', { naam: label }), 'err');
     }
-    // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie.
-    if (app.H) {
+    // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie. (Op een
+    // scherm is er geen kalibratie en geen uitsnede: het hele beeld is het speelveld.)
+    if (app.H && app.speelplek === 'muur') {
       applyRoi();
       if (app.calCam && id && app.calCam !== id) {
         status(t('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"'), 'err');
@@ -6692,11 +7305,13 @@ async function startCamera() {
     app.lastVideoTime = -1; app.videoStill = 0;
     step('cam', 1);
     save();
-    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
+    if (!(wil && id && wil !== id) && !(app.speelplek === 'muur' && app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
     bekendeCams = new Set((await vision.devices()).map(d => d.deviceId));
+    if (app.camGeweigerd) { app.camGeweigerd = false; bekijkCamera(); }
     return true;
   } catch (e) {
     step('cam', 0);
+    if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) { app.camGeweigerd = true; bekijkCamera(); }
     status(cameraFout(e), 'err');
     return false;
   }
@@ -6723,14 +7338,18 @@ async function cameraGewisseld() {
     app.camChosen = true; app.camId = d.deviceId;
     $('camSelect').value = d.deviceId;
     save();
+    const scherm = app.speelplek === 'scherm';
     if (!vision.ready) {
-      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
+      status(scherm ? t('Webcam gevonden en gekozen: {naam} — klik op "Start op dit scherm"', { naam })
+        : t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
       return;
     }
     await runExclusive(startCamera);
     const tr = vision.stream && vision.stream.getVideoTracks()[0];
     if (tr && tr.getSettings && tr.getSettings().deviceId === d.deviceId) {
-      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
+      // (een andere camera ziet de tafel anders: opnieuw leren)
+      status(scherm ? t('Webcam gevonden en gekozen: {naam} — klik op Opnieuw leren', { naam })
+        : t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
     }
     return;
   }
@@ -6748,15 +7367,22 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   });
 }
 
+/** De geleerde muur weggooien. Zonder dat de camera ooit aan stond is er niets te vergeten. */
+function vergeetMuur() {
+  if (vision.mask) vision.clearBackground();
+  step('bg', 0);
+}
+
 $('btnCam').onclick = () => runExclusive(startCamera);
-$('btnFlip').onclick = () => { vision.mirror = !vision.mirror; vision.clearBackground(); step('bg', 0); save(); };
+$('btnFlip').onclick = () => { vision.mirror = !vision.mirror; vergeetMuur(); save(); };
 $('camSelect').onchange = () => {
   const v = $('camSelect').value;
   app.camChosen = !!v;
   if (v) app.camId = v;
   save();
   if (vision.ready) runExclusive(startCamera);
-  else status(v ? t('Camera gekozen — klik op "Alles automatisch instellen"') : t('Camera: automatisch'), 'ok');
+  else if (!v) status(t('Camera: automatisch'), 'ok');
+  else status(app.speelplek === 'scherm' ? t('Camera gekozen — klik op "Start op dit scherm"') : t('Camera gekozen — klik op "Alles automatisch instellen"'), 'ok');
 };
 
 // ---------------------------------------------------------------- beamer
@@ -6772,13 +7398,21 @@ async function openProjector(auto) {
   const feat = scr
     ? 'left=' + scr.availLeft + ',top=' + scr.availTop + ',width=' + scr.availWidth + ',height=' + scr.availHeight
     : 'width=1280,height=720';
-  const w = window.open('', 'stickyclash_projector', feat);
-  if (!w) {
+  let w = null;
+  try { w = window.open('', 'stickyclash_projector', feat); } catch { w = null; }
+  // In een ingesloten venster (zoals op itch.io) mag een pop-up vaak niet, of kunnen we
+  // er niet in tekenen. Dan zeggen we waarom, in plaats van stil niets te doen.
+  const mislukt = () => {
     step('proj', 0);
-    status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
+    if (ingesloten()) {
+      status(t('Het beamervenster kan hier niet open: dit is een ingesloten venster — open het spel in een eigen tabblad'), 'err');
+      app.popupNiet = true;
+      toonCamReden();
+    } else status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
     return false;
-  }
-  w.document.open();
+  };
+  if (!w) return mislukt();
+  try { w.document.open(); } catch { try { w.close(); } catch { /* dan niet */ } return mislukt(); }
   w.document.write(
     '<!doctype html><html><head><meta charset="utf-8"><title>' + t('Sticky Clash — beamer') + '</title>' +
     '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
@@ -7071,16 +7705,20 @@ function updateCal() {
 
 async function learnWall(withCountdown) {
   if (!vision.ready) return false;
+  // Op een scherm is er geen beamer: geen wit beeld, geen muurverlichting, niets vast te
+  // zetten. Het spel leert gewoon hoe de lege tafel (of muur, of bord) eruitziet.
+  const scherm = app.speelplek === 'scherm';
   step('bg', 2);
   if (withCountdown) {
     for (let n = 3; n > 0; n--) {
       if (app.abort) return false;
-      app.wiz = { title: 'Ga even uit beeld', sub: 'ik leer hoe de lege muur eruitziet', count: n };
+      app.wiz = scherm ? { title: 'Handen uit beeld', sub: 'ik leer hoe de lege ondergrond eruitziet', count: n }
+        : { title: 'Ga even uit beeld', sub: 'ik leer hoe de lege muur eruitziet', count: n };
       await sleep(900);
     }
   }
   app.wiz = { title: 'Momentje', sub: '' };
-  if (typeof vision.beginResponse === 'function' && projOk()) {
+  if (!scherm && typeof vision.beginResponse === 'function' && projOk()) {
     // Eerst heel even vol wit: zo leert het spel hoe fel elk stukje muur oplicht onder
     // de beamer, en kan het zijn eigen ballen en letters voorspellen in plaats van er
     // alleen omheen te kijken. Snel meten, voordat de camera zijn belichting aanpast.
@@ -7091,12 +7729,12 @@ async function learnWall(withCountdown) {
     vision.endResponse();
   }
   // Leren onder dezelfde verlichting als waarmee gespeeld wordt.
-  app.calPattern = { kind: 'fill' };
+  if (!scherm) app.calPattern = { kind: 'fill' };
   // Lang genoeg wachten tot de camera gewend is: anders leert hij een muur die net
-  // iets te donker of te licht is.
-  await sleep(1200);
+  // iets te donker of te licht is. Zonder beamer verandert er niets aan het licht.
+  await sleep(scherm ? 400 : 1200);
   let vast = [];
-  if (app.lockExposure) {
+  if (app.lockExposure && !scherm) {
     // Alleen op verzoek, en gecontroleerd: wordt het beeld er merkbaar donkerder van,
     // dan meteen terug naar automatisch.
     vision.grab();
@@ -7129,7 +7767,11 @@ async function learnWall(withCountdown) {
   step('bg', 1);
   // vision.lockCamera noemt wat hij vastzette: 'belichting', 'witbalans'
   const wat = () => vast.map(w => t(w)).join(', ');
-  if (!vast.length) {
+  if (scherm) {
+    status(al ? tAantal(al, 'Geleerd — {n} voorwerp lag er al, dat telt gewoon mee. Handen tellen niet mee.',
+      'Geleerd — {n} voorwerpen lagen er al, die tellen gewoon mee. Handen tellen niet mee.')
+      : t('Geleerd — alles wat je nu neerlegt, kaatst de ballen. Handen tellen niet mee.'), 'ok');
+  } else if (!vast.length) {
     status(al ? tAantal(al, 'Muur geleerd — {n} voorwerp hing er al, dat telt gewoon mee',
       'Muur geleerd — {n} voorwerpen hingen er al, die tellen gewoon mee')
       : t('Muur geleerd — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
@@ -7223,6 +7865,9 @@ $('btnGoal').onclick = () => {
 
 function autoSetup() {
   sfx.resume();
+  // Kan de camera hier helemaal niet (ingesloten venster, geen https)? Dan zeggen we dat
+  // meteen, zonder eerst een beamervenster te openen dat toch niets kan.
+  if (app.camReden && app.camReden !== 'geweigerd') { status(camRedenTekst(app.camReden), 'err'); return false; }
   // Het venster moet binnen de klik open, vóór alles wat wacht.
   const opened = projOk() || openProjector(true);
   return runExclusive(async () => {
@@ -7273,9 +7918,7 @@ $('btnAbort').onclick = () => { app.abort = true; status(t('Afgebroken')); };
 
 function setMode(m) {
   vision.mode = m;
-  game.duel = (m === 'color');
-  game.lowLight = (m === 'object');
-  game.best = app.best[m] || 0;
+  pasSpeelplekToe();              // duel, zuinig met licht en het record hangen ook af van de speelplek
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   toonModeHint();
   document.querySelectorAll('.steps li[data-k="bg"], .steps li[data-k="goal"]')
@@ -7285,9 +7928,12 @@ function setMode(m) {
 }
 
 function toonModeHint() {
-  $('modeHint').textContent = vision.mode === 'object'
-    ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
-    : t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".');
+  // op een scherm ligt het op een tafel, en daar tellen handen juist niet
+  const muur = app.speelplek !== 'scherm';
+  $('modeHint').textContent = vision.mode !== 'object'
+    ? t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".')
+    : muur ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
+      : t('Alles wat je neerlegt kaatst de ballen — briefje, boek, doos. Handen tellen niet mee. Leer eerst de lege ondergrond.');
 }
 
 document.querySelectorAll('#modeSeg button').forEach(b => {
@@ -7465,9 +8111,9 @@ $('resident').onchange = e => {
 $('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
 $('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
 $('effecten').onchange = e => { game.effects = e.target.checked; save(); };
-$('outline').onchange = e => { game.showOutlines = e.target.checked; save(); };
-$('testMode').onchange = e => {
-  app.testMode = e.target.checked;
+$('outline').onchange = () => { pasSpeelplekToe(); save(); };
+$('testMode').onchange = () => {
+  pasSpeelplekToe();
   status(app.testMode ? t('Testmodus: sleep met de muis in de rechter weergave') : t('Testmodus uit'));
 };
 
@@ -7475,8 +8121,11 @@ $('testMode').onchange = e => {
 
 /** Korte tips die op de muur rouleren zolang er niet gespeeld wordt. */
 function updateTips() {
-  const tips = [t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen'),
-                t('Bouw een baan naar de groene bak')];
+  const p = app.speelplek;
+  const eerste = p === 'demo' ? t('Sleep de briefjes of teken nieuwe: de ballen kaatsen ertegen')
+    : p === 'scherm' ? t('Leg briefjes of voorwerpen neer: de ballen kaatsen ertegen')
+      : t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen');
+  const tips = [eerste, t('Bouw een baan naar de groene bak')];
   if (app.special) tips.push(t('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken'));
   if (app.gold) tips.push(t('Een gouden bal in de bak is 3 punten waard'));
   if (app.bonus) tips.push(t('De kleine gouden bak geeft 3 punten, en verspringt steeds'));
@@ -7512,7 +8161,13 @@ function leesRang() {
   try { const r = JSON.parse(localStorage.getItem(RANG) || '{}'); return r && typeof r === 'object' ? r : {}; }
   catch { return {}; }
 }
-function rangSoort() { return game.levelMode ? 'levels' : vision.mode; }
+// De demo heeft een eigen ranglijst: met de muis is het een ander spel.
+function rangSoort() {
+  if (app.speelplek === 'demo') return game.levelMode ? 'demo-levels' : 'demo';
+  return game.levelMode ? 'levels' : vision.mode;
+}
+/** Onder welke naam het record van deze speelmodus bewaard wordt (app.best). */
+function bestSleutel() { return app.speelplek === 'demo' ? 'demo' : vision.mode; }
 function rangLijst(soort = rangSoort()) {
   const l = leesRang()[soort];
   return Array.isArray(l) ? l.filter(e => e && typeof e.name === 'string' && Number.isFinite(e.score)) : [];
@@ -7590,8 +8245,7 @@ const telefoon = new Telefoon(game, {
   status,
   gebaar: () => sfx.resume(),
   // de waarschuwingsbalk onderin de muur (zie drawScene), als deel van de hoogte
-  onderbalk: () => (!app.H && !app.testMode) ? 0.13
-    : (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready ? 0.11 : 0),
+  onderbalk: () => { const s = onderbalkSoort(); return s === 'kalibratie' ? 0.13 : s === 'leren' ? 0.11 : 0; },
 });
 telefoon.koppelPaneel(document);
 
@@ -7680,6 +8334,10 @@ function checkVerschuiving(dt) {
   herstelNaVerschuiving();
 }
 async function herstelNaVerschuiving() {
+  if (app.speelplek === 'scherm') {
+    status(t('De camera is verschoven — klik op Opnieuw leren'), 'err');
+    return;
+  }
   if (!projOk()) {
     status(t('De camera of beamer is verschoven — klik op "Alles automatisch instellen"'), 'err');
     return;
@@ -7703,6 +8361,7 @@ async function herstelNaVerschuiving() {
 function toonPlayKnop() {
   const s = game.state;
   $('btnPlay').textContent = s === 'paused' ? t('Pauze opheffen') : (s === 'play' || s === 'count') ? t('Pauze') : t('Start ronde');
+  $('svStart').textContent = $('btnPlay').textContent;
 }
 
 $('btnPlay').onclick = () => {
@@ -7749,6 +8408,8 @@ function noteFromDrag(a, b, team) {
 
 world.addEventListener('pointerdown', (e) => {
   if (e.button === 2) return;
+  // Demo en scherm: briefjes, bak en bron zoals in het speelscherm (zie wijzerNeer).
+  if (app.speelplek !== 'muur') { wijzerNeer(e, world); return; }
   const p = worldFromEvent(e);
 
   // Doel en bron mag je altijd verslepen, ook zonder testmodus — dat is veel
@@ -7768,15 +8429,17 @@ world.addEventListener('pointerdown', (e) => {
   world.setPointerCapture(e.pointerId);
 });
 world.addEventListener('pointermove', (e) => {
+  if (app.sleep) { wijzerBeweeg(e, world); return; }
   const p = worldFromEvent(e);
   if (app.dragGoal) { game.setGoal(p[0], p[1]); return; }
   if (app.dragSource) { game.setSource(p[0], p[1]); return; }
   if (app.drag) app.drag.b = p;
 });
-const stopDrag = () => { app.dragGoal = false; app.dragSource = false; app.drag = null; };
+const stopDrag = () => { app.dragGoal = false; app.dragSource = false; app.drag = null; app.sleep = null; };
 world.addEventListener('pointercancel', stopDrag);
 world.addEventListener('lostpointercapture', () => { app.dragGoal = false; app.dragSource = false; });
 world.addEventListener('pointerup', () => {
+  if (app.sleep) { wijzerLos(); return; }
   app.dragGoal = false; app.dragSource = false;
   if (!app.drag) return;
   const d = app.drag; app.drag = null;
@@ -8074,7 +8737,11 @@ function drawPattern(ctx, w, h) {
 }
 
 function drawWizard(ctx, w, h) {
-  ctx.fillStyle = '#05070a';
+  if (app.speelplek === 'scherm') {
+    // op een scherm: over het camerabeeld heen, dan zie je meteen wat de camera ziet
+    tekenCameraBeeld(ctx, w, h);
+    ctx.fillStyle = 'rgba(5,7,10,.55)';
+  } else ctx.fillStyle = '#05070a';
   ctx.fillRect(0, 0, w, h);
   const s = h / 1000;
   ctx.textAlign = 'center';
@@ -8125,11 +8792,24 @@ function drawCalibration(ctx, w, h) {
   ctx.textBaseline = 'top';
 }
 
+/**
+ * Welke waarschuwingsbalk er onderin de muur staat: 'kalibratie' (niet gekalibreerd),
+ * 'leren' (muur nog niet geleerd) of null. Niet zolang het welkomstkaartje er staat: dan
+ * is er nog niets gekozen om in te stellen.
+ */
+function onderbalkSoort() {
+  if (!app.plekGekozen) return null;
+  if (!app.H && !app.testMode) return 'kalibratie';
+  if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) return 'leren';
+  return null;
+}
+
 function drawScene(ctx, w, h) {
   if (app.calPattern) { drawPattern(ctx, w, h); return; }
   if (app.wiz) { drawWizard(ctx, w, h); return; }
   if (app.calibrating) { drawCalibration(ctx, w, h); return; }
   game.render(ctx, w, h);
+  if (app.speelplek === 'demo') tekenKruisjes(ctx, w, h);
 
   if (app.projHint) {
     ctx.save();
@@ -8143,7 +8823,8 @@ function drawScene(ctx, w, h) {
 
   // Zonder kalibratie weet het spel niet waar de voorwerpen liggen, en raken de
   // ballen dus niets. Dat mag je nooit per ongeluk over het hoofd zien.
-  if (!app.H && !app.testMode) {
+  const balk = onderbalkSoort();
+  if (balk === 'kalibratie') {
     const bh = h * 0.13;
     ctx.fillStyle = '#b3261e';
     ctx.fillRect(0, h - bh, w, bh);
@@ -8155,7 +8836,7 @@ function drawScene(ctx, w, h) {
     ctx.font = '500 ' + Math.round(bh * 0.2) + 'px ui-sans-serif, system-ui, sans-serif';
     ctx.fillText(t('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"'), w / 2, h - bh * 0.25);
     ctx.textBaseline = 'top';
-  } else if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) {
+  } else if (balk === 'leren') {
     const bh = h * 0.11;
     ctx.fillStyle = '#7a4a10';
     ctx.fillRect(0, h - bh, w, bh);
@@ -8163,7 +8844,7 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 ' + Math.round(bh * 0.3) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
+    ctx.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
 
@@ -8186,7 +8867,7 @@ function drawDebug(tracks) {
     c.drawImage(maskTmp, 0, 0, debug.width, debug.height);
     if (vision.mode === 'object' && !vision.hasBackground) {
       c.fillStyle = '#ffab8f'; c.font = '13px system-ui'; c.textAlign = 'center';
-      c.fillText(t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
+      c.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
     }
   } else if (vision.ready) {
     c.drawImage(vision.cv, 0, 0);
@@ -8238,7 +8919,8 @@ function drawDebug(tracks) {
 }
 
 function updateProjectionMask() {
-  if (vision.mode !== 'object' || !vision.hasBackground || !app.H || !vision.ready) {
+  // Op een scherm valt er geen licht van ons op de tafel: niets te voorspellen.
+  if (vision.mode !== 'object' || !vision.hasBackground || !app.H || !vision.ready || app.speelplek !== 'muur') {
     if (vision.ready) vision.setProjection(null, 0, 0, null);
     return;
   }
@@ -8291,9 +8973,11 @@ function frame(now) {
   if (fpsAcc > 0.5) { $('fps').textContent = Math.round(fpsN / fpsAcc) + ' fps'; fpsAcc = 0; fpsN = 0; }
 
   fitCanvas(world);
+  if (app.svOpen) svMaat();
   if (app.proj && app.proj.closed) { app.proj = null; app.projCtx = null; step('proj', 0); }
-  if (projOk()) game.setAspect(app.projCtx.canvas.width / app.projCtx.canvas.height);
-  else game.setAspect(world.width / world.height);
+  const ar = veldVerhouding();
+  if (app.speelplek === 'demo') demoVeld(ar);
+  game.setAspect(ar);
 
   // Alleen verwerken als de camera echt een nieuw beeld heeft. Dubbele beelden gaven
   // schokkerige snelheden; en blijft het beeld staan, dan zeggen we dat.
@@ -8315,9 +8999,11 @@ function frame(now) {
   checkVerschuiving(dt);
   if (app.syncTip) app.syncTip();
   app.projHint = projOk() && !app.projFull && !app.busy && game.state !== 'play' && game.state !== 'count';
-  game.fill = app.fill;
+  game.fill = app.speelplek === 'muur' ? app.fill : 0;
 
-  if (app.testMode) {
+  if (app.speelplek === 'demo') {
+    game.setObstacles(demoObstakels());
+  } else if (app.testMode) {
     const obs = app.testNotes.slice();
     if (app.drag) obs.push(noteFromDrag(app.drag.a, app.drag.b, app.drag.team));
     game.setObstacles(obs);
@@ -8329,11 +9015,15 @@ function frame(now) {
 
   const before = game.state;
   game.update(dt);
+  // Een versleept briefje beweegt alleen in het beeldje waarin je het verschoof (zie wijzerBeweeg).
+  if (app.speelplek === 'demo') {
+    for (let i = 0; i < app.demoBriefjes.length; i++) { app.demoBriefjes[i].vx = 0; app.demoBriefjes[i].vy = 0; }
+  }
   // Muziek alleen tijdens het spelen; sneller in de laatste tien seconden en per level.
   sfx.muziek.volg(game.state, game.laatsteTien(), game.level);
   if (before !== game.state) {
     if (game.state === 'over') {
-      app.best[vision.mode] = Math.max(app.best[vision.mode] || 0, game.best);
+      app.best[bestSleutel()] = Math.max(app.best[bestSleutel()] || 0, game.best);
       save();
       toonPlayKnop();
       status(game.levelMode ? t('Uitdaging voorbij: je haalde level {n}', { n: game.levelReached || 1 })
@@ -8358,12 +9048,17 @@ function frame(now) {
   if (liveAcc > 0.25) {
     liveAcc = 0;
     const el = $('live');
+    // op een scherm heet het anders: geen muur en geen muurverlichting
+    const scherm = app.speelplek === 'scherm';
     if (app.testMode) el.textContent = tAantal(game.obstacles.length, '{n} obstakel (testmodus)', '{n} obstakels (testmodus)');
     else if (!app.H) el.textContent = t('Niet gekalibreerd — voorwerpen raken de ballen niet');
-    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = t('Muur nog niet geleerd');
-    else if (staleBg > 2) el.textContent = t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
-    else if (vision.floodGuard && vision.mode === 'object') el.textContent = t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
-    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
+    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = scherm ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd');
+    else if (staleBg > 2) el.textContent = scherm ? t('Bijna alles wordt als voorwerp gezien — licht veranderd? Klik op Opnieuw leren')
+      : t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
+    else if (vision.floodGuard && vision.mode === 'object') el.textContent = scherm ? t('Het licht is flink veranderd — herkenning werkt beperkt. Klik op Opnieuw leren')
+      : t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
+    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = scherm ? t('De camera ziet te weinig licht ({n}/255) — doe een lamp aan', { n: Math.round(app.camLuma) })
+      : t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
     else {
       const uitleg = Object.keys(app.reasons || {})
         .map(k => app.reasons[k] + '× ' + (REDENEN[k] ? t(REDENEN[k]) : k)).join(', ');
@@ -8384,12 +9079,552 @@ function frame(now) {
   }
 
   if (projOk()) drawScene(app.projCtx, app.projCtx.canvas.width, app.projCtx.canvas.height);
-  drawScene(wctx, world.width, world.height);
+  // Het speelscherm dekt het paneel af: dan hoeft de weergave rechts niet getekend.
+  if (app.svOpen) drawScene(svCtx, svCanvas.width, svCanvas.height);
+  else drawScene(wctx, world.width, world.height);
   updateProjectionMask();
   drawDebug(tracks);
 
   requestAnimationFrame(frame);
 }
+
+// ---------------------------------------------------------------- speelplek: muur, scherm of demo
+//
+// Drie manieren van spelen (zie js/speelplek.js). Muur + beamer is alles hierboven. Op een
+// scherm is het hele camerabeeld het speelveld: geen beamer, niets te kalibreren, en het
+// spel staat over het camerabeeld heen. De demo heeft geen camera nodig: de briefjes zijn
+// obstakels die je met de muis of je vinger sleept en tekent. Scherm en demo spelen in het
+// speelscherm, over het hele venster; de weergave rechts laat hetzelfde zien.
+
+const svCanvas = $('svCanvas');
+const svCtx = svCanvas.getContext('2d');
+const demoLijst = [];           // de obstakels van de demo, elk beeldje opnieuw gevuld
+const svVak = { b: -1, h: -1, ar: -1 };   // waarvoor het speelscherm zijn maat het laatst kreeg
+
+/** Staat de pagina in een ingesloten venster (een iframe, zoals op itch.io)? */
+function ingesloten() {
+  try { return window.top !== window.self; } catch { return true; }
+}
+
+/** Kan de camera hier? Zonder iets te vragen: de browser laat niets zien. */
+function bekijkCamera() {
+  let beleid = null;
+  const fp = document.permissionsPolicy || document.featurePolicy;
+  try { if (fp && fp.allowsFeature) beleid = fp.allowsFeature('camera'); } catch { /* onbekend */ }
+  app.camReden = cameraReden({
+    api: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+    veilig: !!window.isSecureContext, ingesloten: ingesloten(), beleid, geweigerd: app.camGeweigerd,
+  });
+  toonCamReden();
+}
+
+/** Staat de camera voor deze pagina op geblokkeerd? Ook dat vragen kost geen venster. */
+async function vraagCameraStand() {
+  try {
+    if (!navigator.permissions) return;
+    const st = await navigator.permissions.query({ name: 'camera' });
+    const volg = () => { app.camGeweigerd = st.state === 'denied'; bekijkCamera(); };
+    volg();
+    st.onchange = volg;
+  } catch { /* deze browser kent dat niet */ }
+}
+
+/** Waarom de camera hier niet kan, in gewone woorden. */
+function camRedenTekst(r) {
+  if (r === 'ingesloten') return t('In dit ingesloten venster mag het spel de camera niet gebruiken. De demo werkt hier wel.');
+  if (r === 'onveilig') return t('Via dit adres geeft de browser de camera niet vrij (geen https). De demo werkt hier wel.');
+  if (r === 'geen-api') return t('Deze browser kan de camera niet gebruiken: probeer Chrome of Edge. De demo werkt hier wel.');
+  if (r === 'popup') return t('Het beamervenster kan hier niet open: dit is een ingesloten venster.');
+  return t('De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon en kies Toestaan.');
+}
+
+/** De uitleg bij de camerakeuzes, met een link naar een eigen tabblad als dat helpt. */
+function toonCamReden() {
+  // (dat het beamervenster niet open mag, doet er alleen bij muur + beamer toe)
+  const r = app.camReden || (app.popupNiet && app.speelplek === 'muur' ? 'popup' : null);
+  for (const p of document.querySelectorAll('.camniet')) {
+    p.textContent = '';
+    p.classList.toggle('hidden', !r);
+    if (!r) continue;
+    p.append(camRedenTekst(r));
+    if (r === 'ingesloten' || r === 'onveilig' || r === 'popup') {
+      const a = document.createElement('a');
+      a.href = r === 'onveilig' ? SPEL_ADRES : eigenTabblad(location.href);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = t('Open het spel in een eigen tabblad');
+      p.append(' ', a);
+    }
+  }
+}
+
+/**
+ * Naar een andere speelplek. Muur en scherm delen de camera, maar niet wat ze geleerd
+ * hebben: een muur onder beamerlicht is iets anders dan een tafel zonder. De kalibratie
+ * van de beamer blijft bewaard (app.muurH) zolang je op een scherm speelt.
+ */
+function zetSpeelplek(plek) {
+  if (!SPEELPLEKKEN.includes(plek)) return;
+  const was = app.speelplek;
+  app.plekGekozen = true;
+  if (plek !== was) {
+    if (was === 'scherm') {
+      app.H = app.muurH; app.Hinv = app.H ? invertH(app.H) : null; app.muurH = null;
+      vergeetMuur();
+      if (vision.ready && app.H) applyRoi();
+    }
+    if (plek === 'scherm') {
+      app.muurH = app.H;
+      // Een open beamervenster gooit licht op de tafel dat het spel hier niet voorspelt.
+      if (projOk()) app.proj.close();
+      app.proj = null; app.projCtx = null; step('proj', 0);
+      if (vision.ready) setRoi(null);
+      vergeetMuur();
+      zetSchermVeld();
+    }
+    if (plek === 'demo') {
+      // De demo gebruikt geen camera: uit, dan brandt ook het lampje niet.
+      vision.stop(); tracks = []; step('cam', 0); step('bg', 0);
+    }
+    app.goalTrack = null;
+    app.speelplek = plek;
+    game.reset();
+  }
+  pasSpeelplekToe();
+  toonPlayKnop();
+  save();
+}
+
+/** Op een scherm: het hele camerabeeld is het speelveld, eventueel gespiegeld. */
+function zetSchermVeld() {
+  app.H = schermHomografie(!!app.schermSpiegel);
+  app.Hinv = invertH(app.H);
+  app.projCellsFor = null;
+  $('schermSpiegel').checked = !!app.schermSpiegel;
+}
+
+function zetSchermSpiegel(aan) {
+  app.schermSpiegel = !!aan;
+  if (app.speelplek === 'scherm') zetSchermVeld();
+  save();
+  status(app.schermSpiegel ? t('Gespiegeld: links en rechts zijn om') : t('Niet gespiegeld'), 'ok');
+}
+
+/** Alles wat van de speelplek afhangt: wat het paneel laat zien, en hoe het spel tekent. */
+function pasSpeelplekToe() {
+  const p = app.speelplek, b = document.body.classList;
+  b.toggle('plek-muur', p === 'muur');
+  b.toggle('plek-scherm', p === 'scherm');
+  b.toggle('plek-demo', p === 'demo');
+  b.toggle('welkom-open', !app.plekGekozen);
+  $('welkom').classList.toggle('hidden', app.plekGekozen);
+  document.querySelectorAll('#plekSeg button').forEach(k => k.classList.toggle('on', k.dataset.plek === p));
+  game.duel = vision.mode === 'color' && p !== 'demo';
+  // Zuinig met licht alleen waar de camera naar ons eigen beeld kijkt: op de muur.
+  game.lowLight = vision.mode === 'object' && p === 'muur';
+  game.papier = p === 'demo';
+  game.showOutlines = p === 'scherm' || (p === 'muur' && $('outline').checked);
+  game.onderlaag = p === 'scherm' ? tekenCameraBeeld : null;
+  app.testMode = p === 'demo' || (p === 'muur' && $('testMode').checked);
+  game.best = app.best[bestSleutel()] || 0;
+  updateTips();
+  toonRang();
+  toonSchermKnop();
+  toonModeHint();
+  toonCamReden();
+}
+
+/** Staat alles klaar om op een scherm te spelen: camera aan en de lege ondergrond geleerd? */
+function schermKlaar() {
+  return app.speelplek === 'scherm' && vision.ready && (vision.hasBackground || vision.mode !== 'object');
+}
+
+/** De grote knop bij Scherm: eerst instellen, daarna terug naar het speelscherm. */
+function toonSchermKnop() {
+  $('btnScherm').textContent = schermKlaar() ? t('Naar het speelscherm') : t('Start op dit scherm');
+}
+
+/** Wat de statusregel zegt bij het opstarten. */
+function toonStartStatus() {
+  if (!app.plekGekozen) { status(t('Welkom! Kies hieronder hoe je wilt spelen')); return; }
+  if (app.speelplek === 'demo') { status(t('Klik op "Speel de demo"')); return; }
+  if (!window.isSecureContext) status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
+  else if (!chromium && app.speelplek === 'muur') status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
+  else if (app.speelplek === 'scherm') status(t('Klik op "Start op dit scherm"'));
+}
+
+/**
+ * De achtergrond op een scherm: het camerabeeld, iets donkerder, zodat de ballen en de
+ * teksten erop opvallen. Precies op het speelveld; gespiegeld als dat aan staat.
+ */
+function tekenCameraBeeld(ctx, cw, ch) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, cw, ch);
+  const v = vision.video;
+  if (!vision.ready || v.readyState < 2) return;
+  const sc = ch / game.H, w = game.W * sc, x0 = (cw - w) / 2;
+  ctx.save();
+  if (app.schermSpiegel) { ctx.translate(x0 + w, 0); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0, w, ch); }
+  else ctx.drawImage(v, x0, 0, w, ch);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(6,8,12,.36)';
+  ctx.fillRect(x0, 0, w, ch);
+}
+
+/** Hoe breed het speelveld is (breedte gedeeld door hoogte). */
+function veldVerhouding() {
+  const v = vision.video;
+  // op een scherm is het camerabeeld het speelveld
+  if (app.speelplek === 'scherm' && vision.ready && v.videoWidth) return v.videoWidth / v.videoHeight;
+  if (app.svOpen) return svCanvas.width / svCanvas.height;
+  if (projOk()) return app.projCtx.canvas.width / app.projCtx.canvas.height;
+  return world.width / world.height;
+}
+
+// ---- het speelscherm
+
+function openSpeelvenster() {
+  if (app.svOpen) return;
+  app.svOpen = true;
+  $('speelvenster').classList.remove('hidden');
+  document.body.classList.add('sv-open');
+  // Volledig scherm kan niet overal (een ingesloten venster zonder toestemming, een iPhone):
+  // dan geen knop die alleen maar "kan niet" zegt.
+  $('svVol').classList.toggle('hidden', !document.fullscreenEnabled);
+  // Haal je een plek op de ranglijst, dan typ je je naam hier: het paneel zit eronder.
+  $('svNaam').appendChild($('naamInvoer'));
+  svVak.b = -1;
+  svMaat();
+}
+
+function sluitSpeelvenster() {
+  if (!app.svOpen) return;
+  app.svOpen = false;
+  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); }
+  $('speelvenster').classList.add('hidden');
+  document.body.classList.remove('sv-open');
+  $('ranglijst').insertBefore($('naamInvoer'), $('scoreLijst'));
+  app.sleep = null;
+}
+
+/**
+ * Het speelveld zo groot als past: in de verhouding van het camerabeeld (scherm), of
+ * vrij maar niet te smal (demo, zie pasVeld). Alleen opnieuw als er iets veranderde.
+ */
+function svMaat() {
+  const vak = $('svVeld'), bw = vak.clientWidth - 16, bh = vak.clientHeight - 16;
+  const v = vision.video;
+  const ar = app.speelplek === 'scherm' && vision.ready && v.videoWidth ? v.videoWidth / v.videoHeight : 0;
+  if (bw === svVak.b && bh === svVak.h && ar === svVak.ar) return;
+  svVak.b = bw; svVak.h = bh; svVak.ar = ar;
+  const m = pasVeld(bw, bh, ar);
+  // scherp op een telefoon, maar niet meer dan dubbel: dat kost alleen maar rekenwerk
+  const k = Math.min(2, window.devicePixelRatio || 1);
+  svCanvas.width = Math.round(m.w * k); svCanvas.height = Math.round(m.h * k);
+  svCanvas.style.width = m.w + 'px'; svCanvas.style.height = m.h + 'px';
+}
+
+function volledigScherm() {
+  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); return; }
+  const el = $('speelvenster');
+  const niet = () => status(t('Volledig scherm kan hier niet — in een ingesloten venster mag dat soms niet'), 'err');
+  if (!el.requestFullscreen) { niet(); return; }
+  try {
+    const p = el.requestFullscreen();
+    if (p && p.catch) p.catch(niet);
+  } catch { niet(); }
+}
+
+// ---- de demo
+
+/** De beginopstelling neerleggen: bak, bron en zes briefjes (zie demoOpstelling). */
+function legDemoNeer() {
+  const o = demoOpstelling(game.W, game.H);
+  app.demoBriefjes = o.briefjes;
+  game.goal.r = o.doel.r;
+  game.setGoal(o.doel.x, o.doel.y);
+  game.setSource(o.bron.x, o.bron.y);
+  game.breakables.clear();
+  app.demoW = game.W;
+  app.sleep = null;
+}
+
+/**
+ * Het veld wordt breder of smaller (speelscherm open of dicht, telefoon gedraaid): bak, bron
+ * en briefjes schuiven mee als één geheel, zodat de baan blijft werken (zie demoMee).
+ */
+function demoVeld(ar) {
+  if (!app.demoW) { game.setAspect(ar); legDemoNeer(); return; }
+  const W = game.H * ar;
+  if (Math.abs(W - game.W) >= 0.5) {
+    const gx = demoMee(game.goal.x, game.W, W), bx = demoMee(game.source.x, game.W, W);
+    game.setAspect(ar);
+    game.setGoal(gx, game.goal.y);
+    game.setSource(bx, game.source.y);
+  }
+  // De briefjes horen bij het veld van app.demoW: dat kan ook van vóór een uitstapje
+  // naar de muur of het scherm zijn.
+  if (Math.abs(game.W - app.demoW) >= 0.5) {
+    briefjesMee(app.demoBriefjes, app.demoW, game.W, game.H);
+    app.demoW = game.W;
+  }
+}
+
+/** De demo spelen: speelscherm open, en de ballen vallen meteen (na 3, 2, 1). */
+function demoStart() {
+  sfx.resume();
+  if (app.speelplek !== 'demo') zetSpeelplek('demo');
+  openSpeelvenster();
+  if (game.state === 'idle' || game.state === 'over') {
+    $('btnPlay').click();
+    game.spawnAcc = 1;          // de eerste bal valt meteen bij GO, niet pas een tel later
+  }
+  status(t('Demo: sleep de briefjes zo dat de ballen in de groene bak vallen'), 'ok');
+}
+
+/** De obstakels van de demo: de briefjes, en het briefje dat je nu tekent (dat raakt nog niets). */
+function demoObstakels() {
+  demoLijst.length = 0;
+  for (let i = 0; i < app.demoBriefjes.length; i++) demoLijst.push(app.demoBriefjes[i]);
+  const s = app.sleep;
+  if (s && s.soort === 'nieuw' && s.briefje) demoLijst.push(s.briefje);
+  return demoLijst;
+}
+
+/** Hoeveel CSS-pixels één wereldeenheid is op canvas cv. */
+function pixPerEenheid(cv) {
+  return Math.max(0.05, cv.getBoundingClientRect().height / game.H);
+}
+
+/** Plek in het speelveld (wereldcoördinaten) onder de muis of vinger, op canvas cv. */
+function veldVan(e, cv) {
+  const r = cv.getBoundingClientRect();
+  const k = cv.width / Math.max(1, r.width);          // canvaspixels per CSS-pixel
+  const sc = cv.height / game.H;
+  return [((e.clientX - r.left) * k - (cv.width - game.W * sc) / 2) / sc, (e.clientY - r.top) * k / sc];
+}
+
+/** Het kruisje van een briefje, binnen het veld gehouden (zo tekent tekenKruisjes het ook). */
+function kruisjeIn(poly, r) {
+  const k = kruisjeVan(poly);
+  return [Math.min(k[0], game.W - r), Math.max(k[1], r)];
+}
+const kruisStraal = (ppe) => Math.max(15, 11 / ppe);   // hoe groot het kruisje getekend wordt
+
+/**
+ * Muis of vinger omlaag in het speelveld (demo en scherm). In de demo eerst: het kruisje
+ * van een briefje (weghalen), een briefje (verslepen, of bij een dubbeltik weghalen). Dan
+ * overal: de bak en de balbron verslepen. En op een lege plek in de demo: een nieuw
+ * briefje tekenen. Geeft true als er iets gepakt werd.
+ */
+function wijzerNeer(e, cv) {
+  if (e.button === 2) return false;
+  const p = veldVan(e, cv), ppe = pixPerEenheid(cv);
+  const demo = app.speelplek === 'demo', lijst = app.demoBriefjes;
+  if (demo) {
+    const r = kruisStraal(ppe), raak = Math.max(r * 1.4, 18 / ppe);
+    for (let i = lijst.length - 1; i >= 0; i--) {
+      const k = kruisjeIn(lijst[i].poly, r);
+      if (Math.hypot(p[0] - k[0], p[1] - k[1]) < raak) { lijst.splice(i, 1); app.tik = null; return true; }
+    }
+    const i = briefjeOp(lijst, p[0], p[1], Math.max(4, 8 / ppe));
+    if (i >= 0) {
+      const b = lijst[i], nu = performance.now();
+      if (dubbeltik(app.tik, nu, p[0], p[1], b)) { lijst.splice(i, 1); app.tik = null; return true; }
+      app.tik = { t: nu, x: p[0], y: p[1], doel: b };
+      lijst.splice(i, 1); lijst.push(b);               // bovenop: als laatste getekend
+      app.sleep = { soort: 'briefje', briefje: b, x: p[0], y: p[1], t: nu };
+      cv.setPointerCapture(e.pointerId);
+      return true;
+    }
+  }
+  const g = game.goal, s = game.source;
+  if (Math.hypot(p[0] - g.x, p[1] - g.y) < g.r) {
+    app.sleep = { soort: 'doel', dx: p[0] - g.x, dy: p[1] - g.y };
+    app.goalTrack = null;
+    cv.setPointerCapture(e.pointerId);
+    return true;
+  }
+  if (Math.hypot(p[0] - s.x, p[1] - s.y) < Math.max(50, 22 / ppe)) {
+    app.sleep = { soort: 'bron', dx: p[0] - s.x, dy: p[1] - s.y };
+    cv.setPointerCapture(e.pointerId);
+    return true;
+  }
+  if (!demo) return false;
+  const soort = app.demoKleur, kind = soort === 'los' ? undefined : soort;
+  const kleur = kind ? DEMO_SPECIAAL[kind] : DEMO_KLEUREN[Math.floor(Math.random() * DEMO_KLEUREN.length) % DEMO_KLEUREN.length];
+  app.sleep = { soort: 'nieuw', a: p, kind, kleur, briefje: null };
+  cv.setPointerCapture(e.pointerId);
+  return true;
+}
+
+function wijzerBeweeg(e, cv) {
+  const s = app.sleep;
+  if (!s) return;
+  const p = veldVan(e, cv);
+  if (s.soort === 'doel') { game.setGoal(p[0] - s.dx, p[1] - s.dy); step('goal', 1); return; }
+  if (s.soort === 'bron') { game.setSource(p[0] - s.dx, p[1] - s.dy); return; }
+  if (s.soort === 'nieuw') {
+    s.briefje = briefjeUitSleep(s.a, p, s.kind, s.kleur);
+    if (s.briefje) s.briefje.pending = true;          // pas als je loslaat raakt het de ballen
+    return;
+  }
+  if (s.soort === 'briefje') {
+    const nu = performance.now(), dt = Math.max(1 / 120, (nu - s.t) / 1000);
+    const d = schuifBriefje(s.briefje, p[0] - s.x, p[1] - s.y, game.W, game.H);
+    // Zo snel beweeg je het: dan geeft een geschoven briefje een bal ook echt een klap.
+    const v = clampSpeed(d[0] / dt, d[1] / dt);
+    s.briefje.vx = v[0]; s.briefje.vy = v[1];
+    s.x += d[0]; s.y += d[1]; s.t = nu;
+  }
+}
+
+function wijzerLos() {
+  const s = app.sleep;
+  app.sleep = null;
+  if (!s || s.soort !== 'nieuw' || !s.briefje) return;
+  if (app.demoBriefjes.length >= DEMO_MAX) {
+    status(t('Genoeg briefjes — haal er eerst een weg (dubbeltik of ×)'), 'err');
+    return;
+  }
+  s.briefje.pending = false;
+  app.demoBriefjes.push(s.briefje);
+}
+
+svCanvas.addEventListener('pointerdown', (e) => { if (wijzerNeer(e, svCanvas)) e.preventDefault(); });
+svCanvas.addEventListener('pointermove', (e) => wijzerBeweeg(e, svCanvas));
+svCanvas.addEventListener('pointerup', wijzerLos);
+svCanvas.addEventListener('pointercancel', () => { app.sleep = null; });
+svCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/** In de demo: een klein kruisje rechtsboven elk briefje, om het weg te halen. */
+function tekenKruisjes(ctx, w, h) {
+  const sc = h / game.H, ox = (w - game.W * sc) / 2;
+  const hoog = ctx.canvas.clientHeight || h;
+  const r = kruisStraal(hoog / game.H) * sc, d = r * 0.42;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1.5, r * 0.2);
+  for (let i = 0; i < app.demoBriefjes.length; i++) {
+    const poly = app.demoBriefjes[i].poly;
+    let x1 = -Infinity, y0 = Infinity;
+    for (let j = 0; j < poly.length; j++) { if (poly[j][0] > x1) x1 = poly[j][0]; if (poly[j][1] < y0) y0 = poly[j][1]; }
+    const x = ox + Math.min(x1 * sc, game.W * sc - r), y = Math.max(y0 * sc, r);
+    ctx.fillStyle = 'rgba(12,14,19,.8)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e8eaf0';
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
+    ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---- spelen op een scherm
+
+/**
+ * Spelen op een scherm: camera aan, het hele beeld wordt het speelveld, en het spel leert
+ * hoe de lege ondergrond eruitziet. Geen beamer, dus geen kalibratie en geen wit licht.
+ */
+function schermStart() {
+  sfx.resume();
+  if (app.speelplek !== 'scherm') zetSpeelplek('scherm');
+  // Kan de camera hier niet? Dan zeggen we waarom, in het paneel: daar staat de demo naast.
+  if (app.camReden && app.camReden !== 'geweigerd') { sluitSpeelvenster(); status(camRedenTekst(app.camReden), 'err'); return false; }
+  openSpeelvenster();
+  return runExclusive(async () => {
+    if (!vision.ready) {
+      status(t('Camera starten — klik op Toestaan als de browser erom vraagt'));
+      app.wiz = { title: 'Momentje', sub: 'klik op Toestaan als de browser om de camera vraagt' };
+      // Geen camera (geweigerd, bezet, niet gevonden)? Terug naar het paneel, met de melding:
+      // een zwart speelscherm zegt niemand iets.
+      if (!(await startCamera())) { sluitSpeelvenster(); return false; }
+    }
+    if (app.abort) return false;
+    if (app.schermSpiegel === null) {
+      // Een ingebouwde camera kijkt naar jou: dan is gespiegeld wat je verwacht.
+      const tr = vision.stream && vision.stream.getVideoTracks()[0];
+      app.schermSpiegel = !!(tr && INGEBOUWD.test(tr.label || ''));
+    }
+    zetSchermVeld();
+    setRoi(null);
+    toonSchermKnop();
+    if (vision.mode === 'object' && !(await learnWall(true))) return false;
+    if (app.abort) return false;
+    app.wiz = { title: 'Klaar', sub: 'leg je briefjes neer en start de ronde' };
+    await sleep(1100);
+    app.wiz = null;
+    save();
+    return true;
+  });
+}
+
+/** Opnieuw leren hoe de lege ondergrond eruitziet (op een scherm). */
+function schermLeer() {
+  if (!vision.ready) { schermStart(); return; }
+  if (app.busy) return;
+  // Tijdens het leren telt geen enkel voorwerp: een lopende ronde gaat eerst op pauze.
+  if (game.state === 'play') { game.togglePause(); toonPlayKnop(); }
+  runExclusive(() => learnWall(true));
+}
+
+// ---- knoppen
+
+document.querySelectorAll('#welkom .plekknop').forEach(k => {
+  k.onclick = () => {
+    const plek = k.dataset.plek;
+    if (plek === 'demo') { demoStart(); return; }
+    zetSpeelplek(plek);
+    if (plek === 'scherm') schermStart();
+    else status(t('Klik op "Alles automatisch instellen"'));
+  };
+});
+document.querySelectorAll('#plekSeg button').forEach(k => {
+  k.onclick = () => {
+    k.blur();
+    const plek = k.dataset.plek;
+    if (app.busy || plek === app.speelplek) return;
+    zetSpeelplek(plek);
+    status(plek === 'demo' ? t('Klik op "Speel de demo"') : plek === 'scherm' ? t('Klik op "Start op dit scherm"')
+      : t('Klik op "Alles automatisch instellen"'));
+  };
+});
+// Vanuit de demo meteen echt spelen: op een scherm blijft het speelscherm open.
+document.querySelectorAll('.sv-cta button').forEach(k => {
+  k.onclick = () => {
+    if (k.dataset.plek === 'scherm') { schermStart(); return; }
+    sluitSpeelvenster();
+    zetSpeelplek('muur');
+    status(t('Klik op "Alles automatisch instellen"'));
+  };
+});
+$('btnDemo').onclick = demoStart;
+$('btnScherm').onclick = () => {
+  if (schermKlaar()) { openSpeelvenster(); return; }
+  schermStart();
+};
+$('btnSchermLeer').onclick = schermLeer;
+$('schermSpiegel').onchange = (e) => zetSchermSpiegel(e.target.checked);
+
+// Na een klik de knop weer loslaten: anders drukt spatie hem nog eens in.
+const svKnop = (id, f) => { $(id).onclick = () => { $(id).blur(); f(); }; };
+svKnop('svStart', () => $('btnPlay').click());
+svKnop('svLeer', schermLeer);
+svKnop('svSpiegel', () => zetSchermSpiegel(!app.schermSpiegel));
+svKnop('svBegin', () => { legDemoNeer(); status(t('De briefjes liggen weer zoals in het begin'), 'ok'); });
+svKnop('svVol', volledigScherm);
+svKnop('svSluit', sluitSpeelvenster);
+document.querySelectorAll('#svPalet button').forEach(k => {
+  k.onclick = () => {
+    k.blur();
+    app.demoKleur = k.dataset.soort;
+    document.querySelectorAll('#svPalet button').forEach(x => x.classList.toggle('on', x === k));
+  };
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && app.svOpen && !document.fullscreenElement) sluitSpeelvenster();
+});
 
 // ---------------------------------------------------------------- taal (NL | EN)
 
@@ -8420,6 +9655,8 @@ function nieuweTaal() {
   if (statusBron) status(t(statusBron.nl, statusBron.vars), statusBron.kind);
   toonAutoKnop();
   toonPlayKnop();
+  toonSchermKnop();
+  toonCamReden();
   toonModeHint();
   toonLosHint();
   renderClasses();
@@ -8440,7 +9677,9 @@ function nieuweTaal() {
 vertaalPagina(document.body);
 document.title = t('Sticky Clash — projection mapping game');
 toonTaalKnoppen();
+laadSpeelplek();
 load();
+if (app.speelplek === 'scherm') { app.muurH = app.H; zetSchermVeld(); }
 renderClasses();
 applySliders();
 setMode(vision.mode);
@@ -8453,7 +9692,7 @@ $('fillOut').textContent = Math.round(app.fill * 100) + '%';
 $('fillAuto').checked = app.fillAuto;
 $('lockExp').checked = app.lockExposure;
 game.fill = app.fill;
-game.showOutlines = $('outline').checked;
+pasSpeelplekToe();
 sfx.on = $('sound').checked;
 sfx.muziek.aan = $('muziek').checked;
 game.effects = $('effecten').checked;
@@ -8464,11 +9703,9 @@ fillDevices();
 // Chromium herkennen. userAgentData bestaat alleen daar, maar ook alleen in een
 // beveiligde omgeving — dus de gewone browserstring als reserve.
 const chromium = !!navigator.userAgentData || /Chrome\/|Edg\//.test(navigator.userAgent);
-if (!window.isSecureContext) {
-  status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
-} else if (!chromium) {
-  status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
-}
+toonStartStatus();
+bekijkCamera();
+vraagCameraStand();
 toonLosHint();
 loadScreens(false);
 startApp();
@@ -8477,7 +9714,8 @@ vision.onFormatChange = () => {
   debug.width = vision.vw; debug.height = vision.vh;
   applySliders();
   step('bg', 0);
-  status(t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
+  status(app.speelplek === 'scherm' ? t('De camera wisselde van beeldformaat — klik op Opnieuw leren')
+    : t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
 };
 opTaal(nieuweTaal);
 // Na het kiezen de knop weer loslaten: anders drukt spatie daarna die knop in, in plaats
@@ -8486,7 +9724,8 @@ document.querySelectorAll('#taalKeuze button').forEach(b => { b.onclick = () => 
 requestAnimationFrame(frame);
 
 // handig bij het afstellen: in de console beschikbaar als window.sc
-window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon };
+window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon,
+  zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster };
 
 </script>
 </body>

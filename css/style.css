@@ -132,3 +132,81 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
 .slider.sub{margin-left:22px; opacity:.75}
 .slider.sub.off{opacity:.35; pointer-events:none}
 #world{touch-action:none}
+
+/* ---- speelplek: muur + beamer, scherm, of de demo (zie js/speelplek.js en js/main.js) */
+/* Wat maar bij één manier van spelen hoort. main.js zet plek-muur, plek-scherm of plek-demo op <body>. */
+body:not(.plek-muur) .alleen-muur{display:none !important}
+body:not(.plek-scherm) .alleen-scherm{display:none !important}
+body:not(.plek-demo) .alleen-demo{display:none !important}
+body.plek-demo .alleen-camera{display:none !important}
+/* zolang het welkomstkaartje er staat, geen knoppen van een opstelling die nog niet gekozen is,
+   en rechts alleen het speelveld (nog geen camera, nog geen beamer) */
+body.welkom-open .quick{display:none}
+body.welkom-open .pane.alleen-camera{display:none}
+body.welkom-open .pane-head .alleen-muur{display:none}
+body.welkom-open .pane-head .alleen-demo{display:inline !important}
+
+.welkom{background:#1b1f28; display:flex; flex-direction:column; gap:8px}
+.welkom h2{font-size:15px; text-transform:none; letter-spacing:0; color:var(--ink); margin-bottom:4px}
+.plekknop{display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; padding:11px 12px; border-radius:9px; background:#232835; border-color:#303646}
+.plekknop b{font-size:15px; color:#fff}
+.plekknop span{font-size:12px; color:var(--dim)}
+.plekknop:hover{background:#2b3140; border-color:var(--acc)}
+.plekknop.demo{background:#2a2112; border-color:#6b4a17}
+.plekknop.demo b{color:var(--acc)}
+.plekknop.demo:hover{background:#342914}
+.plekkeuze{display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12px; color:var(--dim)}
+.plekkeuze .seg{flex:1; margin:0}
+.plekkeuze .seg button{padding:6px 4px}
+.camniet{background:#2a1f1f; color:#ffab8f; padding:7px 9px; border-radius:7px}
+.camniet a{color:#fff; font-weight:600}
+
+/* het speelscherm, over het hele venster */
+body.sv-open{overflow:hidden}
+.speelvenster{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:#07080b}
+.sv-balk{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:8px 12px; background:#101217; border-bottom:1px solid var(--line)}
+.sv-balk button{flex:none; padding:7px 12px}
+.sv-naam{font-size:14px; white-space:nowrap}
+.sv-status{flex:1 1 120px; min-width:0; font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.sv-status.err{color:#ff6b6b}
+.sv-status.ok{color:var(--ok)}
+.sv-icoon{font-size:17px; line-height:1; padding:6px 10px !important}
+.sv-veld{flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:8px; overflow:hidden}
+#svCanvas{flex:none; width:auto; border-radius:8px; touch-action:none; cursor:crosshair}
+.sv-voet{padding:8px 12px 12px; background:#101217; border-top:1px solid var(--line)}
+.sv-voet .hint{margin:6px 0 0}
+.sv-palet{display:flex; flex-wrap:wrap; gap:6px}
+.sv-palet button{flex:none; display:flex; align-items:center; gap:6px; padding:6px 10px; font-size:12px}
+.sv-palet button.on{background:#2f3542; border-color:#6a7386; color:#fff}
+.sv-palet i{display:inline-block; width:12px; height:12px; border-radius:3px}
+.sv-cta{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px; font-size:13px}
+.sv-cta button{flex:none; padding:6px 12px}
+.sv-voet .row{margin:8px 0 0}
+
+/* laag scherm (een telefoon die ligt): het speelveld krijgt de ruimte. De uitleg valt weg (de
+   statusregel bovenin zegt wat er moet), het palet en "Speel echt" staan naast elkaar. */
+@media (max-height: 500px){
+  .sv-balk{padding:4px 8px}
+  .sv-balk button{padding:5px 10px}
+  .sv-veld{padding:4px}
+  .sv-voet{display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; padding:4px 8px 6px}
+  .sv-voet > .hint:not(.camniet){display:none}
+  .sv-palet button{padding:4px 8px}
+  .sv-cta{margin-top:0}
+  .sv-cta button{padding:4px 10px}
+}
+
+/* smal scherm (telefoon, of een klein ingesloten venster): het paneel boven, het speelveld eronder */
+@media (max-width: 760px){
+  html,body{height:auto}
+  header{flex-wrap:wrap; gap:4px 12px; padding:10px 14px}
+  .status{order:3; flex-basis:100%}
+  main{flex-direction:column}
+  .panel{width:auto; overflow:visible; border-right:0; border-bottom:1px solid var(--line); padding-bottom:8px}
+  .stage{padding:10px}
+  .pane{flex:none; height:62vw; min-height:190px}
+  .sv-balk{padding:6px 8px}
+  .sv-status{order:9; flex-basis:100%}
+  .sv-veld{padding:4px}
+  .sv-voet{padding:6px 8px 10px}
+}

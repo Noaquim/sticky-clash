@@ -29,6 +29,7 @@ WHAT IS WHERE
   js/game.js            the game itself: balls, gravity, points, the bin, colors,
                         and the effects on the wall (confetti, sparkles, COMBO, fireworks)
   js/main.js            the panel, the buttons, the wizard, what goes on the projector
+  js/speelplek.js       where you play: wall + projector, screen, or the demo without camera
   js/vision.js          the camera and recognizing objects (tricky, be careful)
   js/homography.js      converting the camera image to the projector image (math)
   js/audio.js           the sound effects
@@ -79,6 +80,12 @@ EASY CHANGES
     Tempo                       const MUZIEK_TEMPO = 120;    (beats per minute)
     Faster at the end           const MUZIEK_SPURT = 1.25;   (1.25 = a quarter faster)
     The tune itself             const MUZIEK_AKKOORDEN       (four bars, as MIDI notes)
+  The demo without camera (in js/speelplek.js):
+    Colors of plain notes       export const DEMO_KLEUREN
+                                (no red, green or blue: those are for the
+                                 special notes)
+    Most notes at once          export const DEMO_MAX = 20;
+    The starting layout         export function demoOpstelling(  (source, bin, notes)
   Changing a number that is also in a text (5 hits, 20 seconds)? Then change that
   text too: see CHANGING TEXTS.
   Sound, music and effects can each be turned off under More settings > Game.

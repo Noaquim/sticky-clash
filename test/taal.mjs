@@ -3,7 +3,8 @@
 //   2. elke t('…') en tAantal(n, '…', '…') in js/*.js ook
 //   3. de {plekken} in een zin en in zijn vertaling zijn dezelfde
 //   4. geen Nederlandse tekst gaat buiten t() om naar het scherm (main.js, game.js,
-//      telefoon.js, app.js): status(…), .textContent = …, fillText(…) en dergelijke
+//      telefoon.js, app.js, speelplek.js): status(…), .textContent = …, fillText(…) en
+//      dergelijke
 //   5. telefoon.html heeft alles in zijn eigen woordenboek, ook wat de laptop hem stuurt
 //   6. en het werkt: zonder pagina (hier in node) Nederlands, wisselen, invullen, de muur
 // node test/taal.mjs
@@ -314,7 +315,7 @@ const TOEWIJZING = new Set(['textContent', 'innerText', 'title', 'placeholder', 
 const LOKAAL = new Set(['tekst', 'txt', 'klein', 'sub', 'text']);
 {
   const verdacht = [];
-  for (const f of ['main.js', 'game.js', 'telefoon.js', 'app.js']) {
+  for (const f of ['main.js', 'game.js', 'telefoon.js', 'app.js', 'speelplek.js']) {
     verdacht.push(...ontleed(bronnen[f], f, PUTTEN, TOEWIJZING, LOKAAL).verdacht.filter(v => !TOEGESTAAN.has(v.tekst)));
   }
   check('geen Nederlandse tekst buiten t() naar het scherm', verdacht.length === 0, lijst(verdacht.map(v => JSON.stringify(v.tekst) + '  ' + v.waar)));

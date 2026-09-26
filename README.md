@@ -10,9 +10,10 @@ steer them into the bin with real objects.
 Runs entirely in the browser. Nothing to install, no libraries.
 
 **Play online right away: https://noaquim.github.io/sticky-clash/** — open the link in
-Chrome or Edge, allow the camera, done. Nothing to download or install. Rather play
-without internet? Download `sticky-clash.html` (the whole game in one file) or the whole
-folder via *Code → Download ZIP*.
+Chrome or Edge, allow the camera, done. Nothing to download or install. No projector, or
+not even a camera? That works too, see below. Rather play without internet? Download
+`sticky-clash.html` (the whole game in one file) or the whole folder via
+*Code → Download ZIP*.
 
 ![Balls bouncing off paper notes on a wall towards the bin](docs/demo.gif)
 
@@ -21,15 +22,42 @@ folder via *Code → Download ZIP*.
 Anyone may use, change and share the game (MIT license, see `LICENSE`). Want to tinker
 with it yourself? Read **CUSTOMIZE.txt**.
 
+## Three ways to play
+
+On your first visit the game asks how you want to play. You can switch later at the top of
+the panel, under **Play setup** (Projector · Screen · Demo). The game remembers your choice.
+
+- **Wall + projector** — the real thing. You need a projector, a webcam and a plain wall.
+  The balls fall down your wall, and notes and objects you hold against it bounce them
+  back.
+- **Screen, no projector** — all you need is a webcam, or your phone as a webcam. The
+  camera looks at a table, a wall or a board; the game is on your screen, on top of the
+  camera image. Put down notes or objects: those are the obstacles. Hands don't count.
+  Ideally the camera looks straight down at the table. If it faces you (your laptop's own
+  camera), the game mirrors the picture by itself; if left and right are still the wrong
+  way round, click **Mirror**.
+- **Try it without a camera** — you need nothing at all. Play right away with your mouse
+  or your finger: drag the notes, draw new ones (red = trampoline, green = turbo, blue =
+  breaks), double-tap one or tap its × to remove it. Works on a phone or tablet too, and
+  embedded on another site (like itch.io): the demo never asks for the camera.
+
+When the game is embedded on another site, the camera usually isn't allowed there, and
+neither is a projector window. The game then says so, with a link to open it in its own
+tab.
+
 ## In short
 
-1. Double-click **`sticky-clash.html`** (or on Windows, the shortcut / `start.bat`)
-2. Click **Set up everything automatically** and allow the camera
-3. Follow the instructions that appear on the wall
+1. Double-click **`sticky-clash.html`** (or on Windows, the shortcut / `start.bat`), or
+   open the link above
+2. Choose how you play. The demo starts right away.
+3. With a projector: click **Set up everything automatically**, allow the camera and follow
+   the instructions on the wall. On a screen: allow the camera and keep your hands out of
+   view for a moment while the game learns the empty table.
 4. **Start round**
 
-That's it. Calibration takes care of itself: the game projects a white area and four
-dots and finds them again in the camera image on its own.
+That's it. With a projector, calibration takes care of itself: the game projects a white
+area and four dots and finds them again in the camera image on its own. On a screen there
+is nothing to calibrate: the camera image is the playing field.
 
 ## English or Dutch
 
@@ -87,11 +115,13 @@ you'll be playing in.
 
 ## What you need
 
-- A projector aimed at a plain wall
-- A webcam that can see the whole projected area
+- **With a projector:** a projector aimed at a plain wall, a webcam that can see the whole
+  projected area, and a bucket, wastebasket or box as the goal
+- **On a screen:** just a webcam (or your phone as a webcam) that can see the table, wall or
+  board. The bin is on the screen.
+- **Without a camera (the demo):** nothing. With `sticky-clash.html`, not even internet.
 - For object mode: whatever you have lying around
 - For duel mode: post-its in two clearly different colors
-- A bucket, wastebasket or box as the goal
 
 ## Starting — on any computer
 
@@ -277,6 +307,9 @@ to automatic.
 Tick **Test mode (mouse, no camera)**. Drag with the mouse in the right-hand view to make
 an obstacle (`Shift` = blue), `Alt` + click sets the goal, `Ctrl` + click the ball source,
 right-click clears everything.
+
+Or pick **Demo** under **Play setup**: then you play without a camera, with colored notes
+you drag and draw, with your finger on a phone too.
 
 ## People don't count, the object in your hand does
 
@@ -538,6 +571,7 @@ node test/qr.mjs            # QR codes, read back with a decoder of our own
 node test/telefoon.mjs      # phone control: messages, sending sparingly, QR code on the wall
 node test/taal.mjs          # English version: everything translated, no Dutch outside t(), telefoon.html
 node test/gids.mjs          # CUSTOMIZE.txt and ZELF AANPASSEN.txt: every code snippet really is in that file
+node test/speelplek.mjs     # three ways to play: first-visit choice, demo layout (does it play?), notes, screen, embedded camera
 ```
 
 The tests talk Dutch: "alles goed" at the end means "all good". `bench.mjs` only
@@ -566,7 +600,8 @@ to 34 px. That's the yardstick every change to the detection has been measured a
 | [js/game.js](js/game.js) | physics: circle vs. convex polygon, scoring, drawing |
 | [js/audio.js](js/audio.js) | synthesized sound, no audio files |
 | [js/muziek.js](js/muziek.js) | background music, scheduled ahead on the sound card's clock |
-| [js/main.js](js/main.js) | wizard, automatic calibration, projector window, test mode |
+| [js/main.js](js/main.js) | wizard, automatic calibration, projector window, test mode, welcome card and game screen |
+| [js/speelplek.js](js/speelplek.js) | wall, screen or demo: the choice at startup, the demo's notes, the playing field on a screen |
 | [js/app.js](js/app.js) | installing as an app; registers the service worker (never from file://) |
 | [sw.js](sw.js) | playing without internet: always the network first, otherwise the saved copy |
 | [js/qr.js](js/qr.js) | making QR codes, without a library |
@@ -574,6 +609,22 @@ to 34 px. That's the yardstick every change to the detection has been measured a
 | [telefoon.html](telefoon.html) | the page on the phone, all in one file |
 | [js/taal.js](js/taal.js) | the NL \| EN language choice, and `t()`, which translates a Dutch sentence |
 | [js/taal-en.js](js/taal-en.js) | the English dictionary: Dutch on the left, English on the right |
+
+### Without a projector: on a screen, and the demo
+
+On a screen, the whole camera image is the playing field. So there is nothing to
+calibrate: the conversion from camera to game leaves everything as it is (mirrored: left
+and right swapped), and the playing field takes the proportions of the camera image. The
+camera image is drawn under the game, slightly darkened. With no projector, the game casts
+no light on the table either: no white flash while learning, no wall light, no light
+prediction. For detection that's the easy case. The people filter works exactly as on the
+wall: a hand coming in from the edge of the image never counts.
+
+The demo uses no camera. The notes are ordinary obstacles you drag and draw with the mouse
+or your finger; the game draws them as colored paper. The starting layout
+(`demoOpstelling` in `js/speelplek.js`) is a run that half works already: test/speelplek.mjs
+plays it for a minute and checks that some of the balls reach the bin, and that the
+trampoline, the turbo and the blue wall all take part.
 
 ### The game was blinding itself
 
