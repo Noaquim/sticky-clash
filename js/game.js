@@ -1,5 +1,8 @@
 // Spel: balletjes vallen, ketsen af op de gedetecteerde briefjes, moeten in de bak.
 // Wereldcoordinaten: hoogte altijd 1000, breedte = 1000 * beeldverhouding.
+// Teksten op de muur gaan door t() (js/taal.js), zodat ze meewisselen met NL | EN.
+
+import { t, tAantal, tHerkomst, huidigeTaal, TaalTeller } from './taal.js';
 
 export const WORLD_H = 1000;
 
@@ -112,6 +115,11 @@ const FX_GOUD = ['#ffd479', '#ffe9a8', '#ffb347', '#fff3c4'];
 const FX_POP_FONT = '700 ' + POP_PX + 'px ui-sans-serif, system-ui, sans-serif';
 const FX_POP_GROOT = '800 60px ui-sans-serif, system-ui, sans-serif';
 const FX_COMBO_FONT = '800 56px ui-sans-serif, system-ui, sans-serif';
+// Teksten met een getal die elk beeldje getekend worden: alleen opnieuw opgebouwd als het
+// getal of de taal verandert.
+const HUD_LEVEL = new TaalTeller('LEVEL {n}');
+const HUD_COMBO = new TaalTeller('COMBO x{n}');
+const HUD_BEST = new TaalTeller('hoogste score tot nu toe: {n}');
 
 // Eén deeltje. Soort 0 = vonk (rondje), 1 = confetti (draaiend papiertje), 2 = sterretje.
 function fxDeeltje() {
@@ -287,6 +295,7 @@ export class Game {
     this.levelReached = 0;        // op welk level de laatste reeks strandde
     this.bestLevel = 0;
     this.ownSettings = null;      // de instellingen van de speler, bewaard tijdens een levelreeks
+    this.hint = { level: -1, taal: '', auto: false, doel: 0, tijd: 0, tekst: '' };   // levelHint, onthouden
     // Tekst op de muur buiten een ronde.
     this.tips = [];               // wisselen elke 4,5 s onder het startscherm
     this.highscores = [];         // [{ name, score }], al gesorteerd; top 5 in een hoek
@@ -440,7 +449,7 @@ export class Game {
 
   /** Doel gehaald: banner, drie tellen aftellen, en door naar het volgende level. */
   nextLevel() {
-    this.banner = { text: 'LEVEL ' + this.level + ' GEHAALD', t: 3.1 };
+    this.toonBanner(t('LEVEL {n} GEHAALD', { n: this.level }), 3.1);
     this.level++;
     this.applyLevel();
     this.placeBonus();
@@ -467,7 +476,7 @@ export class Game {
     // Level 1 niet halen is geen record, ook niet de allereerste keer.
     this.newRecord = n > 1 && n > this.bestLevel;
     this.bestLevel = Math.max(this.bestLevel, n);
-    this.banner = { text: 'LEVEL ' + n + ' — GAME OVER', t: 9999 };
+    this.toonBanner(t('LEVEL {n} — GAME OVER', { n }), 9999);
     this.restoreSettings();
     if (this.newRecord) this.feest(6);
     if (this.sfx) {
@@ -478,14 +487,28 @@ export class Game {
     }
   }
 
+  /** Wat er in dit level nieuw is, en het doel. Tijdens het aftellen elk beeldje: dus onthouden. */
   levelHint() {
-    const n = this.level, doel = this.levelTarget + ' punten in ' + this.levelTime + ' s';
-    if (n <= 1) return 'LEVEL 1: ' + doel;
-    const nieuw = n >= 5 ? 'de bron beweegt en er komen meer ballen'
-      : n === 4 ? 'er staat wind'
-      : n === 3 ? (this.goal.auto ? 'meer punten' : 'de bak beweegt')
-      : (this.goal.auto ? 'meer punten' : 'de bak verhuist');
-    return 'LEVEL ' + n + ': ' + nieuw + ' — ' + doel;
+    const n = this.level, h = this.hint, auto = this.goal.auto;
+    if (h.level === n && h.taal === huidigeTaal() && h.auto === auto && h.doel === this.levelTarget && h.tijd === this.levelTime) return h.tekst;
+    const w = { level: n, n: this.levelTarget, s: this.levelTime };
+    h.tekst = n <= 1 ? t('LEVEL 1: {n} punten in {s} s', w)
+      : n >= 5 ? t('LEVEL {level}: de bron beweegt en er komen meer ballen — {n} punten in {s} s', w)
+      : n === 4 ? t('LEVEL {level}: er staat wind — {n} punten in {s} s', w)
+      : auto ? t('LEVEL {level}: meer punten — {n} punten in {s} s', w)
+      : n === 3 ? t('LEVEL {level}: de bak beweegt — {n} punten in {s} s', w)
+      : t('LEVEL {level}: de bak verhuist — {n} punten in {s} s', w);
+    h.level = n; h.taal = huidigeTaal(); h.auto = auto; h.doel = this.levelTarget; h.tijd = this.levelTime;
+    return h.tekst;
+  }
+
+  /**
+   * De grote tekst in het midden (LEVEL 2 GEHAALD, GO, de eindstand). Onthoudt uit welke
+   * zin hij kwam, zodat hij na het wisselen van taal meteen meevertaalt (zie drawHud).
+   */
+  toonBanner(text, tijd) {
+    const h = tHerkomst(text);
+    this.banner = { text, t: tijd, nl: h ? h.nl : '', vars: h ? h.vars : null, taal: huidigeTaal() };
   }
 
   // ---- bonusbak ---------------------------------------------------------------
@@ -720,9 +743,12 @@ export class Game {
   /** Zwevende tekst (+1, BLOK, KRAK, COMBO ×3). Ook uit een voorraad, met een grens. */
   pop(x, y, text, col, font = FX_POP_FONT, rise = POP_RISE, life = 1.1, grow = false) {
     let p = this.pops.length >= FX_MAX_POPS ? this.pops.shift() : this.popPool.pop();
-    if (!p) p = { x: 0, y: 0, t: 0, text: '', col: '', font: '', rise: 0, life: 0, grow: false };
+    if (!p) p = { x: 0, y: 0, t: 0, text: '', col: '', font: '', rise: 0, life: 0, grow: false, nl: '', vars: null, taal: '' };
     p.x = x; p.y = y; p.t = 0; p.text = text; p.col = col;
     p.font = font; p.rise = rise; p.life = life; p.grow = grow;
+    // uit welke zin (KRAK, COMBO ×3), zodat hij bij een andere taal meevertaalt (drawParts)
+    const h = tHerkomst(text);
+    p.nl = h ? h.nl : ''; p.vars = h ? h.vars : null; p.taal = huidigeTaal();
     this.pops.push(p);
     return p;
   }
@@ -791,7 +817,7 @@ export class Game {
    * Past het nergens, dan staat de combo toch al in de HUD.
    */
   comboPop(bin) {
-    const text = 'COMBO ×' + this.combo, w = text.length * 56 * 0.74 + 8, h = 56 + 40 + 4;
+    const text = t('COMBO ×{n}', { n: this.combo }), w = text.length * 56 * 0.74 + 8, h = 56 + 40 + 4;
     const boxes = this.obstacles.map(ob => polyBox(ob.poly));
     const spots = [[bin.x, bin.y - bin.r - 150], [this.W / 2, 250]];
     for (const [cx, cy] of spots) {
@@ -852,7 +878,7 @@ export class Game {
       if (now !== was && now > 0 && this.sfx) this.sfx.tick(false);
       if (this.countdown <= 0) {
         this.state = 'play';
-        this.banner = { text: 'GO', t: 0.9 };
+        this.toonBanner(t('GO'), 0.9);
         if (this.sfx) this.sfx.start();
       }
       // Tussen twee levels vliegen er nog ballen: die vallen gewoon uit, zonder te
@@ -917,12 +943,9 @@ export class Game {
       const a = this.score.attack, b = this.score.block;
       this.newRecord = !this.duel && a > this.best;
       if (this.newRecord) this.best = a;
-      this.banner = {
-        text: this.duel
-          ? (a === b ? 'GELIJKSPEL' : (a > b ? 'AANVALLER WINT' : 'VERDEDIGER WINT'))
-          : (a + (a === 1 ? ' DOELPUNT' : ' DOELPUNTEN')),
-        t: 9999,
-      };
+      this.toonBanner(this.duel
+        ? (a === b ? t('GELIJKSPEL') : (a > b ? t('AANVALLER WINT') : t('VERDEDIGER WINT')))
+        : tAantal(a, '{n} DOELPUNT', '{n} DOELPUNTEN'), 9999);
       if (this.newRecord) this.feest(6);
       if (this.sfx) {
         if (this.newRecord && this.sfx.record) this.sfx.record();
@@ -1113,7 +1136,7 @@ export class Game {
     for (let k = 0; k <= 4; k++) this.burst(x0 + (x1 - x0) * k / 4, y0 - 8, col, 8, 380, 0, -1);
     // Een tekst stijgt nog POP_RISE op terwijl hij vervaagt: dat hele stuk moet vrij zijn.
     // Een 700-letter is ongeveer 0,74 keer zo breed als hoog. Nergens plek: alleen scherven.
-    const text = 'KRAK', h = POP_PX + POP_RISE + 2;
+    const text = t('KRAK'), h = POP_PX + POP_RISE + 2;
     const boxes = this.obstacles.map(o => polyBox(o.poly));
     boxes.push(own);
     const spot = this.labelSpot(boxes, boxes.length - 1, text.length * POP_PX * 0.74 + 8, h);
@@ -1181,7 +1204,7 @@ export class Game {
       // aanvaller zelf mis kaatste is niemands verdienste.
       if (!b.blockHits) return;
       this.score.block += 1;
-      this.pop(b.x, this.H - 60, 'BLOK', '#6ec1ff');
+      this.pop(b.x, this.H - 60, t('BLOK'), '#6ec1ff');
       this.burst(b.x, this.H - 20, '#3aa0ff', 10, 200);
     } else {
       this.misses += 1;
@@ -1276,7 +1299,7 @@ export class Game {
       if (!kind || ob.pending) continue;
       if (!boxes) boxes = this.obstacles.map(o => polyBox(o.poly));
       const sty = KIND_STYLE[kind];
-      let text = sty.label;
+      let text = t(sty.label);
       ctx.globalAlpha = 1;
       if (kind === 'breek') {
         const st = this.breakState(ob, false);
@@ -1463,6 +1486,7 @@ export class Game {
     ctx.textAlign = 'center';
     for (let i = 0; i < this.pops.length; i++) {
       const p = this.pops[i], k = p.t / (p.life || 1.1), y = p.y - k * (p.rise == null ? POP_RISE : p.rise);
+      if (p.nl && p.taal !== huidigeTaal()) { p.text = t(p.nl, p.vars); p.taal = huidigeTaal(); }   // taal gewisseld
       ctx.globalAlpha = 1 - k;
       ctx.fillStyle = p.col;
       ctx.font = p.font || FX_POP_FONT;
@@ -1481,14 +1505,17 @@ export class Game {
 
   drawHud(ctx) {
     const pad = 44;
+    // Taal gewisseld terwijl er een grote tekst staat: meteen in de nieuwe taal.
+    const bn = this.banner;
+    if (bn && bn.nl && bn.taal !== huidigeTaal()) { bn.text = t(bn.nl, bn.vars); bn.taal = huidigeTaal(); }
     ctx.textBaseline = 'top';
     ctx.font = '700 22px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ff8a1e';
-    ctx.fillText(this.duel ? 'AANVALLER' : 'DOELPUNTEN', pad, pad);
+    ctx.fillText(this.duel ? t('AANVALLER') : t('DOELPUNTEN'), pad, pad);
     ctx.textAlign = 'right';
     ctx.fillStyle = this.duel ? '#3aa0ff' : '#7a8296';
-    ctx.fillText(this.duel ? 'VERDEDIGER' : 'GEMIST', this.W - pad, pad);
+    ctx.fillText(this.duel ? t('VERDEDIGER') : t('GEMIST'), this.W - pad, pad);
 
     ctx.font = '800 84px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
@@ -1523,7 +1550,7 @@ export class Game {
       ctx.font = '800 28px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillStyle = '#ff8a1e';
-      ctx.fillText('LEVEL ' + this.level, this.W / 2 - 14, pad + 64);
+      ctx.fillText(HUD_LEVEL.tekst(this.level), this.W / 2 - 14, pad + 64);
       ctx.textAlign = 'left';
       ctx.fillStyle = this.levelGoals >= this.levelTarget ? '#3ddc84' : '#e8eaf0';
       ctx.fillText(this.levelGoals + ' / ' + this.levelTarget, this.W / 2 + 14, pad + 64);
@@ -1534,7 +1561,7 @@ export class Game {
     if (this.combo > 1) {
       ctx.fillStyle = '#ffd479';
       ctx.font = '700 30px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText('COMBO x' + this.combo, this.W / 2, comboY);
+      ctx.fillText(HUD_COMBO.tekst(this.combo), this.W / 2, comboY);
     }
 
     if (this.state === 'count') {
@@ -1555,13 +1582,13 @@ export class Game {
       }
       ctx.fillStyle = '#e8eaf0';
       ctx.font = '600 40px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(this.level > 0 ? this.levelHint() : 'zet je voorwerpen klaar', this.W / 2, this.H / 2 + 200);
+      ctx.fillText(this.level > 0 ? this.levelHint() : t('zet je voorwerpen klaar'), this.W / 2, this.H / 2 + 200);
       ctx.textBaseline = 'top';
       return;
     }
 
     if (this.state === 'idle' || this.state === 'paused' || this.state === 'over' || this.banner) {
-      const txt = this.banner ? this.banner.text : (this.state === 'paused' ? 'PAUZE' : 'KLAAR OM TE STARTEN');
+      const txt = this.banner ? this.banner.text : (this.state === 'paused' ? t('PAUZE') : t('KLAAR OM TE STARTEN'));
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(0,0,0,.5)';
@@ -1571,7 +1598,7 @@ export class Game {
       ctx.fillText(txt, this.W / 2, this.H / 2 - 16);
 
       let sub = '', subCol = '#8b93a5', subA = 1;
-      if (this.state === 'over') sub = this.levelReached ? 'druk op spatie voor een nieuwe poging' : 'druk op spatie voor een nieuwe ronde';
+      if (this.state === 'over') sub = this.levelReached ? t('druk op spatie voor een nieuwe poging') : t('druk op spatie voor een nieuwe ronde');
       else if (this.state === 'idle' && this.tips.length) {
         // Eén tip tegelijk, elke 4,5 s de volgende, met een korte overvloei.
         const k = this.t / 4.5, into = (k - Math.floor(k)) * 4.5;
@@ -1579,12 +1606,12 @@ export class Game {
         subA = Math.max(0, Math.min(1, into / 0.35, (4.5 - into) / 0.35));
         subCol = '#c9cfdb';
       }
-      else if (this.state === 'idle' && this.best) sub = 'hoogste score tot nu toe: ' + this.best;
-      else if (this.state === 'idle') sub = 'zet iets voor de muur en start de ronde';
+      else if (this.state === 'idle' && this.best) sub = HUD_BEST.tekst(this.best);
+      else if (this.state === 'idle') sub = t('zet iets voor de muur en start de ronde');
       if (this.newRecord && this.state === 'over') {
         ctx.fillStyle = '#ffd479';
         ctx.font = '800 46px ui-sans-serif, system-ui, sans-serif';
-        ctx.fillText('NIEUW RECORD', this.W / 2, this.H / 2 + 52);
+        ctx.fillText(t('NIEUW RECORD'), this.W / 2, this.H / 2 + 52);
       } else if (sub) {
         ctx.fillStyle = subCol;
         ctx.globalAlpha = subA;
@@ -1637,7 +1664,7 @@ export class Game {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffd479';
     ctx.font = '800 24px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('RANGLIJST', x, y);
+    ctx.fillText(t('RANGLIJST'), x, y);
     ctx.font = '600 24px ui-sans-serif, system-ui, sans-serif';
     for (let i = 0; i < list.length; i++) {
       const e = list[i] || {}, ry = y + 42 + i * rowH;

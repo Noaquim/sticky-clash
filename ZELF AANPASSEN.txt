@@ -2,6 +2,7 @@
 
 Alles is gewone JavaScript. Open een bestand in een teksteditor, pas iets aan, sla op.
 Er hoeft niets geïnstalleerd of gecompileerd te worden.
+In English: read CUSTOMIZE.txt.
 
 EDITOR
   Visual Studio Code is gratis en het fijnst (code.visualstudio.com): open daarin de
@@ -21,60 +22,118 @@ ZO WERK JE
   versie als één bestand delen? Dubbelklik op "Los bestand maken". Dat werkt op elke
   Windows-pc; Node.js is niet nodig.
 
+  Heb je het spel via start.bat als app geïnstalleerd? Start dan eerst start.bat,
+  anders ziet de app je wijziging niet.
+
 WAT STAAT WAAR
-  js/game.js     het spel zelf: ballen, zwaartekracht, punten, de bak, kleuren
-  js/main.js     het paneel, de knoppen, de wizard, wat er op de beamer komt
-  js/vision.js   de camera en het herkennen van voorwerpen (lastig, pas op)
-  js/audio.js    de geluidjes
-  js/muziek.js   de achtergrondmuziek
-  js/telefoon.js je telefoon als afstandsbediening; die opent telefoon.html
-  css/style.css  hoe het paneel eruitziet
-  index.html     welke knoppen, schuifjes en teksten er in het paneel staan
+  js/game.js            het spel zelf: ballen, zwaartekracht, punten, de bak, kleuren,
+                        en de effecten op de muur (confetti, sterretjes, COMBO, vuurwerk)
+  js/main.js            het paneel, de knoppen, de wizard, wat er op de beamer komt
+  js/vision.js          de camera en het herkennen van voorwerpen (lastig, pas op)
+  js/homography.js      het omrekenen van camerabeeld naar beamerbeeld (wiskunde)
+  js/audio.js           de geluidjes
+  js/muziek.js          de achtergrondmuziek
+  js/telefoon.js        je telefoon als afstandsbediening; die opent telefoon.html
+  js/qr.js              de QR-code die je met je telefoon scant
+  js/app.js             installeren als app
+  js/taal.js            de taalkeuze NL | EN
+  js/taal-en.js         alle Engelse teksten (zie TEKSTEN VERANDEREN)
+  css/style.css         hoe het paneel eruitziet
+  index.html            welke knoppen, schuifjes en teksten er in het paneel staan
+  telefoon.html         de pagina op je telefoon, met zijn eigen Engelse teksten
+  sw.js                 zonder internet spelen: welke bestanden de browser bewaart
+  manifest.webmanifest  naam, pictogram en kleuren van de app
 
 MAKKELIJKE AANPASSINGEN
-  Zoek met Ctrl+F naar het stukje tekst hieronder.
+  Zoek met Ctrl+F naar het stukje code in de tweede kolom, precies zoals het er staat.
+  Wat erachter tussen haakjes staat is uitleg, daar zoek je niet naar.
 
   In js/game.js:
-    Grootte van de ballen      r: 11,                        (groter getal = grotere bal)
-    Kleur van de ballen        ctx.fillStyle = '#fff';       (in drawBalls)
-    Meeste ballen tegelijk     this.balls.length > 70
-    Punten per doelpunt        1 + Math.floor(Math.min(9, this.combo) / 3)
-    Grootte van de bak         r: 110, auto: false           (in de constructor)
-    Kleur van de bak           ctx.strokeStyle = '#3ddc84';  (in drawGoal)
-    Kleur van de balbron       ctx.strokeStyle = '#ff4fa3';  (in drawSource)
-    Kleur bij een doelpunt     '#ffd479'
+    Grootte van de ballen       r: 11,                        (groter getal = grotere bal)
+    Kleur van de ballen         ctx.fillStyle = b.gold ? '#ffd479' : '#fff';
+                                (in drawBalls: '#fff' is een gewone bal, '#ffd479'
+                                 een gouden; de regel eronder is de gloed eromheen)
+    Meeste ballen tegelijk      this.balls.length > 70
+    Punten per doelpunt         1 + Math.floor(Math.min(9, this.combo) / 3)
+                                (in scored: 1 punt, plus 1 per 3 op rij, hooguit 4)
+    Grootte van de bak          r: 110, auto: false           (in de constructor)
+    Kleur van de bak            this.drawBin(ctx, this.goal, '#3ddc84'
+                                (in drawGoal; '61,220,132' erachter is dezelfde kleur
+                                 als rood,groen,blauw, voor de gloed)
+    Kleur van de balbron        ctx.strokeStyle = '#ff4fa3';  (in drawSource)
+    Vonken bij een doelpunt     this.burst(bin.x, bin.y - 20, '#ffd479'  (in scored)
+    Kleur van de punten (+1)    '+' + pts, '#ffd479'          (in scored)
   Speciale briefjes (in js/game.js):
     Hoe hard de trampoline      const TRAMPOLINE_MAX = 1600;
     Hoe hard de turbo duwt      const BOOST_KICK = 550;
     Tikken voor blauw breekt    const BREAK_HITS = 5;
-    Hoe lang blauw weg is       const BREAK_TIME = 5;      (in seconden)
-    Bonusbak verhuist elke      const BONUS_MOVE = 20;     (in seconden)
-  Welke kleur wat doet staat in js/vision.js bij noteKindOf.
+    Hoe lang blauw weg is       const BREAK_TIME = 5;     (in seconden)
+    Bonusbak verhuist elke      const BONUS_MOVE = 20;    (in seconden)
+  Welke kleur wat doet (in js/vision.js):
+    Rood, groen en blauw        function noteKindOf(      (de tinten in graden, 0 tot 360)
   Effecten op de muur (in js/game.js):
     Meeste deeltjes tegelijk    const FX_MAX_PARTS = 250;  (meer = zwaarder voor de pc)
     Kleuren van de confetti     const FX_CONFETTI
   Muziek (in js/muziek.js):
-    Harder of zachter           const MUZIEK_VOLUME = 0.18;  (hoger = harder, 0 = geen muziek)
+    Harder of zachter           const MUZIEK_VOLUME = 0.18;  (hoger = harder, 0 = stil)
     Tempo                       const MUZIEK_TEMPO = 120;    (tellen per minuut)
     Sneller op het eind         const MUZIEK_SPURT = 1.25;   (1.25 = een kwart sneller)
     Het deuntje zelf            const MUZIEK_AKKOORDEN       (vier maten, als MIDI-noten)
+  Verander je een getal dat ook in een tekst staat (5 tikken, 20 seconden), pas dan
+  ook die tekst aan: zie TEKSTEN VERANDEREN.
   Geluid, muziek en effecten zet je los uit onder Meer instellingen > Spel.
 
   Kleuren schrijf je als #rrggbb, bijvoorbeeld '#ff0000' voor rood. Zoek op internet
   naar "color picker" om er een te kiezen.
 
   In index.html (de beginstand van de schuifjes, bij value="..."):
-    Rondetijd       id="roundLen"   (in seconden; 180 = 3 minuten)
-    Zwaartekracht   id="gravity"
-    Stuiteren       id="bounce"
-    Ballen per tel  id="rate"
-    Wind            id="wind"
+    Rondetijd                   id="roundLen"             (in seconden; 180 = 3 minuten)
+    Zwaartekracht               id="gravity"
+    Stuiteren                   id="bounce"
+    Ballen per tel              id="rate"                 (10 = één bal per seconde)
+    Wind                        id="wind"                 (0 = geen wind)
   Het spel onthoudt je laatste instellingen. Zie je je nieuwe beginstand niet? Druk
-  F12, typ bij Console:  localStorage.clear()  en druk op Enter, daarna F5.
+  F12, typ bij Console:  localStorage.clear()  en druk op Enter, daarna F5. Dat wist
+  ook de kalibratie, de ranglijst en je taalkeuze: klik daarna weer op "Alles
+  automatisch instellen".
 
-  Teksten in het paneel veranderen: gewoon in index.html.
+  Het Engels (zie TEKSTEN VERANDEREN hieronder), in js/taal-en.js:
+    Het Engelse woordenboek     export const TAAL_EN = {
+  En voor de pagina op je telefoon, in telefoon.html:
+    Engels op de telefoon       const EN = {
+
+  Voor wie deze lijst aanpast: een regel met vier spaties ervoor is uitleg, dan
+  minstens twee spaties, dan het stukje code. Het bestand staat in de regel erboven
+  die op een dubbele punt eindigt. node test/gids.mjs controleert dat elk stukje
+  precies één keer in dat bestand staat, hier en in CUSTOMIZE.txt.
+
+TEKSTEN VERANDEREN
+  Het spel is er in het Nederlands en het Engels: de knoppen NL | EN rechtsboven.
+  De Nederlandse tekst staat gewoon in de code:
+    - de vaste teksten in het paneel: index.html
+    - de meldingen, de teller onder "Doel aanwijzen", de aanwijzingen en tips op de
+      muur en de foto van wat de camera ziet: js/main.js
+    - de teksten op de muur tijdens het spel (LEVEL, COMBO, RANGLIJST): js/game.js
+    - de meldingen voor je telefoon: js/telefoon.js
+    - de namen van de kleuren (Aanvaller, Verdediger, Doel, Balbron): js/vision.js
+    - de pagina op je telefoon: telefoon.html
+  Het Engels staat in js/taal-en.js: links de Nederlandse zin, precies zoals in de
+  code, rechts het Engels. De pagina op je telefoon heeft een eigen lijstje, bovenin
+  telefoon.html.
+
+  Alleen het Engels anders? Pas in js/taal-en.js de rechterkant aan.
+  Een Nederlandse tekst anders? Pas hem aan in de code of in index.html, en daarna
+  ook links in js/taal-en.js. Vergeet je dat, dan blijft die tekst in het Engels
+  Nederlands; node test/taal.mjs zegt welke.
+  Laat {naam}, {n} en dergelijke staan: daar vult het spel een naam of getal in.
+  Houd de grote titels op de muur kort, anders passen ze niet op de beamer.
+  Een melding die naar de telefoon gaat, staat in js/taal-en.js én in telefoon.html,
+  met hetzelfde Engels.
 
 VOOR WIE MEER WIL
-  README.md legt uit hoe alles werkt (herkenning, physics, kalibratie).
+  README.nl.md legt uit hoe alles werkt (herkenning, physics, kalibratie, telefoon).
   Heb je Node.js? Dan kun je de tests draaien, bijvoorbeeld:  node test/spel.mjs
   Die zeggen "alles goed" als je niets kapot hebt gemaakt.
+  Een nieuw bestand in js/ gemaakt? Zet het dan ook in de lijst NODIG in sw.js,
+  anders mist de app het zonder internet. node test/app.mjs zegt het als je dat
+  vergeet.

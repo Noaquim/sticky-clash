@@ -10,7 +10,7 @@
 // Heeft het spel een nieuw bestand nodig? Zet het in NODIG en verhoog VERSIE.
 // test/app.mjs controleert dat alles in de lijst ook echt bestaat.
 
-const VERSIE = 'sticky-clash-v1';
+const VERSIE = 'sticky-clash-v2';
 const NODIG = [
   './',
   'index.html',
@@ -22,6 +22,8 @@ const NODIG = [
   'js/homography.js',
   'js/muziek.js',
   'js/qr.js',
+  'js/taal.js',
+  'js/taal-en.js',
   'js/telefoon.js',
   'js/vision.js',
   'manifest.webmanifest',

@@ -20,6 +20,9 @@
 <header>
   <h1>Sticky <em>Clash</em></h1>
   <div id="status" class="status">Klik op "Alles automatisch instellen"</div>
+  <div id="taalKeuze" class="taal" role="group" aria-label="Taal">
+    <button data-taal="nl" lang="nl" translate="no" title="Nederlands">NL</button><span aria-hidden="true">|</span><button data-taal="en" lang="en" translate="no" title="English">EN</button>
+  </div>
 </header>
 
 <main>
@@ -62,7 +65,7 @@
       <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
       <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
       <div class="row">
-        <button id="btnBg">Muur opnieuw leren</button>
+        <button id="btnBg" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
         <button id="btnGoal">Doel aanwijzen</button>
       </div>
       <p id="live" class="live">—</p>
@@ -112,7 +115,7 @@
       <label class="camkeuze">Spelvorm
         <select id="spelvorm">
           <option value="vrij">Vrij spel — zo veel mogelijk in de tijd</option>
-          <option value="levels">Uitdaging — levels die steeds moeilijker worden</option>
+          <option value="levels">Uitdaging — steeds moeilijkere levels</option>
         </select>
       </label>
       <label class="check"><input type="checkbox" id="special" checked> Speciale briefjes: rood = trampoline, groen = turbo, blauw = breekt na 5 tikken</label>
@@ -214,6 +217,6 @@
   </div>
 </main>
 
-<script type="module" src="js/main.js" onerror="document.getElementById('status').textContent='Kon het spel niet laden — open sticky-clash.html, of start via start.bat'"></script>
+<script type="module" src="js/main.js" onerror="var k='';try{k=localStorage.getItem('stickyclash.taal')}catch(e){}if(k!='nl'&&k!='en')k=/^nl/i.test((navigator.languages||[])[0]||navigator.language||'')?'nl':'en';document.getElementById('status').textContent=k=='nl'?'Kon het spel niet laden — open sticky-clash.html, of start via start.bat':'Couldn\'t load the game — open sticky-clash.html, or start it with start.bat'"></script>
 </body>
 </html>
