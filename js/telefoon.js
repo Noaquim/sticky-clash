@@ -13,8 +13,13 @@
 //     altijd de nieuwste stand. De resterende tijd gaat mee; die telt de telefoon zelf af.
 // Wat binnenkomt wordt streng gecontroleerd: alleen bekende knoppen, korte berichten, en
 // een naam komt nooit als code op het scherm.
+//
+// Meldingen en de naamvraag gaan in de taal van de laptop naar de telefoon. Staat de
+// telefoon op een andere taal, dan vertaalt telefoon.html ze zelf (met zijn eigen
+// woordenboek); daarom moeten ze daar ook in staan (test/taal.mjs controleert dat).
 
 import { qrMaak, qrTeken } from './qr.js';
+import { t } from './taal.js';
 
 // Het doorgeefluik. Eén adres: heb je een eigen ntfy-server, zet die dan hier. (De tests
 // zetten hier via sc.telefoon.relay hun eigen nep-server neer.)
@@ -329,33 +334,33 @@ export class Telefoon {
     const g = this.game, s = g.state, bezig = !!this.bron.bezig();
     const eerder = this.telefoons.size, id = k.van || '?';
     if (eerder < 8 || this.telefoons.has(id)) this.telefoons.set(id, this.klok());
-    if (!eerder) this.bron.status('Telefoon verbonden', 'ok');
+    if (!eerder) this.bron.status(t('Telefoon verbonden'), 'ok');
     if (this.telefoons.size !== eerder) this.toonStatus();   // ook bij een tweede telefoon
     const nee = (reden) => { this.melding = reden; };
     switch (k.wat) {
       case 'hallo': break;
       case 'start':
-        if (bezig) nee('Even wachten: het spel is nog aan het instellen');
+        if (bezig) nee(t('Even wachten: het spel is nog aan het instellen'));
         else if (s === 'idle' || s === 'over') this.bron.knop('btnPlay');
-        else nee(s === 'count' ? 'De ronde begint al' : 'Er loopt al een ronde');
+        else nee(s === 'count' ? t('De ronde begint al') : t('Er loopt al een ronde'));
         break;
       case 'pauze':
         if (s === 'play') this.bron.knop('btnPlay');
-        else nee(s === 'paused' ? 'Staat al op pauze' : 'Er loopt geen ronde');
+        else nee(s === 'paused' ? t('Staat al op pauze') : t('Er loopt geen ronde'));
         break;
       case 'verder':
-        if (s !== 'paused') nee(s === 'play' ? 'Het spel loopt al' : 'Er is geen pauze');
-        else if (bezig) nee('Even wachten: het spel stelt zich opnieuw in');
+        if (s !== 'paused') nee(s === 'play' ? t('Het spel loopt al') : t('Er is geen pauze'));
+        else if (bezig) nee(t('Even wachten: het spel stelt zich opnieuw in'));
         else this.bron.knop('btnPlay');
         break;
       case 'nieuw':
-        if (bezig) nee('Even wachten: het spel is nog aan het instellen');
-        else if (s === 'play' || s === 'count') nee('Zet de ronde eerst op pauze');
+        if (bezig) nee(t('Even wachten: het spel is nog aan het instellen'));
+        else if (s === 'play' || s === 'count') nee(t('Zet de ronde eerst op pauze'));
         else { this.bron.knop('btnReset'); this.bron.knop('btnPlay'); }
         break;
       case 'naam':
-        if (!this.bron.vraag() || k.vraag !== this.vraagNr) nee('Er wordt nu geen naam gevraagd');
-        else { this.bron.bewaarNaam(k.naam); this.melding = 'Opgeslagen in de ranglijst'; }
+        if (!this.bron.vraag() || k.vraag !== this.vraagNr) nee(t('Er wordt nu geen naam gevraagd'));
+        else { this.bron.bewaarNaam(k.naam); this.melding = t('Opgeslagen in de ranglijst'); }
         break;
     }
     // Altijd antwoorden: met de nieuwe stand, of met de reden waarom niet.
@@ -527,25 +532,26 @@ export class Telefoon {
     this.toonStatus();
   }
 
+  /** De regel onder de QR-code. Ook na het wisselen van taal (main.js roept hem dan aan). */
   toonStatus() {
     const el = this.el;
     if (!el) return;
-    let t = '', goed = false;
-    const over = (tot) => Math.max(1, Math.ceil((tot - this.klok()) / 1000)) + ' s';
-    if (!this.actief) t = '';
-    else if (this.relais === 'verbinden') t = 'Verbinden met ntfy.sh…';
+    let tekst = '', goed = false;
+    const over = (tot) => Math.max(1, Math.ceil((tot - this.klok()) / 1000));
+    if (!this.actief) tekst = '';
+    else if (this.relais === 'verbinden') tekst = t('Verbinden met ntfy.sh…');
     else if (this.relais === 'weg') {
-      t = this.es ? 'Verbinding met ntfy.sh weg — opnieuw verbinden…'
-        : 'Geen verbinding met ntfy.sh — opnieuw over ' + over(this.herOver) + '. Heeft de laptop internet?';
+      tekst = this.es ? t('Verbinding met ntfy.sh weg — opnieuw verbinden…')
+        : t('Geen verbinding met ntfy.sh — opnieuw over {n} s. Heeft de laptop internet?', { n: over(this.herOver) });
     } else if (this.zender && this.zender.status === 'druk') {
-      t = 'ntfy.sh vraagt om rustiger aan te doen — volgende poging over ' + over(this.zender.volgende);
+      tekst = t('ntfy.sh vraagt om rustiger aan te doen — volgende poging over {n} s', { n: over(this.zender.volgende) });
     } else if (this.zender && this.zender.status === 'fout') {
-      t = 'Bericht naar de telefoon mislukt — opnieuw over ' + over(this.zender.volgende);
+      tekst = t('Bericht naar de telefoon mislukt — opnieuw over {n} s', { n: over(this.zender.volgende) });
     } else if (this.telefoons.size) {
-      t = this.telefoons.size === 1 ? 'Telefoon verbonden' : this.telefoons.size + ' telefoons verbonden';
+      tekst = this.telefoons.size === 1 ? t('Telefoon verbonden') : t('{n} telefoons verbonden', { n: this.telefoons.size });
       goed = true;
-    } else t = 'Klaar — wacht op je telefoon';
-    el.status.textContent = t;
+    } else tekst = t('Klaar — wacht op je telefoon');
+    el.status.textContent = tekst;
     el.status.className = 'badge' + (goed ? ' ok' : '');
   }
 }

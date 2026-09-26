@@ -4,6 +4,7 @@ import { Game, normalizePoly } from './game.js';
 import { Sfx } from './audio.js';
 import { startApp } from './app.js';
 import { Telefoon } from './telefoon.js';
+import { t, tAantal, tHerkomst, huidigeTaal, zetTaal, opTaal, vertaalPagina, TaalTeller } from './taal.js';
 
 const $ = (id) => document.getElementById(id);
 const CAL_TARGETS = [[0.08, 0.10], [0.92, 0.10], [0.92, 0.90], [0.08, 0.90]];
@@ -67,6 +68,7 @@ const app = {
   fill: 0.25,             // muurverlichting door de beamer, 0..1
   fillAuto: true,         // bij instellen zelf afstellen
   lockExposure: false,    // camerabelichting vastzetten (standaard uit, zie vision.js)
+  ingesteld: false,       // al eens alles automatisch ingesteld (de knop heet dan anders)
   camLuma: -1,            // hoe helder de camera het beamervlak ziet
 };
 
@@ -173,10 +175,17 @@ function load() {
   } catch { /* stille val-terug op standaardwaarden */ }
 }
 
+// De laatste melding in de statusregel: uit welke zin, om hem na het wisselen van taal
+// opnieuw te vertalen (zie nieuweTaal).
+let statusBron = null;
+
+/** Melding bovenin. msg is een vertaalde tekst: status(t('Doel gezet'), 'ok'). */
 function status(msg, kind) {
   const el = $('status');
   el.textContent = msg;
   el.className = 'status' + (kind ? ' ' + kind : '');
+  const h = tHerkomst(msg);
+  statusBron = h ? { nl: h.nl, vars: h.vars, kind } : null;
 }
 
 function step(k, v) {
@@ -204,7 +213,7 @@ async function runExclusive(fn) {
   try {
     return await fn();
   } catch (e) {
-    status('Er ging iets mis: ' + (e && e.message ? e.message : e), 'err');
+    status(t('Er ging iets mis: {fout}', { fout: e && e.message ? e.message : e }), 'err');
     return false;
   } finally {
     app.wiz = null;
@@ -272,11 +281,16 @@ async function fillDevices() {
   const devs = await vision.devices();
   const sel = $('camSelect');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">Automatisch — losse webcam als die er is</option>';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = t('Automatisch — losse webcam als die er is');
+  sel.appendChild(auto);
   devs.forEach((d, i) => {
     const o = document.createElement('option');
     o.value = d.deviceId;
-    o.textContent = (d.label || ('Camera ' + (i + 1))) + (camRang(d) === 1 ? ' (ingebouwd)' : '');
+    const naam = d.label || t('Camera {n}', { n: i + 1 });
+    o.textContent = camRang(d) === 1 ? t('{naam} (ingebouwd)', { naam }) : naam;
     sel.appendChild(o);
   });
   const ids = devs.map(d => d.deviceId);
@@ -294,12 +308,14 @@ async function gewensteCamera() {
   return besteCamera(devs) || app.camId || undefined;
 }
 
+/** De hele melding als de camera niet wil starten. */
 function cameraFout(e) {
   const n = e && e.name;
-  if (n === 'NotAllowedError' || n === 'SecurityError') return 'de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan';
-  if (n === 'NotReadableError' || n === 'AbortError') return 'de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw';
-  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'geen camera gevonden — sluit je webcam aan';
-  return (e && e.message) || 'onbekende fout';
+  if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan');
+  if (n === 'NotReadableError' || n === 'AbortError') return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return t('Camera mislukt: geen camera gevonden — sluit je webcam aan');
+  if (e && e.message) return t('Camera mislukt: {fout}', { fout: e.message });
+  return t('Camera mislukt: onbekende fout');
 }
 
 async function startCamera() {
@@ -323,13 +339,13 @@ async function startCamera() {
       }
     }
     if (wil && id && wil !== id) {
-      status('De gekozen camera deed het niet (bezet?) — nu: ' + label, 'err');
+      status(t('De gekozen camera deed het niet (bezet?) — nu: {naam}', { naam: label }), 'err');
     }
     // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie.
     if (app.H) {
       applyRoi();
       if (app.calCam && id && app.calCam !== id) {
-        status('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"', 'err');
+        status(t('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"'), 'err');
       }
     }
     if (track) {
@@ -337,7 +353,7 @@ async function startCamera() {
       track.addEventListener('ended', () => {
         vision.ready = false;
         step('cam', 0);
-        status('De camera is weggevallen — controleer de kabel en klik "Camera starten"', 'err');
+        status(t('De camera is weggevallen — controleer de kabel en klik "Camera starten"'), 'err');
       });
     }
     // Een camera kan een handmatige belichting uit een vorige sessie onthouden. Altijd
@@ -348,19 +364,19 @@ async function startCamera() {
       // witbalans staat, geeft een te donker of verkleurd beeld.
       const st = track && track.getSettings ? track.getSettings() : {};
       if (st.exposureMode === 'manual' || st.whiteBalanceMode === 'manual') {
-        status('De camera staat nog op vaste belichting — trek de camera er even uit en weer in', 'err');
+        status(t('De camera staat nog op vaste belichting — trek de camera er even uit en weer in'), 'err');
       }
     }
     if (!(app.camChosen && wil && id && wil !== id)) app.camId = id || app.camId;
     app.lastVideoTime = -1; app.videoStill = 0;
     step('cam', 1);
     save();
-    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status('Camera actief: ' + label, 'ok');
+    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
     bekendeCams = new Set((await vision.devices()).map(d => d.deviceId));
     return true;
   } catch (e) {
     step('cam', 0);
-    status('Camera mislukt: ' + cameraFout(e), 'err');
+    status(cameraFout(e), 'err');
     return false;
   }
 }
@@ -375,31 +391,32 @@ async function cameraGewisseld() {
   const nieuw = devs.filter(d => !vorige.has(d.deviceId) && camRang(d) < 2);
   if (nieuw.length) {
     const d = nieuw[0];
-    const naam = d.label || 'nieuwe camera';
+    // zonder naam: pas bij het tonen vertalen, dan wisselt het mee met de taal
+    const naam = d.label || (() => t('nieuwe camera'));
     // Een losse webcam die je nu insteekt wil je gebruiken — tenzij je bewust een
     // andere hebt gekozen, of we midden in het instellen zitten.
     if (app.busy || (app.camChosen && nu.has(app.camId))) {
-      status('Webcam gevonden: ' + naam + ' — kies hem bovenaan bij Camera', 'ok');
+      status(t('Webcam gevonden: {naam} — kies hem bovenaan bij Camera', { naam }), 'ok');
       return;
     }
     app.camChosen = true; app.camId = d.deviceId;
     $('camSelect').value = d.deviceId;
     save();
     if (!vision.ready) {
-      status('Webcam gevonden en gekozen: ' + naam + ' — klik op "Alles automatisch instellen"', 'ok');
+      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
       return;
     }
     await runExclusive(startCamera);
     const tr = vision.stream && vision.stream.getVideoTracks()[0];
     if (tr && tr.getSettings && tr.getSettings().deviceId === d.deviceId) {
-      status('Webcam gevonden en gekozen: ' + naam + ' — klik op "Alles automatisch instellen" om hem af te stellen', 'ok');
+      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
     }
     return;
   }
   const actief = vision.stream && vision.stream.getVideoTracks()[0];
   const actiefId = actief && actief.getSettings ? actief.getSettings().deviceId : '';
   if (actiefId && !nu.has(actiefId)) {
-    status('De webcam is losgekoppeld — steek hem er weer in, of kies bovenaan een andere camera', 'err');
+    status(t('De webcam is losgekoppeld — steek hem er weer in, of kies bovenaan een andere camera'), 'err');
   }
 }
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
@@ -418,7 +435,7 @@ $('camSelect').onchange = () => {
   if (v) app.camId = v;
   save();
   if (vision.ready) runExclusive(startCamera);
-  else status(v ? 'Camera gekozen — klik op "Alles automatisch instellen"' : 'Camera: automatisch', 'ok');
+  else status(v ? t('Camera gekozen — klik op "Alles automatisch instellen"') : t('Camera: automatisch'), 'ok');
 };
 
 // ---------------------------------------------------------------- beamer
@@ -437,12 +454,12 @@ async function openProjector(auto) {
   const w = window.open('', 'stickyclash_projector', feat);
   if (!w) {
     step('proj', 0);
-    status('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw', 'err');
+    status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
     return false;
   }
   w.document.open();
   w.document.write(
-    '<!doctype html><html><head><meta charset="utf-8"><title>Sticky Clash — beamer</title>' +
+    '<!doctype html><html><head><meta charset="utf-8"><title>' + t('Sticky Clash — beamer') + '</title>' +
     '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
     'canvas{display:block;width:100%;height:100%}' +
     'html.fs,html.fs body{cursor:none}</style>' +
@@ -468,7 +485,7 @@ async function openProjector(auto) {
     const full = !!w.document.fullscreenElement;
     if (full !== app.projFull) {
       app.projFull = full;
-      if (!full) status('Klik één keer in het beamervenster voor volledig scherm');
+      if (!full) status(t('Klik één keer in het beamervenster voor volledig scherm'));
     }
     w.document.documentElement.classList.toggle('fs', full);
   };
@@ -541,14 +558,14 @@ function projectorScreen() {
 
 $('btnScreens').onclick = async () => {
   if (!('getScreenDetails' in window)) {
-    status('Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer', 'err');
+    status(t('Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer'), 'err');
     return;
   }
   const det = await loadScreens(true);
-  if (!det) { status('Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer', 'err'); return; }
+  if (!det) { status(t('Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer'), 'err'); return; }
   const scr = projectorScreen();
-  if (!scr) { status('Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw', 'err'); return; }
-  status('Beamer gevonden (' + scr.width + '×' + scr.height + ') — het beamervenster opent daar voortaan vanzelf', 'ok');
+  if (!scr) { status(t('Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw'), 'err'); return; }
+  status(t('Beamer gevonden ({b}×{h}) — het beamervenster opent daar voortaan vanzelf', { b: scr.width, h: scr.height }), 'ok');
   if (projOk()) {
     app.proj.moveTo(scr.availLeft, scr.availTop);
     app.proj.resizeTo(scr.availWidth, scr.availHeight);
@@ -600,10 +617,11 @@ async function diffAgainst(pattern, ref, settle) {
  * alleen als die goed genoeg te zien zijn.
  */
 async function autoCalibrate(silent) {
-  if (!vision.ready) { if (!silent) status('Start eerst de camera', 'err'); return false; }
-  if (!projOk()) { if (!silent) status('Open eerst het beamervenster', 'err'); return false; }
+  if (!vision.ready) { if (!silent) status(t('Start eerst de camera'), 'err'); return false; }
+  if (!projOk()) { if (!silent) status(t('Open eerst het beamervenster'), 'err'); return false; }
   step('cal', 2);
   const wasWiz = app.wiz;
+  // title en sub zijn Nederlandse zinnen; drawWizard vertaalt ze bij het tekenen
   app.wiz = { title: 'Kalibreren', sub: 'even niet voor de beamer gaan staan' };
   // Op het volledige beeld kalibreren: na een verschoven beamer kan het vlak best
   // buiten de vorige uitsnede liggen. En met een camera die zich weer aanpast.
@@ -627,8 +645,8 @@ async function autoCalibrate(silent) {
   const white = await diffAgainst({ kind: 'white' }, ref, 900);
   app.calDiag = { wit: Math.round(white.max) };
   if (white.max < 9) {
-    return fail('De camera ziet het beamerbeeld niet (contrast ' + Math.round(white.max) +
-      '). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?');
+    return fail(t('De camera ziet het beamerbeeld niet (contrast {n}). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?',
+      { n: Math.round(white.max) }));
   }
   const thr = Math.max(7, white.max * 0.45);
   const cols = vision.cols;
@@ -646,13 +664,13 @@ async function autoCalibrate(silent) {
     if (t < blV) { blV = t; bl = [cx, cy]; }
   }
   if (n < white.d.length * 0.02 || !tl || !tr || !br || !bl) {
-    return fail('Het beamervlak is te klein in beeld. Richt de camera op de muur.');
+    return fail(t('Het beamervlak is te klein in beeld. Richt de camera op de muur.'));
   }
   const toPx = (p) => [(p[0] + 0.5) * vision.cell, (p[1] + 0.5) * vision.cell];
   const rough = [tl, tr, br, bl].map(toPx);
-  if (!quadOk(rough)) return fail('Het beamervlak ligt niet volledig in beeld.');
+  if (!quadOk(rough)) return fail(t('Het beamervlak ligt niet volledig in beeld.'));
   let H = computeHomography(rough.map(p => vision.camNorm(p[0], p[1])), [[0, 0], [1, 0], [1, 1], [0, 1]]);
-  if (!H) return fail('Kalibratie mislukt.');
+  if (!H) return fail(t('Kalibratie mislukt.'));
 
   // ---- stap 2: verfijnen met vier stippen ----
   const pts = [];
@@ -694,8 +712,8 @@ async function autoCalibrate(silent) {
 
   if (!silent) {
     status(refined
-      ? 'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt'
-      : 'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)', 'ok');
+      ? t('Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt')
+      : t('Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)'), 'ok');
   }
   return true;
 }
@@ -703,8 +721,8 @@ async function autoCalibrate(silent) {
 $('btnCalAuto').onclick = () => runExclusive(() => autoCalibrate(false));
 
 $('btnCal').onclick = () => {
-  if (!projOk()) { status('Open eerst het beamervenster', 'err'); return; }
-  if (!vision.ready) { status('Start eerst de camera', 'err'); return; }
+  if (!projOk()) { status(t('Open eerst het beamervenster'), 'err'); return; }
+  if (!vision.ready) { status(t('Start eerst de camera'), 'err'); return; }
   app.calibrating = true;
   app.calPts = [];
   updateCal();
@@ -719,12 +737,12 @@ $('btnCalReset').onclick = () => {
 function updateCal() {
   const st = $('calState');
   if (app.calibrating) {
-    st.textContent = 'Klik punt ' + (app.calPts.length + 1) + ' van 4 in het camerabeeld';
+    st.textContent = t('Klik punt {n} van 4 in het camerabeeld', { n: app.calPts.length + 1 });
     st.className = 'badge';
   } else if (app.H) {
-    st.textContent = 'Gekalibreerd'; st.className = 'badge ok';
+    st.textContent = t('Gekalibreerd'); st.className = 'badge ok';
   } else {
-    st.textContent = 'Niet gekalibreerd'; st.className = 'badge';
+    st.textContent = t('Niet gekalibreerd'); st.className = 'badge';
   }
 }
 
@@ -770,7 +788,7 @@ async function learnWall(withCountdown) {
       await vision.unlockCamera();
       await sleep(600);
       vast = [];
-      status('Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch', 'err');
+      status(t('Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch'), 'err');
     }
   }
   // Een seconde aan beelden: met maar acht werd de ruis naast scherpe randen
@@ -788,9 +806,17 @@ async function learnWall(withCountdown) {
   app.calPattern = null;
   app.wiz = null;
   step('bg', 1);
-  status('Muur geleerd' + (vast.length ? ' en camera vastgezet (' + vast.join(', ') + ')' : '') +
-    (al ? ' — ' + al + (al === 1 ? ' voorwerp hing' : ' voorwerpen hingen') + ' er al, die tellen gewoon mee'
-        : ' — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
+  // vision.lockCamera noemt wat hij vastzette: 'belichting', 'witbalans'
+  const wat = () => vast.map(w => t(w)).join(', ');
+  if (!vast.length) {
+    status(al ? tAantal(al, 'Muur geleerd — {n} voorwerp hing er al, dat telt gewoon mee',
+      'Muur geleerd — {n} voorwerpen hingen er al, die tellen gewoon mee')
+      : t('Muur geleerd — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
+  } else {
+    status(al ? tAantal(al, 'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerp hing er al, dat telt gewoon mee',
+      'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerpen hingen er al, die tellen gewoon mee', { wat })
+      : t('Muur geleerd en camera vastgezet ({wat}) — alles wat je er nu voor zet, kaatst de ballen', { wat }), 'ok');
+  }
   return true;
 }
 
@@ -839,12 +865,12 @@ async function findBin() {
 
   if (!best) {
     step('goal', 0);
-    status('Geen bak gevonden — probeer "Doel aanwijzen" en klik erop in het camerabeeld', 'err');
+    status(t('Geen bak gevonden — probeer "Doel aanwijzen" en klik erop in het camerabeeld'), 'err');
     return false;
   }
   setGoalFromBlob(best);
   step('goal', 1);
-  status('Doel gevonden — verplaats de bak gerust tijdens het spel', 'ok');
+  status(t('Doel gevonden — verplaats de bak gerust tijdens het spel'), 'ok');
   return true;
 }
 
@@ -869,7 +895,7 @@ function setGoalFromBlob(b) {
 
 $('btnGoal').onclick = () => {
   app.pickGoal = true;
-  status('Klik op de bak in het camerabeeld links');
+  status(t('Klik op de bak in het camerabeeld links'));
 };
 
 // ---------------------------------------------------------------- de wizard
@@ -906,16 +932,21 @@ function autoSetup() {
     app.wiz = { title: 'Klaar', sub: 'veel plezier' };
     await sleep(1200);
     app.wiz = null;
-    $('btnAuto').textContent = 'Opnieuw instellen';
-    if (bak) status('Alles staat klaar — klik op "Start ronde"', 'ok');
-    else status('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak', 'err');
+    app.ingesteld = true;
+    toonAutoKnop();
+    if (bak) status(t('Alles staat klaar — klik op "Start ronde"'), 'ok');
+    else status(t('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak'), 'err');
     return true;
   });
 }
 
+/** De grote knop bovenaan: na de eerste keer instellen heet hij "Opnieuw instellen". */
+function toonAutoKnop() {
+  $('btnAuto').textContent = app.ingesteld ? t('Opnieuw instellen') : t('Alles automatisch instellen');
+}
+
 $('btnAuto').onclick = autoSetup;
-$('btnAbort').onclick = () => { app.abort = true; status('Afgebroken'); };
-$('btnBg').title = 'Leer opnieuw hoe de lege muur eruitziet';
+$('btnAbort').onclick = () => { app.abort = true; status(t('Afgebroken')); };
 
 // ---------------------------------------------------------------- speelmodus
 
@@ -925,13 +956,17 @@ function setMode(m) {
   game.lowLight = (m === 'object');
   game.best = app.best[m] || 0;
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-  $('modeHint').textContent = m === 'object'
-    ? 'Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.'
-    : 'Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".';
+  toonModeHint();
   document.querySelectorAll('.steps li[data-k="bg"], .steps li[data-k="goal"]')
     .forEach(li => li.classList.toggle('hidden', m !== 'object'));
   vision.tracks.length = 0;
   save();
+}
+
+function toonModeHint() {
+  $('modeHint').textContent = vision.mode === 'object'
+    ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
+    : t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".');
 }
 
 document.querySelectorAll('#modeSeg button').forEach(b => {
@@ -948,10 +983,10 @@ function renderClasses() {
     row.className = 'cls';
     row.innerHTML =
       '<span class="dot" style="background:' + c.css + '"></span>' +
-      '<span class="nm">' + c.label + '</span>' +
+      '<span class="nm">' + t(c.label) + '</span>' +
       '<span class="cnt" data-cnt="' + c.id + '">0</span>';
     const b = document.createElement('button');
-    b.textContent = app.learning === i ? 'Klik…' : 'Leren';
+    b.textContent = app.learning === i ? t('Klik…') : t('Leren');
     if (app.learning === i) b.className = 'learning';
     b.onclick = () => { app.learning = app.learning === i ? -1 : i; renderClasses(); };
     row.appendChild(b);
@@ -970,7 +1005,7 @@ debug.addEventListener('click', (e) => {
 
   if (app.pickGoal) {
     app.pickGoal = false;
-    if (!app.H) { status('Eerst kalibreren', 'err'); return; }
+    if (!app.H) { status(t('Eerst kalibreren'), 'err'); return; }
     const near = vision.tracks.filter(t => Math.hypot(t.cx - x, t.cy - y) < 40)
       .sort((a, b) => b.cells - a.cells)[0];
     if (near && setGoalFromBlob(near)) { /* bak gevonden */ }
@@ -980,7 +1015,7 @@ debug.addEventListener('click', (e) => {
       game.goal.auto = false; app.goalTrack = null;
     }
     step('goal', 1);
-    status('Doel gezet', 'ok');
+    status(t('Doel gezet'), 'ok');
     return;
   }
 
@@ -991,7 +1026,7 @@ debug.addEventListener('click', (e) => {
       C.hue = hsv[0];
       C.sMin = Math.max(0.15, hsv[1] * 0.55);
       C.vMin = Math.max(0.12, hsv[2] * 0.45);
-      status(C.label + ' geleerd: tint ' + Math.round(hsv[0]) + '°', 'ok');
+      status(t('{kleur} geleerd: tint {tint}°', { kleur: () => t(C.label), tint: Math.round(hsv[0]) }), 'ok');
       save();
     }
     app.learning = -1;
@@ -1008,10 +1043,10 @@ debug.addEventListener('click', (e) => {
         app.calibrating = false;
         step('cal', 1); save();
         applyRoi();
-        status('Kalibratie gelukt', 'ok');
+        status(t('Kalibratie gelukt'), 'ok');
       } else {
         app.calPts = [];
-        status('Kalibratie mislukt — klik de punten in de juiste volgorde', 'err');
+        status(t('Kalibratie mislukt — klik de punten in de juiste volgorde'), 'err');
       }
     }
     updateCal();
@@ -1020,8 +1055,12 @@ debug.addEventListener('click', (e) => {
 
 // ---------------------------------------------------------------- schuifregelaars
 
+// per regelaar het getal ernaast, om na het wisselen van taal opnieuw te schrijven ("uit")
+const schuifTeksten = [];
+
 function bindSlider(id, fmt, apply) {
   const el = $(id), out = $(id + 'Out');
+  schuifTeksten.push(() => { out.textContent = fmt(+el.value); });
   const upd = () => { out.textContent = fmt(+el.value); apply(+el.value); };
   el.oninput = () => { upd(); save(); };
   upd();
@@ -1058,7 +1097,7 @@ bindSlider('srcSpeed', v => (v / 10).toFixed(1), v => {
 bindSlider('goalSpeed', v => (v / 10).toFixed(1), v => {
   game.goalSweep = $('moveGoal').checked ? v / 10 : 0;
 });
-bindSlider('wind', v => (v ? String(v) : 'uit'), v => { game.wind = v; });
+bindSlider('wind', v => (v ? String(v) : t('uit')), v => { game.wind = v; });
 
 function syncSweeps() {
   game.sourceSweep = $('moveSource').checked ? +$('srcSpeed').value / 10 : 0;
@@ -1083,24 +1122,24 @@ $('fill').oninput = () => {
   $('fillOut').textContent = $('fill').value + '%';
   game.fill = app.fill;
   save();
-  if (vision.hasBackground) status('Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning');
+  if (vision.hasBackground) status(t('Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning'));
 };
 $('fillAuto').onchange = e => { app.fillAuto = e.target.checked; save(); };
 $('lockExp').onchange = e => {
   app.lockExposure = e.target.checked;
   save();
   if (!app.lockExposure && vision.ready) vision.unlockCamera();
-  status(app.lockExposure ? 'Belichting wordt vastgezet bij het leren van de muur' : 'Belichting weer automatisch', 'ok');
+  status(app.lockExposure ? t('Belichting wordt vastgezet bij het leren van de muur') : t('Belichting weer automatisch'), 'ok');
 };
 $('skin').onchange = e => { vision.skinFilter = e.target.checked; save(); };
 $('resident').onchange = e => {
   app.resident = e.target.checked;
   save();
   if (!vision.hasBackground) return;
-  if (!app.resident) { vision.dropResident(); status('Wat er al hing telt niet meer mee', 'ok'); return; }
+  if (!app.resident) { vision.dropResident(); status(t('Wat er al hing telt niet meer mee'), 'ok'); return; }
   const al = vision.findResident(inProjection);
-  status(al ? al + (al === 1 ? ' voorwerp hing' : ' voorwerpen hingen') + ' er al, die tellen nu mee'
-            : 'Er hing niets op de muur toen hij geleerd werd', 'ok');
+  status(al ? tAantal(al, '{n} voorwerp hing er al, dat telt nu mee', '{n} voorwerpen hingen er al, die tellen nu mee')
+            : t('Er hing niets op de muur toen hij geleerd werd'), 'ok');
 };
 $('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
 $('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
@@ -1108,21 +1147,21 @@ $('effecten').onchange = e => { game.effects = e.target.checked; save(); };
 $('outline').onchange = e => { game.showOutlines = e.target.checked; save(); };
 $('testMode').onchange = e => {
   app.testMode = e.target.checked;
-  status(app.testMode ? 'Testmodus: sleep met de muis in de rechter weergave' : 'Testmodus uit');
+  status(app.testMode ? t('Testmodus: sleep met de muis in de rechter weergave') : t('Testmodus uit'));
 };
 
 // ---------------------------------------------------------------- spelvorm en extra's
 
 /** Korte tips die op de muur rouleren zolang er niet gespeeld wordt. */
 function updateTips() {
-  const t = ['Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen',
-             'Bouw een baan naar de groene bak'];
-  if (app.special) t.push('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken');
-  if (app.gold) t.push('Een gouden bal in de bak is 3 punten waard');
-  if (app.bonus) t.push('De kleine gouden bak geeft 3 punten, en verspringt steeds');
-  if (app.levels) t.push('Uitdaging: haal elk level op tijd — het wordt steeds moeilijker');
-  t.push('Druk op spatie om te beginnen');
-  game.tips = t;
+  const tips = [t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen'),
+                t('Bouw een baan naar de groene bak')];
+  if (app.special) tips.push(t('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken'));
+  if (app.gold) tips.push(t('Een gouden bal in de bak is 3 punten waard'));
+  if (app.bonus) tips.push(t('De kleine gouden bak geeft 3 punten, en verspringt steeds'));
+  if (app.levels) tips.push(t('Uitdaging: haal elk level op tijd — het wordt steeds moeilijker'));
+  tips.push(t('Druk op spatie om te beginnen'));
+  game.tips = tips;
 }
 
 function applySpel() {
@@ -1140,7 +1179,7 @@ for (const k of ['special', 'gold', 'bonus']) {
 $('spelvorm').onchange = e => {
   app.levels = e.target.value === 'levels';
   if (game.state === 'play' || game.state === 'paused' || game.state === 'count') {
-    game.reset(); $('btnPlay').textContent = 'Start ronde';
+    game.reset(); toonPlayKnop();
   }
   applySpel(); save();
 };
@@ -1162,14 +1201,14 @@ function toonRang() {
   ol.innerHTML = '';
   if (!l.length) {
     const li = document.createElement('li');
-    li.className = 'leeg'; li.textContent = 'Nog geen scores — speel een ronde';
+    li.className = 'leeg'; li.textContent = t('Nog geen scores — speel een ronde');
     ol.appendChild(li);
   }
   for (const e of l.slice(0, 10)) {
     const li = document.createElement('li'), b = document.createElement('b');
     b.textContent = e.name;                           // textContent: een naam kan nooit code worden
     li.appendChild(b);
-    li.append(' — ' + (game.levelMode ? 'level ' + e.score : e.score + (e.score === 1 ? ' punt' : ' punten')));
+    li.append(' — ' + (game.levelMode ? t('level {n}', { n: e.score }) : tAantal(e.score, '{n} punt', '{n} punten')));
     ol.appendChild(li);
   }
   game.highscores = l.slice(0, 5).map(e => ({ name: e.name, score: e.score }));
@@ -1181,16 +1220,21 @@ function rondeVoorbij() {
   if (!(score > 0)) return;
   const l = rangLijst();
   if (l.length >= 10 && score <= l[l.length - 1].score) return;
-  app.pendingScore = { soort: rangSoort(), score };
-  $('naamVraag').textContent = (game.levelMode ? 'Level ' + score : score + (score === 1 ? ' punt' : ' punten')) +
-    ' — dat haalt de ranglijst! Hoe heet je?';
+  app.pendingScore = { soort: rangSoort(), score, levels: game.levelMode };
+  toonNaamVraag();
   $('naam').value = app.lastName || '';
   $('naamInvoer').classList.remove('hidden');
   $('naam').focus(); $('naam').select();
 }
+/** De vraag boven het naamvak (de telefoon krijgt hem ook, zie vraagTekst hieronder). */
+function toonNaamVraag() {
+  const p = app.pendingScore;
+  $('naamVraag').textContent = p.levels ? t('Level {n} — dat haalt de ranglijst! Hoe heet je?', { n: p.score })
+    : tAantal(p.score, '{n} punt — dat haalt de ranglijst! Hoe heet je?', '{n} punten — dat haalt de ranglijst! Hoe heet je?');
+}
 function bewaarNaam() {
   if (!app.pendingScore) return;
-  const naam = ($('naam').value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || 'Anoniem';
+  const naam = ($('naam').value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || t('Anoniem');
   app.lastName = naam;
   const r = leesRang(), soort = app.pendingScore.soort;
   const l = rangLijst(soort);
@@ -1202,12 +1246,12 @@ function bewaarNaam() {
   $('naamInvoer').classList.add('hidden');
   save();
   toonRang();
-  status('Opgeslagen in de ranglijst: ' + naam, 'ok');
+  status(t('Opgeslagen in de ranglijst: {naam}', { naam }), 'ok');
 }
 $('btnNaam').onclick = bewaarNaam;
 $('naam').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); bewaarNaam(); } });
 $('btnScoresWis').onclick = () => {
-  if (!confirm('De ranglijst van deze spelvorm wissen?')) return;
+  if (!confirm(t('De ranglijst van deze spelvorm wissen?'))) return;
   const r = leesRang();
   delete r[rangSoort()];
   try { localStorage.setItem(RANG, JSON.stringify(r)); } catch { /* opslag geblokkeerd */ }
@@ -1245,51 +1289,55 @@ function diagnoseFoto() {
     g.imageSmoothingEnabled = !scherp;
     g.drawImage(src, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
   };
-  const kop = (t, x, y) => { g.fillStyle = '#8b93a5'; g.font = '600 15px system-ui, sans-serif'; g.fillText(t, x, y); };
+  const kop = (tekst, x, y) => { g.fillStyle = '#8b93a5'; g.font = '600 15px system-ui, sans-serif'; g.fillText(tekst, x, y); };
   // camera met omlijningen: even het gewone beeld tekenen, ook als het tabblad op masker staat
   const view = app.debugView;
   app.debugView = 'video'; drawDebug(tracks);
   fit(debug, 10, 34, 680, 400);
   app.debugView = view; drawDebug(tracks);
-  kop('Camera, met wat het spel herkent', 12, 24);
+  kop(t('Camera, met wat het spel herkent'), 12, 24);
   fit(world, 710, 34, 680, 400);
-  kop('Wat de beamer laat zien', 712, 24);
+  kop(t('Wat de beamer laat zien'), 712, 24);
   if (vision.maskImage && vision.cols) {
     const m = document.createElement('canvas');
     m.width = vision.cols; m.height = vision.rows;
     m.getContext('2d').putImageData(vision.maskImage, 0, 0);
     fit(m, 10, 470, 680, 400, true);
   }
-  kop('Wat het spel als voorwerp ziet (licht = voorgrond)', 12, 460);
+  kop(t('Wat het spel als voorwerp ziet (licht = voorgrond)'), 12, 460);
   const st = vision.stream && vision.stream.getVideoTracks()[0];
+  const ja = (v) => (v ? t('ja') : t('nee'));
+  const aan = (v) => (v ? t('aan') : t('uit'));
+  // het oordeel per spoor en de soort briefje zijn korte codes uit main.js en vision.js
+  const code = (c) => (c ? t(c) : '—');
   const regels = [
-    'Sticky Clash — ' + new Date().toLocaleString('nl-NL'),
-    'Camera: ' + ((st && st.label) || '—') + '  ' + (vision.video.videoWidth || 0) + 'x' + (vision.video.videoHeight || 0) +
-      (vision.roi ? '  (uitsnede)' : ''),
-    'Kalibratie: ' + (app.H ? 'ja' : 'nee') + '   Muur geleerd: ' + (vision.hasBackground ? 'ja' : 'nee') +
-      '   Modus: ' + vision.mode + (app.levels ? ' / uitdaging' : ''),
-    'Gevoeligheid ' + $('sens').value + '   Muurverlichting ' + Math.round(app.fill * 100) + '%   Huid negeren ' +
-      (vision.skinFilter ? 'aan' : 'uit') + '   Mensen negeren ' + (app.noPeople ? 'aan' : 'uit'),
-    'Camera ziet helderheid ' + Math.round(app.camLuma) + '/255   voorgrond ' + (vision.fgFraction * 100).toFixed(1) +
-      '%   lichtcorrectie ' + (vision.gain || 1).toFixed(2) + '   ' + $('fps').textContent,
-    'Teller: ' + $('live').textContent,
+    'Sticky Clash — ' + new Date().toLocaleString(huidigeTaal() === 'en' ? 'en-US' : 'nl-NL'),
+    t('Camera: {naam}  {b}x{h}', { naam: (st && st.label) || '—', b: vision.video.videoWidth || 0, h: vision.video.videoHeight || 0 }) +
+      (vision.roi ? '  ' + t('(uitsnede)') : ''),
+    t('Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}', { kal: ja(app.H), muur: ja(vision.hasBackground),
+      modus: vision.mode + (app.levels ? ' / ' + t('uitdaging') : '') }),
+    t('Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}', { sens: $('sens').value,
+      licht: Math.round(app.fill * 100), huid: aan(vision.skinFilter), mensen: aan(app.noPeople) }),
+    t('Camera ziet helderheid {l}/255   voorgrond {fg}%   lichtcorrectie {gain}   {fps}', { l: Math.round(app.camLuma),
+      fg: (vision.fgFraction * 100).toFixed(1), gain: (vision.gain || 1).toFixed(2), fps: $('fps').textContent }),
+    t('Teller: {teller}', { teller: $('live').textContent }),
     '',
-    'Sporen (id · cellen · oordeel · huid · schaduw · vertrouwd · stil · trilling · soort):',
+    t('Sporen (id · cellen · oordeel · huid · schaduw · vertrouwd · stil · trilling · soort):'),
   ];
-  for (const t of tracks.slice(0, 18)) {
-    regels.push('#' + t.id + ' · ' + t.cells + ' · ' + (app.reasonById.get(t.id) || '—') + ' · ' +
-      (t.skinFrac || 0).toFixed(2) + ' · ' + (t.shadowFrac || 0).toFixed(2) + ' · ' + (t.trusted ? 'ja' : 'nee') + ' · ' +
-      (t.stillT || 0).toFixed(1) + 's · ' + (Number.isFinite(t.jitter) ? t.jitter.toFixed(2) : '—') + ' · ' + (t.kind || '—'));
+  for (const sp of tracks.slice(0, 18)) {
+    regels.push('#' + sp.id + ' · ' + sp.cells + ' · ' + code(app.reasonById.get(sp.id)) + ' · ' +
+      (sp.skinFrac || 0).toFixed(2) + ' · ' + (sp.shadowFrac || 0).toFixed(2) + ' · ' + ja(sp.trusted) + ' · ' +
+      (sp.stillT || 0).toFixed(1) + 's · ' + (Number.isFinite(sp.jitter) ? sp.jitter.toFixed(2) : '—') + ' · ' + code(sp.kind));
   }
-  if (tracks.length > 18) regels.push('… en nog ' + (tracks.length - 18));
+  if (tracks.length > 18) regels.push(t('… en nog {n}', { n: tracks.length - 18 }));
   g.fillStyle = '#e8eaf0'; g.font = '13px ui-monospace, Consolas, monospace';
   regels.forEach((r, i) => g.fillText(r, 712, 480 + i * 18, 670));
   const a = document.createElement('a');
   const nu = new Date(), z = (n) => String(n).padStart(2, '0');
-  a.download = 'sticky-clash-foto-' + nu.getFullYear() + z(nu.getMonth() + 1) + z(nu.getDate()) + '-' + z(nu.getHours()) + z(nu.getMinutes()) + '.png';
+  a.download = t('sticky-clash-foto') + '-' + nu.getFullYear() + z(nu.getMonth() + 1) + z(nu.getDate()) + '-' + z(nu.getHours()) + z(nu.getMinutes()) + '.png';
   a.href = c.toDataURL('image/png');
   document.body.appendChild(a); a.click(); a.remove();
-  status('Foto opgeslagen in je map Downloads (' + a.download + ')', 'ok');
+  status(t('Foto opgeslagen in je map Downloads ({bestand})', { bestand: a.download }), 'ok');
 }
 $('btnDiag').onclick = diagnoseFoto;
 
@@ -1312,34 +1360,39 @@ function checkVerschuiving(dt) {
 }
 async function herstelNaVerschuiving() {
   if (!projOk()) {
-    status('De camera of beamer is verschoven — klik op "Alles automatisch instellen"', 'err');
+    status(t('De camera of beamer is verschoven — klik op "Alles automatisch instellen"'), 'err');
     return;
   }
   const speelde = game.state === 'play';
-  if (speelde) { game.togglePause(); $('btnPlay').textContent = 'Pauze opheffen'; }
-  status('De camera of beamer is verschoven — ik stel alles opnieuw in', 'err');
+  if (speelde) { game.togglePause(); toonPlayKnop(); }
+  status(t('De camera of beamer is verschoven — ik stel alles opnieuw in'), 'err');
   await runExclusive(async () => {
     if (!(await autoCalibrate(true))) {
-      status('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"', 'err');
+      status(t('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"'), 'err');
       return false;
     }
     app.goalTrack = null;                          // in camerapunten; die kloppen niet meer
     if (vision.mode === 'object' && !(await learnWall(true))) return false;
-    status('Opnieuw ingesteld' + (speelde ? ' — klik op "Pauze opheffen" om verder te spelen' : ''), 'ok');
+    status(speelde ? t('Opnieuw ingesteld — klik op "Pauze opheffen" om verder te spelen') : t('Opnieuw ingesteld'), 'ok');
     return true;
   });
+}
+
+/** Tekst van de startknop, bij de stand van het spel. */
+function toonPlayKnop() {
+  const s = game.state;
+  $('btnPlay').textContent = s === 'paused' ? t('Pauze opheffen') : (s === 'play' || s === 'count') ? t('Pauze') : t('Start ronde');
 }
 
 $('btnPlay').onclick = () => {
   sfx.resume();
   if (game.state === 'count') return;                     // aftellen loopt al
-  if (game.state === 'play') { game.togglePause(); $('btnPlay').textContent = 'Pauze opheffen'; return; }
-  if (game.state === 'paused') { game.togglePause(); $('btnPlay').textContent = 'Pauze'; return; }
+  if (game.state === 'play' || game.state === 'paused') { game.togglePause(); toonPlayKnop(); return; }
   game.start(+$('roundLen').value);
-  $('btnPlay').textContent = 'Pauze';
+  toonPlayKnop();
 };
 
-$('btnReset').onclick = () => { game.reset(); $('btnPlay').textContent = 'Start ronde'; };
+$('btnReset').onclick = () => { game.reset(); toonPlayKnop(); };
 
 document.querySelectorAll('.tabs button').forEach(b => {
   b.onclick = () => {
@@ -1466,7 +1519,7 @@ function applyRoi() {
   if (roi.sw * roi.sh > W * H * 0.80) { setRoi(null); return false; }
   setRoi(roi);
   const zoom = Math.sqrt((W * H) / (roi.sw * roi.sh));
-  status('Beeld bijgesneden tot het beamervlak — ' + zoom.toFixed(1) + '× meer detail', 'ok');
+  status(t('Beeld bijgesneden tot het beamervlak — {zoom}× meer detail', { zoom: zoom.toFixed(1) }), 'ok');
   return true;
 }
 
@@ -1665,7 +1718,7 @@ async function autoLight() {
   app.camLuma = gemeten;
   save();
   if (gemeten < 45) {
-    status('Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan', 'err');
+    status(t('Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan'), 'err');
   }
   return true;
 }
@@ -1695,7 +1748,7 @@ function drawPattern(ctx, w, h) {
     ctx.fillStyle = '#3ddc84';
     ctx.font = '700 ' + Math.round(h * 0.055) + 'px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Gekalibreerd', w / 2, h * 0.5);
+    ctx.fillText(t('Gekalibreerd'), w / 2, h * 0.5);
   }
 }
 
@@ -1707,11 +1760,12 @@ function drawWizard(ctx, w, h) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
   ctx.font = '800 ' + Math.round(110 * s) + 'px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(app.wiz.title, w / 2, h * 0.40);
+  // Nederlandse zinnen, hier pas vertaald: zo wisselt de aanwijzing op de muur meteen mee
+  ctx.fillText(t(app.wiz.title), w / 2, h * 0.40);
   if (app.wiz.sub) {
     ctx.fillStyle = '#8b93a5';
     ctx.font = '500 ' + Math.round(46 * s) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(app.wiz.sub, w / 2, h * 0.52);
+    ctx.fillText(t(app.wiz.sub), w / 2, h * 0.52);
   }
   if (app.wiz.count) {
     ctx.fillStyle = '#ff8a1e';
@@ -1720,6 +1774,8 @@ function drawWizard(ctx, w, h) {
   }
   ctx.textBaseline = 'top';
 }
+
+const KRUIS_TEKST = new TaalTeller('Klik kruis {n} aan in het camerabeeld op de laptop');
 
 function drawCalibration(ctx, w, h) {
   ctx.fillStyle = '#0a0a0a';
@@ -1744,7 +1800,7 @@ function drawCalibration(ctx, w, h) {
   ctx.fillStyle = '#999';
   ctx.font = '600 26px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Klik kruis ' + Math.min(4, app.calPts.length + 1) + ' aan in het camerabeeld op de laptop', w / 2, h * 0.5);
+  ctx.fillText(KRUIS_TEKST.tekst(Math.min(4, app.calPts.length + 1)), w / 2, h * 0.5);
   ctx.textBaseline = 'top';
 }
 
@@ -1760,7 +1816,7 @@ function drawScene(ctx, w, h) {
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(200,205,215,.8)';
     ctx.font = '600 ' + Math.max(12, Math.round(h * 0.026)) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Klik één keer in dit venster voor volledig scherm', w / 2, h * 0.975);
+    ctx.fillText(t('Klik één keer in dit venster voor volledig scherm'), w / 2, h * 0.975);
     ctx.restore();
   }
 
@@ -1774,9 +1830,9 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '800 ' + Math.round(bh * 0.34) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('NIET GEKALIBREERD', w / 2, h - bh * 0.62);
+    ctx.fillText(t('NIET GEKALIBREERD'), w / 2, h - bh * 0.62);
     ctx.font = '500 ' + Math.round(bh * 0.2) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"', w / 2, h - bh * 0.25);
+    ctx.fillText(t('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"'), w / 2, h - bh * 0.25);
     ctx.textBaseline = 'top';
   } else if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) {
     const bh = h * 0.11;
@@ -1786,7 +1842,7 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 ' + Math.round(bh * 0.3) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Muur nog niet geleerd', w / 2, h - bh * 0.5);
+    ctx.fillText(t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
 
@@ -1809,14 +1865,14 @@ function drawDebug(tracks) {
     c.drawImage(maskTmp, 0, 0, debug.width, debug.height);
     if (vision.mode === 'object' && !vision.hasBackground) {
       c.fillStyle = '#ffab8f'; c.font = '13px system-ui'; c.textAlign = 'center';
-      c.fillText('Muur nog niet geleerd', debug.width / 2, debug.height / 2);
+      c.fillText(t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
     }
   } else if (vision.ready) {
     c.drawImage(vision.cv, 0, 0);
   } else {
     c.fillStyle = '#111'; c.fillRect(0, 0, debug.width, debug.height);
     c.fillStyle = '#666'; c.font = '13px system-ui'; c.textAlign = 'center';
-    c.fillText('Camera nog niet gestart', debug.width / 2, debug.height / 2);
+    c.fillText(t('Camera nog niet gestart'), debug.width / 2, debug.height / 2);
   }
 
   for (const t of tracks) {
@@ -1894,6 +1950,12 @@ function fitCanvas(cv) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
 }
 
+// Waarom een vlek niet meetelt, voor de teller onder "Doel aanwijzen" (zie buildObstacles).
+const REDENEN = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
+                  hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
+                  schaduw: 'donker of schaduw (telt als het stil hangt)',
+                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
+
 let last = performance.now();
 let visionAcc = 0;
 let tracks = [];
@@ -1924,10 +1986,10 @@ function frame(now) {
       app.videoStill += dt;
       if (app.videoStill > 2 && !app.stillWarned) {
         app.stillWarned = true;
-        status('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera', 'err');
+        status(t('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera'), 'err');
       }
     }
-    if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status('Camerabeeld is terug', 'ok'); }
+    if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status(t('Camerabeeld is terug'), 'ok'); }
   }
   checkVerschuiving(dt);
   if (app.syncTip) app.syncTip();
@@ -1952,12 +2014,12 @@ function frame(now) {
     if (game.state === 'over') {
       app.best[vision.mode] = Math.max(app.best[vision.mode] || 0, game.best);
       save();
-      $('btnPlay').textContent = 'Start ronde';
-      status(game.levelMode ? 'Uitdaging voorbij: je haalde level ' + (game.levelReached || 1)
-        : (game.newRecord ? 'Nieuw record: ' + game.best + ' doelpunten' : 'Ronde afgelopen'), 'ok');
+      toonPlayKnop();
+      status(game.levelMode ? t('Uitdaging voorbij: je haalde level {n}', { n: game.levelReached || 1 })
+        : (game.newRecord ? tAantal(game.best, 'Nieuw record: {n} doelpunt', 'Nieuw record: {n} doelpunten') : t('Ronde afgelopen')), 'ok');
       rondeVoorbij();
     } else if (game.state === 'play' && before === 'count') {
-      $('btnPlay').textContent = 'Pauze';
+      toonPlayKnop();
     }
   }
   telefoon.bijwerken(now);
@@ -1975,26 +2037,22 @@ function frame(now) {
   if (liveAcc > 0.25) {
     liveAcc = 0;
     const el = $('live');
-    if (app.testMode) el.textContent = game.obstacles.length + ' obstakels (testmodus)';
-    else if (!app.H) el.textContent = 'Niet gekalibreerd — voorwerpen raken de ballen niet';
-    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = 'Muur nog niet geleerd';
-    else if (staleBg > 2) el.textContent = 'Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw';
-    else if (vision.floodGuard && vision.mode === 'object') el.textContent = 'Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw';
-    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = 'De camera ziet te weinig licht (' + Math.round(app.camLuma) + '/255) — zet Muurverlichting hoger of doe een lamp aan';
+    if (app.testMode) el.textContent = tAantal(game.obstacles.length, '{n} obstakel (testmodus)', '{n} obstakels (testmodus)');
+    else if (!app.H) el.textContent = t('Niet gekalibreerd — voorwerpen raken de ballen niet');
+    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = t('Muur nog niet geleerd');
+    else if (staleBg > 2) el.textContent = t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
+    else if (vision.floodGuard && vision.mode === 'object') el.textContent = t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
+    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
     else {
-      const woorden = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
-                        hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
-                        schaduw: 'donker of schaduw (telt als het stil hangt)',
-                        huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
       const uitleg = Object.keys(app.reasons || {})
-        .map(k => app.reasons[k] + '× ' + (woorden[k] || k)).join(', ');
-      let txt = app.active + ' voorwerp' + (app.active === 1 ? '' : 'en') + ' actief'
-        + (app.rejected ? ' · genegeerd: ' + uitleg : '');
+        .map(k => app.reasons[k] + '× ' + (REDENEN[k] ? t(REDENEN[k]) : k)).join(', ');
+      let txt = tAantal(app.active, '{n} voorwerp actief', '{n} voorwerpen actief')
+        + (app.rejected ? ' · ' + t('genegeerd: {lijst}', { lijst: uitleg }) : '');
       // Het lastigste geval om zelf te zien: er wordt wél iets opgemerkt, maar het
       // valt onder de minimale grootte. Dan zwijgt de teller normaal helemaal.
       if (!app.active && vision.tooSmall > 0) {
-        const klein = vision.tooSmall + ' vlek' + (vision.tooSmall === 1 ? '' : 'ken') +
-          ' te klein — zet Min. grootte lager, of Gevoeligheid hoger';
+        const klein = tAantal(vision.tooSmall, '{n} vlek te klein — zet Min. grootte lager, of Gevoeligheid hoger',
+          '{n} vlekken te klein — zet Min. grootte lager, of Gevoeligheid hoger');
         txt = app.rejected ? txt + ' · ' + klein : klein;
       }
       el.textContent = txt;
@@ -2012,8 +2070,55 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---------------------------------------------------------------- taal (NL | EN)
+
+/** De knoppen NL en EN bovenin: de gekozen taal licht op. */
+function toonTaalKnoppen() {
+  document.querySelectorAll('#taalKeuze button').forEach(b => {
+    const aan = b.dataset.taal === huidigeTaal();
+    b.classList.toggle('on', aan);
+    b.setAttribute('aria-pressed', aan ? 'true' : 'false');
+  });
+}
+
+/** Het losse bestand (file://) vraagt bij elke start om de camera: dat zegt de hint bovenaan. */
+function toonLosHint() {
+  if (location.protocol !== 'file:') return;
+  $('wizHint').textContent = t('Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.');
+}
+
+/**
+ * Na het wisselen van taal alles opnieuw: de vaste teksten van de pagina, en wat main.js
+ * en telefoon.js zelf schrijven. De muur vertaalt al bij het tekenen, en de teller onder
+ * "Doel aanwijzen" schrijft zichzelf vier keer per seconde opnieuw.
+ */
+function nieuweTaal() {
+  vertaalPagina(document.body);
+  document.title = t('Sticky Clash — projection mapping game');
+  toonTaalKnoppen();
+  if (statusBron) status(t(statusBron.nl, statusBron.vars), statusBron.kind);
+  toonAutoKnop();
+  toonPlayKnop();
+  toonModeHint();
+  toonLosHint();
+  renderClasses();
+  updateCal();
+  updateTips();
+  toonRang();
+  if (app.pendingScore) toonNaamVraag();
+  for (const f of schuifTeksten) f();
+  fillDevices();
+  telefoon.toonStatus();
+  if (projOk()) app.proj.document.title = t('Sticky Clash — beamer');
+  liveAcc = 1;                                     // de teller meteen, niet pas over een kwart seconde
+}
+
 // ---------------------------------------------------------------- start
 
+// De vaste teksten van index.html in de gekozen taal (in het Nederlands verandert er niets).
+vertaalPagina(document.body);
+document.title = t('Sticky Clash — projection mapping game');
+toonTaalKnoppen();
 load();
 renderClasses();
 applySliders();
@@ -2039,14 +2144,11 @@ fillDevices();
 // beveiligde omgeving — dus de gewone browserstring als reserve.
 const chromium = !!navigator.userAgentData || /Chrome\/|Edg\//.test(navigator.userAgent);
 if (!window.isSecureContext) {
-  status('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij', 'err');
+  status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
 } else if (!chromium) {
-  status('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen', 'err');
+  status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
 }
-if (location.protocol === 'file:') {
-  $('wizHint').textContent = 'Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. ' +
-    'Wil je dat hij het onthoudt, start dan via start.bat.';
-}
+toonLosHint();
 loadScreens(false);
 startApp();
 vision.insideFn = inProjection;
@@ -2054,8 +2156,12 @@ vision.onFormatChange = () => {
   debug.width = vision.vw; debug.height = vision.vh;
   applySliders();
   step('bg', 0);
-  status('De camera wisselde van beeldformaat — leer de muur opnieuw', 'err');
+  status(t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
 };
+opTaal(nieuweTaal);
+// Na het kiezen de knop weer loslaten: anders drukt spatie daarna die knop in, in plaats
+// van de ronde te starten.
+document.querySelectorAll('#taalKeuze button').forEach(b => { b.onclick = () => { zetTaal(b.dataset.taal); b.blur(); }; });
 requestAnimationFrame(frame);
 
 // handig bij het afstellen: in de console beschikbaar als window.sc

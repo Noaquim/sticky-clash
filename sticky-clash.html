@@ -26,6 +26,11 @@ h1 em{font-style:normal; color:var(--acc)}
 .status{font-size:12px; color:var(--dim)}
 .status.err{color:#ff6b6b}
 .status.ok{color:var(--ok)}
+/* taalkeuze NL | EN, rechts in de kopbalk */
+.taal{margin-left:auto; flex:none; display:flex; align-items:center; gap:1px; font-size:11px; color:#3a404d}
+.taal button{flex:none; padding:3px 7px; border:0; border-radius:5px; background:none; color:var(--dim); font-size:11px; font-weight:600; letter-spacing:.06em}
+.taal button:hover{background:#1d2029; color:var(--ink)}
+.taal button.on{background:#2f3542; color:#fff}
 
 main{flex:1; display:flex; min-height:0}
 
@@ -85,7 +90,8 @@ canvas{
 button.big{padding:12px; font-size:15px; font-weight:600}
 .quick{background:#181b22}
 .camkeuze{display:block; margin-top:10px; font-size:12px; color:var(--dim)}
-.camkeuze select{margin:4px 0 0}
+/* rechts weinig ruimte: zo past ook de langste Engelse keuze naast het pijltje */
+.camkeuze select{margin:4px 0 0; padding:7px 2px 7px 6px}
 .installeer{margin-top:10px}
 input[type=text]{flex:1; min-width:0; padding:7px; border-radius:7px; background:#1d2029; color:var(--ink); border:1px solid var(--line); font:inherit}
 .scores{margin:6px 0 8px; padding-left:22px; font-size:13px}
@@ -143,6 +149,9 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
 <header>
   <h1>Sticky <em>Clash</em></h1>
   <div id="status" class="status">Klik op "Alles automatisch instellen"</div>
+  <div id="taalKeuze" class="taal" role="group" aria-label="Taal">
+    <button data-taal="nl" lang="nl" translate="no" title="Nederlands">NL</button><span aria-hidden="true">|</span><button data-taal="en" lang="en" translate="no" title="English">EN</button>
+  </div>
 </header>
 
 <main>
@@ -185,7 +194,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
       <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
       <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
       <div class="row">
-        <button id="btnBg">Muur opnieuw leren</button>
+        <button id="btnBg" title="Leer opnieuw hoe de lege muur eruitziet">Muur opnieuw leren</button>
         <button id="btnGoal">Doel aanwijzen</button>
       </div>
       <p id="live" class="live">—</p>
@@ -235,7 +244,7 @@ details section{border-bottom:0; border-top:1px solid var(--line)}
       <label class="camkeuze">Spelvorm
         <select id="spelvorm">
           <option value="vrij">Vrij spel — zo veel mogelijk in de tijd</option>
-          <option value="levels">Uitdaging — levels die steeds moeilijker worden</option>
+          <option value="levels">Uitdaging — steeds moeilijkere levels</option>
         </select>
       </label>
       <label class="check"><input type="checkbox" id="special" checked> Speciale briefjes: rood = trampoline, groen = turbo, blauw = breekt na 5 tikken</label>
@@ -2711,9 +2720,582 @@ function invertH(H) {
   return inv;
 }
 
+// ---- js/taal-en.js
+// Het Engels van Sticky Clash. Links de Nederlandse tekst precies zoals hij in de code of
+// in index.html staat, rechts het Engels. Zie js/taal.js voor hoe het werkt.
+//
+// Zelf iets veranderen: pas alleen de rechterkant aan. Laat {naam}, {n} en dergelijke
+// staan: daar vult het spel zelf iets in (een getal, een naam). Verander je een zin links
+// in de code, verander hem dan hier ook, anders blijft hij in het Engels Nederlands.
+// test/taal.mjs controleert of alles erin staat.
+
+const TAAL_EN = {
+  // ---- het paneel (index.html)
+  'Sticky Clash — projection mapping game': 'Sticky Clash — projection mapping game',
+  'Klik op "Alles automatisch instellen"': 'Click "Set up everything automatically"',
+  'Taal': 'Language',
+  'Alles automatisch instellen': 'Set up everything automatically',
+  'Camera': 'Camera',
+  'Automatisch — losse webcam als die er is': 'Automatic — external webcam if there is one',
+  'Geen webcam? Je telefoon kan het ook, met een gratis app als DroidCam of Camo. Op een Mac kan een iPhone meteen als camera.':
+    'No webcam? Your phone can do it too, with a free app like DroidCam or Camo. On a Mac, an iPhone works as a camera right away.',
+  'Beamer': 'Projector',
+  'Kalibratie': 'Calibration',
+  'Muur geleerd': 'Wall learned',
+  'Doel gevonden': 'Goal found',
+  'Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.':
+    'Sets up the projector, camera, calibration and wall in one go. Follow the instructions on the wall.',
+  'Afbreken': 'Cancel',
+  'Installeer als app': 'Install as app',
+  'Eigen venster en pictogram, en daarna start het spel ook zonder internet.': 'Its own window and icon, and after that the game also starts without internet.',
+  'Speelmodus': 'Play mode',
+  'Elk voorwerp': 'Any object',
+  'Post-its · duel': 'Post-its · duel',
+  'Gevoeligheid': 'Sensitivity',
+  'Hoger = pakt ook zwakkere verschillen op. Te hoog en de hele muur licht op.': 'Higher = picks up fainter differences too. Too high and the whole wall lights up.',
+  'Muurverlichting': 'Wall light',
+  'Automatisch afstellen bij instellen': 'Adjust automatically during setup',
+  'De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.':
+    'The projector gently lights the wall, so the camera can see your objects even in a dark room.',
+  'Mensen negeren': 'Ignore people',
+  'Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft': 'Ignore skin — your arm disappears, the object in your hand stays',
+  'Wat al aan de muur hangt telt ook mee': 'Things already on the wall count too',
+  'Leer opnieuw hoe de lege muur eruitziet': 'Relearn what the empty wall looks like',
+  'Muur opnieuw leren': 'Relearn wall',
+  'Doel aanwijzen': 'Mark goal',
+  'Foto van wat de camera ziet': 'Photo of what the camera sees',
+  'Wordt iets niet goed herkend? Klik hierop en stuur de foto op: dan is precies te zien wat er gebeurt.':
+    "Something not recognized properly? Click this and send the photo along: it shows exactly what's going on.",
+  'Start ronde': 'Start round',
+  'Reset': 'Reset',
+  'Testmodus (muis, geen camera)': 'Test mode (mouse, no camera)',
+  'Telefoon': 'Phone',
+  'Telefoon koppelen': 'Connect phone',
+  'Scan de code met je telefoon. Zolang er niet gespeeld wordt staat hij ook op de muur. Geen scanner? Open op je telefoon:':
+    "Scan the code with your phone. While no round is being played, it's on the wall too. No scanner? On your phone, open:",
+  'Code ook op de muur': 'Show the code on the wall too',
+  'Nieuwe code': 'New code',
+  'Stoppen': 'Stop',
+  'Starten, pauzeren en je naam voor de ranglijst typen vanaf je telefoon. Laptop én telefoon hebben internet nodig: de knoppen gaan via ntfy.sh, en daar wordt niets bewaard.':
+    'Start, pause and type your name for the leaderboard from your phone. The laptop and the phone both need internet: the buttons go through ntfy.sh, and nothing is stored there.',
+  'Ranglijst': 'Leaderboard',
+  'Nieuwe score! Hoe heet je?': "New score! What's your name?",
+  'Naam': 'Name',
+  'Opslaan': 'Save',
+  'Ranglijst wissen': 'Clear leaderboard',
+  'Spelregels': 'Game rules',
+  'Spelvorm': 'Game type',
+  'Vrij spel — zo veel mogelijk in de tijd': 'Free play — score as many as you can in time',
+  'Uitdaging — steeds moeilijkere levels': 'Challenge — levels that keep getting harder',
+  'Speciale briefjes: rood = trampoline, groen = turbo, blauw = breekt na 5 tikken': 'Special notes: red = trampoline, green = turbo, blue = breaks after 5 hits',
+  'Gouden ballen — 3 punten': 'Gold balls — 3 points',
+  'Bonusbak — 3 punten, verspringt elke 20 seconden': 'Bonus bin — 3 points, moves every 20 seconds',
+  'Rondetijd': 'Round time',
+  'Geen tijdslimiet — blijft doorgaan': 'No time limit — keeps going',
+  'Balbron beweegt heen en weer': 'Ball source moves back and forth',
+  'tempo': 'speed',
+  'Bak beweegt heen en weer': 'Bin moves back and forth',
+  'Wind': 'Wind',
+  'uit': 'off',
+  'Wind duwt de ballen langzaam heen en weer. Je ziet de richting boven in beeld.': 'Wind slowly pushes the balls back and forth. The direction is shown at the top of the screen.',
+  'Meer instellingen': 'More settings',
+  'Camera starten': 'Start camera',
+  'Spiegelen': 'Mirror',
+  'Belichting vastzetten — alleen als het beeld flikkert': 'Lock exposure — only if the image flickers',
+  "Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.":
+    'On some cameras this makes the image darker. The game checks for that and switches it back.',
+  'Venster openen': 'Open window',
+  'Sluiten': 'Close',
+  'Beamerscherm herkennen': 'Detect projector screen',
+  'Eén keer toestaan, daarna opent het beamervenster voortaan vanzelf op de beamer.': 'Allow it once, and from then on the projector window opens on the projector by itself.',
+  'Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.':
+    'Not full screen by itself? Click once in that window. The game then recalibrates by itself.',
+  'Automatisch': 'Automatic',
+  'Met de hand': 'Manual',
+  'Wissen': 'Clear',
+  'Niet gekalibreerd': 'Not calibrated',
+  'Vanzelf opnieuw instellen als de camera of beamer verschuift': 'Redo setup automatically if the camera or projector moves',
+  'Kleuren': 'Colors',
+  '(duelmodus)': '(duel mode)',
+  'Klik "Leren" en klik daarna op het voorwerp in het camerabeeld.': 'Click "Learn", then click the object in the camera view.',
+  'Spel': 'Game',
+  'Min. grootte': 'Min. size',
+  'Max. grootte': 'Max. size',
+  'Stilstaan': 'Hold still',
+  'Mensenfilter': 'People filter',
+  'Hoger = strenger. Het filter kijkt of een vorm star is: een voorwerp houdt zijn omtrek, een mens niet.':
+    "Higher = stricter. The filter checks whether a shape is rigid: an object keeps its outline, a person doesn't.",
+  'Zwaartekracht': 'Gravity',
+  'Stuiter': 'Bounce',
+  'Baltempo': 'Ball rate',
+  'Geluid': 'Sound',
+  'Muziek — zacht, alleen tijdens een ronde': 'Music — soft, only during a round',
+  'Effecten — confetti, sterretjes, COMBO en feest bij een record': 'Effects — confetti, sparkles, COMBO and a celebration for a record',
+  'Voorwerpen omlijnen op de muur': 'Outline objects on the wall',
+  'Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.':
+    'Off in object mode: light on an object makes it invisible to the camera. You always see the outlines on your laptop.',
+  // de uitleg onderaan, in stukjes rond de toetsen
+  'Doel en bron verplaatsen:': 'Moving the goal and source:',
+  'sleep ze met de muis in de rechter weergave. Het doel pak je door erin te klikken, de bron met':
+    'drag them with the mouse in the right-hand view. Grab the goal by clicking inside it, the source with',
+  '+klik. Of met de pijltjestoetsen en': '+click. Or use the arrow keys and',
+  'spatie': 'space',
+  '= pauze.': '= pause.',
+  'Beeld': 'Image',
+  'Wat het spel ziet': 'What the game sees',
+  'Wat de beamer laat zien': 'What the projector shows',
+  'Kon het spel niet laden — open sticky-clash.html, of start via start.bat': "Couldn't load the game — open sticky-clash.html, or start it with start.bat",
+
+  // ---- knoppen en meldingen (main.js)
+  'Er ging iets mis: {fout}': 'Something went wrong: {fout}',
+  'Camera {n}': 'Camera {n}',
+  '{naam} (ingebouwd)': '{naam} (built-in)',
+  'Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan':
+    "Camera failed: the camera isn't allowed — click the camera icon in the address bar and choose Allow",
+  'Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw':
+    'Camera failed: the camera is in use — close Teams, Zoom, OBS or the Camera app and try again',
+  'Camera mislukt: geen camera gevonden — sluit je webcam aan': 'Camera failed: no camera found — connect your webcam',
+  'Camera mislukt: {fout}': 'Camera failed: {fout}',
+  'Camera mislukt: onbekende fout': 'Camera failed: unknown error',
+  'De gekozen camera deed het niet (bezet?) — nu: {naam}': "The selected camera didn't work (in use?) — now using: {naam}",
+  'Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"': 'Different camera than during calibration — click "Set up everything automatically"',
+  'De camera is weggevallen — controleer de kabel en klik "Camera starten"': 'The camera dropped out — check the cable and click "Start camera"',
+  'De camera staat nog op vaste belichting — trek de camera er even uit en weer in': 'The camera is still on fixed exposure — unplug the camera and plug it back in',
+  'Camera actief: {naam}': 'Camera active: {naam}',
+  'nieuwe camera': 'new camera',
+  'Webcam gevonden: {naam} — kies hem bovenaan bij Camera': 'Webcam found: {naam} — pick it at the top under Camera',
+  'Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"': 'Webcam found and selected: {naam} — click "Set up everything automatically"',
+  'Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen':
+    'Webcam found and selected: {naam} — click "Set up everything automatically" to set it up',
+  'De webcam is losgekoppeld — steek hem er weer in, of kies bovenaan een andere camera': 'The webcam was unplugged — plug it back in, or pick another camera at the top',
+  'Camera gekozen — klik op "Alles automatisch instellen"': 'Camera selected — click "Set up everything automatically"',
+  'Camera: automatisch': 'Camera: automatic',
+  'Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw': 'Pop-up blocked — allow pop-ups for this page and try again',
+  'Sticky Clash — beamer': 'Sticky Clash — projector',
+  'Klik één keer in het beamervenster voor volledig scherm': 'Click once in the projector window for full screen',
+  'Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer': "This browser can't detect screens — drag the projector window to the projector yourself",
+  'Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer': 'No permission given — drag the projector window to the projector yourself',
+  'Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw': 'Only one screen found — connect the projector and try again',
+  'Beamer gevonden ({b}×{h}) — het beamervenster opent daar voortaan vanzelf': 'Projector found ({b}×{h}) — the projector window will open there by itself from now on',
+  'Start eerst de camera': 'Start the camera first',
+  'Open eerst het beamervenster': 'Open the projector window first',
+  'De camera ziet het beamerbeeld niet (contrast {n}). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?':
+    "The camera can't see the projected image (contrast {n}). Is the projector window on the projector, and is the camera pointed at it?",
+  'Het beamervlak is te klein in beeld. Richt de camera op de muur.': 'The projected area is too small in the camera view. Point the camera at the wall.',
+  'Het beamervlak ligt niet volledig in beeld.': "The projected area isn't fully in the camera view.",
+  'Kalibratie mislukt.': 'Calibration failed.',
+  'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt': 'Calibration done — check that the dashed line runs around the projected image',
+  'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)': "Calibration done (rough measurement; the dots weren't clearly visible)",
+  'Klik punt {n} van 4 in het camerabeeld': 'Click point {n} of 4 in the camera view',
+  'Gekalibreerd': 'Calibrated',
+  'Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch': 'Locking made the camera image darker — exposure stays automatic',
+  'Muur geleerd — alles wat je er nu voor zet, kaatst de ballen': 'Wall learned — anything you put in front of it now bounces the balls',
+  'Muur geleerd — {n} voorwerp hing er al, dat telt gewoon mee': 'Wall learned — {n} object was already there, and it counts too',
+  'Muur geleerd — {n} voorwerpen hingen er al, die tellen gewoon mee': 'Wall learned — {n} objects were already there, and they count too',
+  'Muur geleerd en camera vastgezet ({wat}) — alles wat je er nu voor zet, kaatst de ballen':
+    'Wall learned and camera locked ({wat}) — anything you put in front of it now bounces the balls',
+  'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerp hing er al, dat telt gewoon mee':
+    'Wall learned and camera locked ({wat}) — {n} object was already there, and it counts too',
+  'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerpen hingen er al, die tellen gewoon mee':
+    'Wall learned and camera locked ({wat}) — {n} objects were already there, and they count too',
+  'belichting': 'exposure',
+  'witbalans': 'white balance',
+  'Geen bak gevonden — probeer "Doel aanwijzen" en klik erop in het camerabeeld': 'No bin found — try "Mark goal" and click it in the camera view',
+  'Doel gevonden — verplaats de bak gerust tijdens het spel': 'Goal found — feel free to move the bin during the game',
+  'Klik op de bak in het camerabeeld links': 'Click the bin in the camera view on the left',
+  'Alles staat klaar — klik op "Start ronde"': 'All set — click "Start round"',
+  'Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak': 'Done, but no bin found — drag the goal onto your bin in the right-hand view',
+  'Opnieuw instellen': 'Set up again',
+  'Afgebroken': 'Cancelled',
+  'Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.':
+    'Anything you hold in front of the wall bounces the balls — a book, a box, your hand, whatever you grab. Learn the empty wall first.',
+  'Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".':
+    'Orange post-its steer the balls to the bin, blue ones block them. Teach it the two colors under "More settings".',
+  'Klik…': 'Click…',
+  'Leren': 'Learn',
+  'Aanvaller': 'Attacker',
+  'Verdediger': 'Defender',
+  'Doel': 'Goal',
+  'Balbron': 'Ball source',
+  'Eerst kalibreren': 'Calibrate first',
+  'Doel gezet': 'Goal set',
+  '{kleur} geleerd: tint {tint}°': '{kleur} learned: hue {tint}°',
+  'Kalibratie gelukt': 'Calibration done',
+  'Kalibratie mislukt — klik de punten in de juiste volgorde': 'Calibration failed — click the points in the right order',
+  'Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning': 'Wall light changed — click "Relearn wall" for the best detection',
+  'Belichting wordt vastgezet bij het leren van de muur': 'Exposure will be locked when the wall is learned',
+  'Belichting weer automatisch': 'Exposure back to automatic',
+  'Wat er al hing telt niet meer mee': 'Things already on the wall no longer count',
+  '{n} voorwerp hing er al, dat telt nu mee': '{n} object was already there, and it counts now',
+  '{n} voorwerpen hingen er al, die tellen nu mee': '{n} objects were already there, and they count now',
+  'Er hing niets op de muur toen hij geleerd werd': 'Nothing was on the wall when it was learned',
+  'Testmodus: sleep met de muis in de rechter weergave': 'Test mode: drag with the mouse in the right-hand view',
+  'Testmodus uit': 'Test mode off',
+  'Nog geen scores — speel een ronde': 'No scores yet — play a round',
+  'level {n}': 'level {n}',
+  '{n} punt': '{n} point',
+  '{n} punten': '{n} points',
+  'Level {n} — dat haalt de ranglijst! Hoe heet je?': "Level {n} — that makes the leaderboard! What's your name?",
+  '{n} punt — dat haalt de ranglijst! Hoe heet je?': "{n} point — that makes the leaderboard! What's your name?",
+  '{n} punten — dat haalt de ranglijst! Hoe heet je?': "{n} points — that makes the leaderboard! What's your name?",
+  'Anoniem': 'Anonymous',
+  'Opgeslagen in de ranglijst: {naam}': 'Saved to the leaderboard: {naam}',
+  'De ranglijst van deze spelvorm wissen?': 'Clear the leaderboard for this game type?',
+  'De camera of beamer is verschoven — klik op "Alles automatisch instellen"': 'The camera or projector has moved — click "Set up everything automatically"',
+  'De camera of beamer is verschoven — ik stel alles opnieuw in': 'The camera or projector has moved — setting everything up again',
+  'Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"': 'Setting up again didn\'t work — click "Set up everything automatically"',
+  'Opnieuw ingesteld': 'Everything set up again',
+  'Opnieuw ingesteld — klik op "Pauze opheffen" om verder te spelen': 'Everything set up again — click "Resume" to keep playing',
+  'Pauze': 'Pause',
+  'Pauze opheffen': 'Resume',
+  'Beeld bijgesneden tot het beamervlak — {zoom}× meer detail': 'Image cropped to the projected area — {zoom}× more detail',
+  'Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan':
+    "It's very dark — the camera sees little, even with the wall light. Switch on a lamp",
+  'Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera':
+    'The camera image is frozen — close programs that use the camera, or pick another camera',
+  'Camerabeeld is terug': 'Camera image is back',
+  'Uitdaging voorbij: je haalde level {n}': 'Challenge over: you reached level {n}',
+  'Nieuw record: {n} doelpunt': 'New record: {n} goal',
+  'Nieuw record: {n} doelpunten': 'New record: {n} goals',
+  'Ronde afgelopen': 'Round over',
+  'Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.':
+    'Single-file version: the browser asks for the camera every time you start — just click Allow. Want it to remember? Start with start.bat instead.',
+  'Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij': "Open sticky-clash.html or start.bat — opened like this, the browser won't allow the camera",
+  'Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen': 'Works best in Chrome or Edge — in this browser the projector window may stutter',
+  'De camera wisselde van beeldformaat — leer de muur opnieuw': 'The camera changed its image format — relearn the wall',
+
+  // ---- de teller onder "Doel aanwijzen"
+  '{n} obstakel (testmodus)': '{n} obstacle (test mode)',
+  '{n} obstakels (testmodus)': '{n} obstacles (test mode)',
+  'Niet gekalibreerd — voorwerpen raken de ballen niet': "Not calibrated — objects don't touch the balls",
+  'Muur nog niet geleerd': 'Wall not learned yet',
+  'Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw': 'Almost everything is seen as an object — did the light change? Relearn the wall',
+  'Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw': 'The light has changed a lot — detection is limited. Relearn the wall',
+  'De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan': 'The camera sees too little light ({n}/255) — turn Wall light up or switch on a lamp',
+  '{n} voorwerp actief': '{n} object active',
+  '{n} voorwerpen actief': '{n} objects active',
+  'genegeerd: {lijst}': 'ignored: {lijst}',
+  'loopt beeld uit': 'leaves the frame',
+  'te groot': 'too big',
+  'buiten beamervlak': 'outside projection',
+  'te hoog': 'too high',
+  'mens': 'person',
+  'geen voorwerpvorm': 'not an object shape',
+  'donker of schaduw (telt als het stil hangt)': 'dark or shadow (counts once it hangs still)',
+  'huidkleur (telt als het stil hangt)': 'skin color (counts once it hangs still)',
+  'schaduw van de bak': 'shadow of the bin',
+  '{n} vlek te klein — zet Min. grootte lager, of Gevoeligheid hoger': '{n} blob too small — lower Min. size, or raise Sensitivity',
+  '{n} vlekken te klein — zet Min. grootte lager, of Gevoeligheid hoger': '{n} blobs too small — lower Min. size, or raise Sensitivity',
+
+  // ---- de diagnosefoto (knop "Foto van wat de camera ziet")
+  'Camera, met wat het spel herkent': 'Camera, with what the game recognizes',
+  'Wat het spel als voorwerp ziet (licht = voorgrond)': 'What the game sees as objects (light = foreground)',
+  'ja': 'yes',
+  'nee': 'no',
+  'aan': 'on',
+  'Camera: {naam}  {b}x{h}': 'Camera: {naam}  {b}x{h}',
+  '(uitsnede)': '(cropped)',
+  'uitdaging': 'challenge',
+  'Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}': 'Calibration: {kal}   Wall learned: {muur}   Mode: {modus}',
+  'Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}':
+    'Sensitivity {sens}   Wall light {licht}%   Ignore skin {huid}   Ignore people {mensen}',
+  'Camera ziet helderheid {l}/255   voorgrond {fg}%   lichtcorrectie {gain}   {fps}': 'Camera sees brightness {l}/255   foreground {fg}%   light correction {gain}   {fps}',
+  'Teller: {teller}': 'Counter: {teller}',
+  'Sporen (id · cellen · oordeel · huid · schaduw · vertrouwd · stil · trilling · soort):': 'Tracks (id · cells · verdict · skin · shadow · trusted · still · jitter · kind):',
+  // oordeel per spoor en soort briefje (korte codes uit main.js en vision.js)
+  'wacht': 'waiting',
+  'telt': 'counts',
+  'bak': 'bin',
+  'rand': 'edge',
+  'groot': 'big',
+  'buiten': 'outside',
+  'vorm': 'shape',
+  'schaduw': 'shadow',
+  'huid': 'skin',
+  'trampoline': 'trampoline',
+  'booster': 'booster',
+  'breek': 'breakable',
+  '… en nog {n}': '… and {n} more',
+  'sticky-clash-foto': 'sticky-clash-photo',
+  'Foto opgeslagen in je map Downloads ({bestand})': 'Photo saved in your Downloads folder ({bestand})',
+
+  // ---- op de muur tijdens het instellen (main.js). De titels staan heel groot op de muur:
+  // houd ze kort, anders passen ze niet op een beamer van 4:3.
+  'Kalibreren': 'Calibrating',
+  'even niet voor de beamer gaan staan': "please don't stand in front of the projector",
+  'Ga even uit beeld': 'Step out of view',
+  'ik leer hoe de lege muur eruitziet': "I'm learning what the empty wall looks like",
+  'Momentje': 'One moment',
+  'Zet nu de bak neer': 'Now place the bin',
+  'en ga daarna zelf uit beeld': 'then step out of view yourself',
+  'Zoeken…': 'Searching…',
+  'Licht afstellen': 'Adjusting the light',
+  'Klaar': 'All set',
+  'veel plezier': 'have fun',
+  'Klik kruis {n} aan in het camerabeeld op de laptop': 'Click cross {n} in the camera view on the laptop',
+  'Klik één keer in dit venster voor volledig scherm': 'Click once in this window for full screen',
+  'NIET GEKALIBREERD': 'NOT CALIBRATED',
+  'voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"': 'objects don\'t touch the balls — click "Set up everything automatically"',
+  'Camera nog niet gestart': 'Camera not started yet',
+
+  // ---- tips op de muur zolang er niet gespeeld wordt (main.js)
+  'Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen': 'Stick notes or hold objects against the wall: the balls bounce off them',
+  'Bouw een baan naar de groene bak': 'Build a path to the green bin',
+  'Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken': 'Red note = trampoline · green = turbo · blue = breaks after 5 hits',
+  'Een gouden bal in de bak is 3 punten waard': 'A gold ball in the bin is worth 3 points',
+  'De kleine gouden bak geeft 3 punten, en verspringt steeds': 'The small gold bin gives 3 points, and keeps moving',
+  'Uitdaging: haal elk level op tijd — het wordt steeds moeilijker': 'Challenge: clear each level in time — it keeps getting harder',
+  'Druk op spatie om te beginnen': 'Press space to start',
+
+  // ---- het spel op de muur (game.js)
+  'AANVALLER': 'ATTACKER',
+  'VERDEDIGER': 'DEFENDER',
+  'DOELPUNTEN': 'GOALS',
+  'GEMIST': 'MISSED',
+  'LEVEL {n}': 'LEVEL {n}',
+  'COMBO x{n}': 'COMBO x{n}',
+  'COMBO ×{n}': 'COMBO ×{n}',
+  'GO': 'GO',
+  'KRAK': 'CRACK',
+  'BLOK': 'BLOCK',
+  'BOING': 'BOING',
+  'TURBO': 'TURBO',
+  'zet je voorwerpen klaar': 'get your objects ready',
+  'LEVEL 1: {n} punten in {s} s': 'LEVEL 1: {n} points in {s} s',
+  'LEVEL {level}: de bron beweegt en er komen meer ballen — {n} punten in {s} s': 'LEVEL {level}: the source moves and more balls fall — {n} points in {s} s',
+  'LEVEL {level}: er staat wind — {n} punten in {s} s': 'LEVEL {level}: wind is blowing — {n} points in {s} s',
+  'LEVEL {level}: meer punten — {n} punten in {s} s': 'LEVEL {level}: more points — {n} points in {s} s',
+  'LEVEL {level}: de bak beweegt — {n} punten in {s} s': 'LEVEL {level}: the bin moves — {n} points in {s} s',
+  'LEVEL {level}: de bak verhuist — {n} punten in {s} s': 'LEVEL {level}: the bin moves to a new spot — {n} points in {s} s',
+  'LEVEL {n} GEHAALD': 'LEVEL {n} CLEARED',
+  'LEVEL {n} — GAME OVER': 'LEVEL {n} — GAME OVER',
+  'PAUZE': 'PAUSED',
+  'KLAAR OM TE STARTEN': 'READY TO START',
+  'hoogste score tot nu toe: {n}': 'high score so far: {n}',
+  'zet iets voor de muur en start de ronde': 'put something in front of the wall and start the round',
+  'druk op spatie voor een nieuwe ronde': 'press space for a new round',
+  'druk op spatie voor een nieuwe poging': 'press space to try again',
+  '{n} DOELPUNT': '{n} GOAL',
+  '{n} DOELPUNTEN': '{n} GOALS',
+  'GELIJKSPEL': 'DRAW',
+  'AANVALLER WINT': 'ATTACKER WINS',
+  'VERDEDIGER WINT': 'DEFENDER WINS',
+  'NIEUW RECORD': 'NEW RECORD',
+  'RANGLIJST': 'LEADERBOARD',
+
+  // ---- bediening met de telefoon (telefoon.js). De meldingen gaan naar de telefoon en
+  // staan daarom ook in telefoon.html, met dezelfde vertaling.
+  'Telefoon verbonden': 'Phone connected',
+  '{n} telefoons verbonden': '{n} phones connected',
+  'Klaar — wacht op je telefoon': 'Ready — waiting for your phone',
+  'Verbinden met ntfy.sh…': 'Connecting to ntfy.sh…',
+  'Verbinding met ntfy.sh weg — opnieuw verbinden…': 'Connection to ntfy.sh lost — reconnecting…',
+  'Geen verbinding met ntfy.sh — opnieuw over {n} s. Heeft de laptop internet?': 'No connection to ntfy.sh — retrying in {n} s. Does the laptop have internet?',
+  'ntfy.sh vraagt om rustiger aan te doen — volgende poging over {n} s': 'ntfy.sh asks us to slow down — next try in {n} s',
+  'Bericht naar de telefoon mislukt — opnieuw over {n} s': 'Message to the phone failed — retrying in {n} s',
+  'Even wachten: het spel is nog aan het instellen': 'One moment: the game is still setting up',
+  'Even wachten: het spel stelt zich opnieuw in': 'One moment: the game is setting itself up again',
+  'De ronde begint al': 'The round is already starting',
+  'Er loopt al een ronde': 'A round is already running',
+  'Staat al op pauze': 'Already paused',
+  'Er loopt geen ronde': 'No round is running',
+  'Het spel loopt al': 'The game is already running',
+  'Er is geen pauze': "The game isn't paused",
+  'Zet de ronde eerst op pauze': 'Pause the round first',
+  'Er wordt nu geen naam gevraagd': "No name is being asked for right now",
+  'Opgeslagen in de ranglijst': 'Saved to the leaderboard',
+};
+
+// ---- js/taal.js
+// Taal van het spel: Nederlands of Engels.
+//
+// De Nederlandse zin is zelf de sleutel. In de code staat t('Start ronde'); in het Engels
+// wordt dat 'Start round', zoals het woordenboek in js/taal-en.js zegt. Zo blijft de code
+// leesbaar, en een zin die (nog) niet in taal-en.js staat blijft gewoon Nederlands.
+// Iets invullen gaat met {naam}: t('Camera actief: {naam}', { naam: label }).
+//
+// Welke taal: wat je bovenin koos (NL | EN, bewaard in deze browser), en anders de taal
+// van de browser: begint die met "nl", dan Nederlands, anders Engels. Zonder echte pagina
+// (de tests in node) altijd Nederlands: node kent ook een navigator, met de taal van de
+// computer, en daar mogen de tests niet van afhangen.
+//
+// Wisselen gaat meteen, zonder herladen. vertaalPagina() zet de vaste teksten van
+// index.html om; wie zelf teksten maakt, meldt zich met opTaal() en maakt ze opnieuw.
+// Wat op de muur staat, vertaalt het spel bij het tekenen: dat wisselt vanzelf mee.
+
+const TAAL_OPSLAG = 'stickyclash.taal';
+
+// Opzoeken gebeurt ook elk beeldje (de teksten op de muur): een Map is daar het snelst.
+const TAAL_KAART = new Map(Object.entries(TAAL_EN));
+const TAAL_ATTR = ['placeholder', 'title', 'aria-label'];
+const taalVolgers = [];
+// Wat t() het laatst teruggaf, en waaruit (zie tHerkomst).
+const taalLaatst = { uit: '', nl: '', vars: null };
+// Vaste teksten van de pagina: per tekstknoop en per attribuut het Nederlandse origineel,
+// zodat heen en weer wisselen nooit iets kwijtraakt.
+const taalKnopen = new WeakMap();
+const taalAttrs = new WeakMap();
+
+let taalNu = kiesTaal(taalBewaard(), taalBrowser(), taalHeeftPagina());
+if (taalHeeftPagina()) document.documentElement.lang = taalNu;
+
+function taalHeeftPagina() {
+  return typeof window !== 'undefined' && typeof document !== 'undefined' && !!document.documentElement;
+}
+
+function taalBewaard() {
+  try { return localStorage.getItem(TAAL_OPSLAG); } catch { return null; }   // geblokkeerd, of node
+}
+
+function taalBrowser() {
+  if (typeof navigator === 'undefined' || !navigator) return '';
+  return (navigator.languages && navigator.languages[0]) || navigator.language || '';
+}
+
+/** De taal bij het opstarten: de bewaarde keuze, anders die van de browser. Zonder pagina: Nederlands. */
+function kiesTaal(bewaard, browser, pagina) {
+  if (!pagina) return 'nl';
+  if (bewaard === 'nl' || bewaard === 'en') return bewaard;
+  return /^nl/i.test(browser || '') ? 'nl' : 'en';
+}
+
+/** 'nl' of 'en'. */
+function huidigeTaal() { return taalNu; }
+
+/**
+ * De vertaling van een Nederlandse zin, met {naam} ingevuld uit vars. Staat de zin niet in
+ * taal-en.js, dan blijft hij Nederlands. Een waarde in vars mag ook een functie zijn: die
+ * wordt pas bij het invullen aangeroepen, zodat een vertaling ín de zin later meewisselt.
+ */
+function t(nl, vars) {
+  let uit = nl;
+  if (taalNu === 'en') {
+    const en = TAAL_KAART.get(nl);
+    if (en !== undefined) uit = en;
+  }
+  if (vars) uit = taalVul(uit, vars);
+  taalLaatst.uit = uit; taalLaatst.nl = nl; taalLaatst.vars = vars || null;
+  return uit;
+}
+
+/**
+ * Voor aantallen: tAantal(3, '{n} voorwerp', '{n} voorwerpen') geeft '3 voorwerpen', en in
+ * het Engels '3 objects'. De eerste zin is voor precies één, de tweede voor de rest.
+ */
+function tAantal(n, een, meer, vars) {
+  return t(n === 1 ? een : meer, vars ? Object.assign({}, vars, { n }) : { n });
+}
+
+/** Alleen invullen, niet vertalen: {naam} wordt vars.naam. Onbekende {…} blijven staan. */
+function taalVul(tekst, vars) {
+  return tekst.replace(/\{(\w+)\}/g, (heel, naam) => {
+    if (!(naam in vars)) return heel;
+    const v = vars[naam];
+    return String(typeof v === 'function' ? v() : v);
+  });
+}
+
+/**
+ * Kwam `tekst` net uit t()? Dan staan in het antwoord de Nederlandse zin (nl) en de
+ * waarden (vars), om hem na het wisselen van taal opnieuw te vertalen: t(h.nl, h.vars).
+ * Anders null. Het is steeds hetzelfde object, dus meteen overnemen. Zo onthouden de
+ * statusregel en de grote teksten op de muur waar ze vandaan kwamen, zonder dat elke
+ * aanroep daar iets voor hoeft te doen.
+ */
+function tHerkomst(tekst) {
+  return taalLaatst.nl && tekst === taalLaatst.uit ? taalLaatst : null;
+}
+
+/**
+ * Een tekst met een getal erin die elk beeldje op de muur staat, zoals 'LEVEL {n}'. Hij
+ * wordt alleen opnieuw gemaakt als het getal of de taal verandert: tekenen maakt dan
+ * niets nieuws aan.
+ */
+class TaalTeller {
+  constructor(nl) {
+    this.nl = nl;
+    this.n = NaN;
+    this.taal = '';
+    this.uit = '';
+  }
+
+  tekst(n) {
+    if (n !== this.n || this.taal !== taalNu) {
+      this.n = n; this.taal = taalNu;
+      this.uit = t(this.nl, { n });
+    }
+    return this.uit;
+  }
+}
+
+/** Een andere taal kiezen en onthouden. Wie zich met opTaal() meldde, maakt zijn teksten opnieuw. */
+function zetTaal(nieuw) {
+  if (nieuw !== 'nl' && nieuw !== 'en') return;
+  try { localStorage.setItem(TAAL_OPSLAG, nieuw); } catch { /* opslag geblokkeerd: dan alleen voor nu */ }
+  if (nieuw === taalNu) return;
+  taalNu = nieuw;
+  if (taalHeeftPagina()) document.documentElement.lang = nieuw;
+  for (const f of taalVolgers) f(nieuw);
+}
+
+/** f(taal) wordt aangeroepen na elke wissel van taal. */
+function opTaal(f) {
+  taalVolgers.push(f);
+}
+
+/**
+ * De vaste teksten onder `wortel` in de huidige taal zetten: tekstknopen, en de attributen
+ * placeholder, title en aria-label. Alleen wat (zonder de spaties eromheen) precies in
+ * taal-en.js staat; die spaties blijven. Overgeslagen: script, style, en alles met
+ * translate="no", zoals de knoppen NL en EN zelf.
+ */
+function vertaalPagina(wortel) {
+  for (let n = wortel.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 3) taalKnoop(n);
+    else if (n.nodeType === 1) {
+      if (n.nodeName === 'SCRIPT' || n.nodeName === 'STYLE' || n.getAttribute('translate') === 'no') continue;
+      for (const a of TAAL_ATTR) if (n.hasAttribute(a)) taalAttr(n, a);
+      vertaalPagina(n);
+    }
+  }
+}
+
+/** Een tekst met eventueel spaties eromheen: alleen het midden vertalen. */
+function taalZin(nl) {
+  if (taalNu !== 'en') return nl;
+  const kern = nl.trim();
+  const en = kern ? TAAL_KAART.get(kern) : undefined;
+  if (en === undefined) return nl;
+  const voor = nl.length - nl.trimStart().length;
+  return nl.slice(0, voor) + en + nl.slice(voor + kern.length);
+}
+
+// Heeft iemand de tekst intussen zelf veranderd (hij is niet meer wat wij er neerzetten),
+// dan is die nieuwe tekst voortaan het origineel.
+function taalKnoop(n) {
+  const oud = taalKnopen.get(n);
+  const nl = oud && n.data === oud.getoond ? oud.nl : n.data;
+  const uit = taalZin(nl);
+  if (uit !== n.data) n.data = uit;
+  if (oud || uit !== nl) taalKnopen.set(n, { nl, getoond: uit });
+}
+
+function taalAttr(el, a) {
+  let m = taalAttrs.get(el);
+  const oud = m && m[a], nu = el.getAttribute(a);
+  const nl = oud && nu === oud.getoond ? oud.nl : nu;
+  const uit = taalZin(nl);
+  if (uit !== nu) el.setAttribute(a, uit);
+  if (oud || uit !== nl) {
+    if (!m) taalAttrs.set(el, m = {});
+    m[a] = { nl, getoond: uit };
+  }
+}
+
 // ---- js/game.js
 // Spel: balletjes vallen, ketsen af op de gedetecteerde briefjes, moeten in de bak.
 // Wereldcoordinaten: hoogte altijd 1000, breedte = 1000 * beeldverhouding.
+// Teksten op de muur gaan door t() (js/taal.js), zodat ze meewisselen met NL | EN.
 
 const WORLD_H = 1000;
 
@@ -2826,6 +3408,11 @@ const FX_GOUD = ['#ffd479', '#ffe9a8', '#ffb347', '#fff3c4'];
 const FX_POP_FONT = '700 ' + POP_PX + 'px ui-sans-serif, system-ui, sans-serif';
 const FX_POP_GROOT = '800 60px ui-sans-serif, system-ui, sans-serif';
 const FX_COMBO_FONT = '800 56px ui-sans-serif, system-ui, sans-serif';
+// Teksten met een getal die elk beeldje getekend worden: alleen opnieuw opgebouwd als het
+// getal of de taal verandert.
+const HUD_LEVEL = new TaalTeller('LEVEL {n}');
+const HUD_COMBO = new TaalTeller('COMBO x{n}');
+const HUD_BEST = new TaalTeller('hoogste score tot nu toe: {n}');
 
 // Eén deeltje. Soort 0 = vonk (rondje), 1 = confetti (draaiend papiertje), 2 = sterretje.
 function fxDeeltje() {
@@ -3001,6 +3588,7 @@ class Game {
     this.levelReached = 0;        // op welk level de laatste reeks strandde
     this.bestLevel = 0;
     this.ownSettings = null;      // de instellingen van de speler, bewaard tijdens een levelreeks
+    this.hint = { level: -1, taal: '', auto: false, doel: 0, tijd: 0, tekst: '' };   // levelHint, onthouden
     // Tekst op de muur buiten een ronde.
     this.tips = [];               // wisselen elke 4,5 s onder het startscherm
     this.highscores = [];         // [{ name, score }], al gesorteerd; top 5 in een hoek
@@ -3154,7 +3742,7 @@ class Game {
 
   /** Doel gehaald: banner, drie tellen aftellen, en door naar het volgende level. */
   nextLevel() {
-    this.banner = { text: 'LEVEL ' + this.level + ' GEHAALD', t: 3.1 };
+    this.toonBanner(t('LEVEL {n} GEHAALD', { n: this.level }), 3.1);
     this.level++;
     this.applyLevel();
     this.placeBonus();
@@ -3181,7 +3769,7 @@ class Game {
     // Level 1 niet halen is geen record, ook niet de allereerste keer.
     this.newRecord = n > 1 && n > this.bestLevel;
     this.bestLevel = Math.max(this.bestLevel, n);
-    this.banner = { text: 'LEVEL ' + n + ' — GAME OVER', t: 9999 };
+    this.toonBanner(t('LEVEL {n} — GAME OVER', { n }), 9999);
     this.restoreSettings();
     if (this.newRecord) this.feest(6);
     if (this.sfx) {
@@ -3192,14 +3780,28 @@ class Game {
     }
   }
 
+  /** Wat er in dit level nieuw is, en het doel. Tijdens het aftellen elk beeldje: dus onthouden. */
   levelHint() {
-    const n = this.level, doel = this.levelTarget + ' punten in ' + this.levelTime + ' s';
-    if (n <= 1) return 'LEVEL 1: ' + doel;
-    const nieuw = n >= 5 ? 'de bron beweegt en er komen meer ballen'
-      : n === 4 ? 'er staat wind'
-      : n === 3 ? (this.goal.auto ? 'meer punten' : 'de bak beweegt')
-      : (this.goal.auto ? 'meer punten' : 'de bak verhuist');
-    return 'LEVEL ' + n + ': ' + nieuw + ' — ' + doel;
+    const n = this.level, h = this.hint, auto = this.goal.auto;
+    if (h.level === n && h.taal === huidigeTaal() && h.auto === auto && h.doel === this.levelTarget && h.tijd === this.levelTime) return h.tekst;
+    const w = { level: n, n: this.levelTarget, s: this.levelTime };
+    h.tekst = n <= 1 ? t('LEVEL 1: {n} punten in {s} s', w)
+      : n >= 5 ? t('LEVEL {level}: de bron beweegt en er komen meer ballen — {n} punten in {s} s', w)
+      : n === 4 ? t('LEVEL {level}: er staat wind — {n} punten in {s} s', w)
+      : auto ? t('LEVEL {level}: meer punten — {n} punten in {s} s', w)
+      : n === 3 ? t('LEVEL {level}: de bak beweegt — {n} punten in {s} s', w)
+      : t('LEVEL {level}: de bak verhuist — {n} punten in {s} s', w);
+    h.level = n; h.taal = huidigeTaal(); h.auto = auto; h.doel = this.levelTarget; h.tijd = this.levelTime;
+    return h.tekst;
+  }
+
+  /**
+   * De grote tekst in het midden (LEVEL 2 GEHAALD, GO, de eindstand). Onthoudt uit welke
+   * zin hij kwam, zodat hij na het wisselen van taal meteen meevertaalt (zie drawHud).
+   */
+  toonBanner(text, tijd) {
+    const h = tHerkomst(text);
+    this.banner = { text, t: tijd, nl: h ? h.nl : '', vars: h ? h.vars : null, taal: huidigeTaal() };
   }
 
   // ---- bonusbak ---------------------------------------------------------------
@@ -3434,9 +4036,12 @@ class Game {
   /** Zwevende tekst (+1, BLOK, KRAK, COMBO ×3). Ook uit een voorraad, met een grens. */
   pop(x, y, text, col, font = FX_POP_FONT, rise = POP_RISE, life = 1.1, grow = false) {
     let p = this.pops.length >= FX_MAX_POPS ? this.pops.shift() : this.popPool.pop();
-    if (!p) p = { x: 0, y: 0, t: 0, text: '', col: '', font: '', rise: 0, life: 0, grow: false };
+    if (!p) p = { x: 0, y: 0, t: 0, text: '', col: '', font: '', rise: 0, life: 0, grow: false, nl: '', vars: null, taal: '' };
     p.x = x; p.y = y; p.t = 0; p.text = text; p.col = col;
     p.font = font; p.rise = rise; p.life = life; p.grow = grow;
+    // uit welke zin (KRAK, COMBO ×3), zodat hij bij een andere taal meevertaalt (drawParts)
+    const h = tHerkomst(text);
+    p.nl = h ? h.nl : ''; p.vars = h ? h.vars : null; p.taal = huidigeTaal();
     this.pops.push(p);
     return p;
   }
@@ -3505,7 +4110,7 @@ class Game {
    * Past het nergens, dan staat de combo toch al in de HUD.
    */
   comboPop(bin) {
-    const text = 'COMBO ×' + this.combo, w = text.length * 56 * 0.74 + 8, h = 56 + 40 + 4;
+    const text = t('COMBO ×{n}', { n: this.combo }), w = text.length * 56 * 0.74 + 8, h = 56 + 40 + 4;
     const boxes = this.obstacles.map(ob => polyBox(ob.poly));
     const spots = [[bin.x, bin.y - bin.r - 150], [this.W / 2, 250]];
     for (const [cx, cy] of spots) {
@@ -3566,7 +4171,7 @@ class Game {
       if (now !== was && now > 0 && this.sfx) this.sfx.tick(false);
       if (this.countdown <= 0) {
         this.state = 'play';
-        this.banner = { text: 'GO', t: 0.9 };
+        this.toonBanner(t('GO'), 0.9);
         if (this.sfx) this.sfx.start();
       }
       // Tussen twee levels vliegen er nog ballen: die vallen gewoon uit, zonder te
@@ -3631,12 +4236,9 @@ class Game {
       const a = this.score.attack, b = this.score.block;
       this.newRecord = !this.duel && a > this.best;
       if (this.newRecord) this.best = a;
-      this.banner = {
-        text: this.duel
-          ? (a === b ? 'GELIJKSPEL' : (a > b ? 'AANVALLER WINT' : 'VERDEDIGER WINT'))
-          : (a + (a === 1 ? ' DOELPUNT' : ' DOELPUNTEN')),
-        t: 9999,
-      };
+      this.toonBanner(this.duel
+        ? (a === b ? t('GELIJKSPEL') : (a > b ? t('AANVALLER WINT') : t('VERDEDIGER WINT')))
+        : tAantal(a, '{n} DOELPUNT', '{n} DOELPUNTEN'), 9999);
       if (this.newRecord) this.feest(6);
       if (this.sfx) {
         if (this.newRecord && this.sfx.record) this.sfx.record();
@@ -3827,7 +4429,7 @@ class Game {
     for (let k = 0; k <= 4; k++) this.burst(x0 + (x1 - x0) * k / 4, y0 - 8, col, 8, 380, 0, -1);
     // Een tekst stijgt nog POP_RISE op terwijl hij vervaagt: dat hele stuk moet vrij zijn.
     // Een 700-letter is ongeveer 0,74 keer zo breed als hoog. Nergens plek: alleen scherven.
-    const text = 'KRAK', h = POP_PX + POP_RISE + 2;
+    const text = t('KRAK'), h = POP_PX + POP_RISE + 2;
     const boxes = this.obstacles.map(o => polyBox(o.poly));
     boxes.push(own);
     const spot = this.labelSpot(boxes, boxes.length - 1, text.length * POP_PX * 0.74 + 8, h);
@@ -3895,7 +4497,7 @@ class Game {
       // aanvaller zelf mis kaatste is niemands verdienste.
       if (!b.blockHits) return;
       this.score.block += 1;
-      this.pop(b.x, this.H - 60, 'BLOK', '#6ec1ff');
+      this.pop(b.x, this.H - 60, t('BLOK'), '#6ec1ff');
       this.burst(b.x, this.H - 20, '#3aa0ff', 10, 200);
     } else {
       this.misses += 1;
@@ -3990,7 +4592,7 @@ class Game {
       if (!kind || ob.pending) continue;
       if (!boxes) boxes = this.obstacles.map(o => polyBox(o.poly));
       const sty = KIND_STYLE[kind];
-      let text = sty.label;
+      let text = t(sty.label);
       ctx.globalAlpha = 1;
       if (kind === 'breek') {
         const st = this.breakState(ob, false);
@@ -4177,6 +4779,7 @@ class Game {
     ctx.textAlign = 'center';
     for (let i = 0; i < this.pops.length; i++) {
       const p = this.pops[i], k = p.t / (p.life || 1.1), y = p.y - k * (p.rise == null ? POP_RISE : p.rise);
+      if (p.nl && p.taal !== huidigeTaal()) { p.text = t(p.nl, p.vars); p.taal = huidigeTaal(); }   // taal gewisseld
       ctx.globalAlpha = 1 - k;
       ctx.fillStyle = p.col;
       ctx.font = p.font || FX_POP_FONT;
@@ -4195,14 +4798,17 @@ class Game {
 
   drawHud(ctx) {
     const pad = 44;
+    // Taal gewisseld terwijl er een grote tekst staat: meteen in de nieuwe taal.
+    const bn = this.banner;
+    if (bn && bn.nl && bn.taal !== huidigeTaal()) { bn.text = t(bn.nl, bn.vars); bn.taal = huidigeTaal(); }
     ctx.textBaseline = 'top';
     ctx.font = '700 22px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ff8a1e';
-    ctx.fillText(this.duel ? 'AANVALLER' : 'DOELPUNTEN', pad, pad);
+    ctx.fillText(this.duel ? t('AANVALLER') : t('DOELPUNTEN'), pad, pad);
     ctx.textAlign = 'right';
     ctx.fillStyle = this.duel ? '#3aa0ff' : '#7a8296';
-    ctx.fillText(this.duel ? 'VERDEDIGER' : 'GEMIST', this.W - pad, pad);
+    ctx.fillText(this.duel ? t('VERDEDIGER') : t('GEMIST'), this.W - pad, pad);
 
     ctx.font = '800 84px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
@@ -4237,7 +4843,7 @@ class Game {
       ctx.font = '800 28px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillStyle = '#ff8a1e';
-      ctx.fillText('LEVEL ' + this.level, this.W / 2 - 14, pad + 64);
+      ctx.fillText(HUD_LEVEL.tekst(this.level), this.W / 2 - 14, pad + 64);
       ctx.textAlign = 'left';
       ctx.fillStyle = this.levelGoals >= this.levelTarget ? '#3ddc84' : '#e8eaf0';
       ctx.fillText(this.levelGoals + ' / ' + this.levelTarget, this.W / 2 + 14, pad + 64);
@@ -4248,7 +4854,7 @@ class Game {
     if (this.combo > 1) {
       ctx.fillStyle = '#ffd479';
       ctx.font = '700 30px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText('COMBO x' + this.combo, this.W / 2, comboY);
+      ctx.fillText(HUD_COMBO.tekst(this.combo), this.W / 2, comboY);
     }
 
     if (this.state === 'count') {
@@ -4269,13 +4875,13 @@ class Game {
       }
       ctx.fillStyle = '#e8eaf0';
       ctx.font = '600 40px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(this.level > 0 ? this.levelHint() : 'zet je voorwerpen klaar', this.W / 2, this.H / 2 + 200);
+      ctx.fillText(this.level > 0 ? this.levelHint() : t('zet je voorwerpen klaar'), this.W / 2, this.H / 2 + 200);
       ctx.textBaseline = 'top';
       return;
     }
 
     if (this.state === 'idle' || this.state === 'paused' || this.state === 'over' || this.banner) {
-      const txt = this.banner ? this.banner.text : (this.state === 'paused' ? 'PAUZE' : 'KLAAR OM TE STARTEN');
+      const txt = this.banner ? this.banner.text : (this.state === 'paused' ? t('PAUZE') : t('KLAAR OM TE STARTEN'));
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(0,0,0,.5)';
@@ -4285,7 +4891,7 @@ class Game {
       ctx.fillText(txt, this.W / 2, this.H / 2 - 16);
 
       let sub = '', subCol = '#8b93a5', subA = 1;
-      if (this.state === 'over') sub = this.levelReached ? 'druk op spatie voor een nieuwe poging' : 'druk op spatie voor een nieuwe ronde';
+      if (this.state === 'over') sub = this.levelReached ? t('druk op spatie voor een nieuwe poging') : t('druk op spatie voor een nieuwe ronde');
       else if (this.state === 'idle' && this.tips.length) {
         // Eén tip tegelijk, elke 4,5 s de volgende, met een korte overvloei.
         const k = this.t / 4.5, into = (k - Math.floor(k)) * 4.5;
@@ -4293,12 +4899,12 @@ class Game {
         subA = Math.max(0, Math.min(1, into / 0.35, (4.5 - into) / 0.35));
         subCol = '#c9cfdb';
       }
-      else if (this.state === 'idle' && this.best) sub = 'hoogste score tot nu toe: ' + this.best;
-      else if (this.state === 'idle') sub = 'zet iets voor de muur en start de ronde';
+      else if (this.state === 'idle' && this.best) sub = HUD_BEST.tekst(this.best);
+      else if (this.state === 'idle') sub = t('zet iets voor de muur en start de ronde');
       if (this.newRecord && this.state === 'over') {
         ctx.fillStyle = '#ffd479';
         ctx.font = '800 46px ui-sans-serif, system-ui, sans-serif';
-        ctx.fillText('NIEUW RECORD', this.W / 2, this.H / 2 + 52);
+        ctx.fillText(t('NIEUW RECORD'), this.W / 2, this.H / 2 + 52);
       } else if (sub) {
         ctx.fillStyle = subCol;
         ctx.globalAlpha = subA;
@@ -4351,7 +4957,7 @@ class Game {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffd479';
     ctx.font = '800 24px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('RANGLIJST', x, y);
+    ctx.fillText(t('RANGLIJST'), x, y);
     ctx.font = '600 24px ui-sans-serif, system-ui, sans-serif';
     for (let i = 0; i < list.length; i++) {
       const e = list[i] || {}, ry = y + 42 + i * rowH;
@@ -5172,6 +5778,11 @@ function qrTeken(ctx, qr, x, y, maat, rand = 4) {
 //     altijd de nieuwste stand. De resterende tijd gaat mee; die telt de telefoon zelf af.
 // Wat binnenkomt wordt streng gecontroleerd: alleen bekende knoppen, korte berichten, en
 // een naam komt nooit als code op het scherm.
+//
+// Meldingen en de naamvraag gaan in de taal van de laptop naar de telefoon. Staat de
+// telefoon op een andere taal, dan vertaalt telefoon.html ze zelf (met zijn eigen
+// woordenboek); daarom moeten ze daar ook in staan (test/taal.mjs controleert dat).
+
 
 // Het doorgeefluik. Eén adres: heb je een eigen ntfy-server, zet die dan hier. (De tests
 // zetten hier via sc.telefoon.relay hun eigen nep-server neer.)
@@ -5486,33 +6097,33 @@ class Telefoon {
     const g = this.game, s = g.state, bezig = !!this.bron.bezig();
     const eerder = this.telefoons.size, id = k.van || '?';
     if (eerder < 8 || this.telefoons.has(id)) this.telefoons.set(id, this.klok());
-    if (!eerder) this.bron.status('Telefoon verbonden', 'ok');
+    if (!eerder) this.bron.status(t('Telefoon verbonden'), 'ok');
     if (this.telefoons.size !== eerder) this.toonStatus();   // ook bij een tweede telefoon
     const nee = (reden) => { this.melding = reden; };
     switch (k.wat) {
       case 'hallo': break;
       case 'start':
-        if (bezig) nee('Even wachten: het spel is nog aan het instellen');
+        if (bezig) nee(t('Even wachten: het spel is nog aan het instellen'));
         else if (s === 'idle' || s === 'over') this.bron.knop('btnPlay');
-        else nee(s === 'count' ? 'De ronde begint al' : 'Er loopt al een ronde');
+        else nee(s === 'count' ? t('De ronde begint al') : t('Er loopt al een ronde'));
         break;
       case 'pauze':
         if (s === 'play') this.bron.knop('btnPlay');
-        else nee(s === 'paused' ? 'Staat al op pauze' : 'Er loopt geen ronde');
+        else nee(s === 'paused' ? t('Staat al op pauze') : t('Er loopt geen ronde'));
         break;
       case 'verder':
-        if (s !== 'paused') nee(s === 'play' ? 'Het spel loopt al' : 'Er is geen pauze');
-        else if (bezig) nee('Even wachten: het spel stelt zich opnieuw in');
+        if (s !== 'paused') nee(s === 'play' ? t('Het spel loopt al') : t('Er is geen pauze'));
+        else if (bezig) nee(t('Even wachten: het spel stelt zich opnieuw in'));
         else this.bron.knop('btnPlay');
         break;
       case 'nieuw':
-        if (bezig) nee('Even wachten: het spel is nog aan het instellen');
-        else if (s === 'play' || s === 'count') nee('Zet de ronde eerst op pauze');
+        if (bezig) nee(t('Even wachten: het spel is nog aan het instellen'));
+        else if (s === 'play' || s === 'count') nee(t('Zet de ronde eerst op pauze'));
         else { this.bron.knop('btnReset'); this.bron.knop('btnPlay'); }
         break;
       case 'naam':
-        if (!this.bron.vraag() || k.vraag !== this.vraagNr) nee('Er wordt nu geen naam gevraagd');
-        else { this.bron.bewaarNaam(k.naam); this.melding = 'Opgeslagen in de ranglijst'; }
+        if (!this.bron.vraag() || k.vraag !== this.vraagNr) nee(t('Er wordt nu geen naam gevraagd'));
+        else { this.bron.bewaarNaam(k.naam); this.melding = t('Opgeslagen in de ranglijst'); }
         break;
     }
     // Altijd antwoorden: met de nieuwe stand, of met de reden waarom niet.
@@ -5684,30 +6295,32 @@ class Telefoon {
     this.toonStatus();
   }
 
+  /** De regel onder de QR-code. Ook na het wisselen van taal (main.js roept hem dan aan). */
   toonStatus() {
     const el = this.el;
     if (!el) return;
-    let t = '', goed = false;
-    const over = (tot) => Math.max(1, Math.ceil((tot - this.klok()) / 1000)) + ' s';
-    if (!this.actief) t = '';
-    else if (this.relais === 'verbinden') t = 'Verbinden met ntfy.sh…';
+    let tekst = '', goed = false;
+    const over = (tot) => Math.max(1, Math.ceil((tot - this.klok()) / 1000));
+    if (!this.actief) tekst = '';
+    else if (this.relais === 'verbinden') tekst = t('Verbinden met ntfy.sh…');
     else if (this.relais === 'weg') {
-      t = this.es ? 'Verbinding met ntfy.sh weg — opnieuw verbinden…'
-        : 'Geen verbinding met ntfy.sh — opnieuw over ' + over(this.herOver) + '. Heeft de laptop internet?';
+      tekst = this.es ? t('Verbinding met ntfy.sh weg — opnieuw verbinden…')
+        : t('Geen verbinding met ntfy.sh — opnieuw over {n} s. Heeft de laptop internet?', { n: over(this.herOver) });
     } else if (this.zender && this.zender.status === 'druk') {
-      t = 'ntfy.sh vraagt om rustiger aan te doen — volgende poging over ' + over(this.zender.volgende);
+      tekst = t('ntfy.sh vraagt om rustiger aan te doen — volgende poging over {n} s', { n: over(this.zender.volgende) });
     } else if (this.zender && this.zender.status === 'fout') {
-      t = 'Bericht naar de telefoon mislukt — opnieuw over ' + over(this.zender.volgende);
+      tekst = t('Bericht naar de telefoon mislukt — opnieuw over {n} s', { n: over(this.zender.volgende) });
     } else if (this.telefoons.size) {
-      t = this.telefoons.size === 1 ? 'Telefoon verbonden' : this.telefoons.size + ' telefoons verbonden';
+      tekst = this.telefoons.size === 1 ? t('Telefoon verbonden') : t('{n} telefoons verbonden', { n: this.telefoons.size });
       goed = true;
-    } else t = 'Klaar — wacht op je telefoon';
-    el.status.textContent = t;
+    } else tekst = t('Klaar — wacht op je telefoon');
+    el.status.textContent = tekst;
     el.status.className = 'badge' + (goed ? ' ok' : '');
   }
 }
 
 // ---- js/main.js
+
 
 
 
@@ -5776,6 +6389,7 @@ const app = {
   fill: 0.25,             // muurverlichting door de beamer, 0..1
   fillAuto: true,         // bij instellen zelf afstellen
   lockExposure: false,    // camerabelichting vastzetten (standaard uit, zie vision.js)
+  ingesteld: false,       // al eens alles automatisch ingesteld (de knop heet dan anders)
   camLuma: -1,            // hoe helder de camera het beamervlak ziet
 };
 
@@ -5882,10 +6496,17 @@ function load() {
   } catch { /* stille val-terug op standaardwaarden */ }
 }
 
+// De laatste melding in de statusregel: uit welke zin, om hem na het wisselen van taal
+// opnieuw te vertalen (zie nieuweTaal).
+let statusBron = null;
+
+/** Melding bovenin. msg is een vertaalde tekst: status(t('Doel gezet'), 'ok'). */
 function status(msg, kind) {
   const el = $('status');
   el.textContent = msg;
   el.className = 'status' + (kind ? ' ' + kind : '');
+  const h = tHerkomst(msg);
+  statusBron = h ? { nl: h.nl, vars: h.vars, kind } : null;
 }
 
 function step(k, v) {
@@ -5913,7 +6534,7 @@ async function runExclusive(fn) {
   try {
     return await fn();
   } catch (e) {
-    status('Er ging iets mis: ' + (e && e.message ? e.message : e), 'err');
+    status(t('Er ging iets mis: {fout}', { fout: e && e.message ? e.message : e }), 'err');
     return false;
   } finally {
     app.wiz = null;
@@ -5981,11 +6602,16 @@ async function fillDevices() {
   const devs = await vision.devices();
   const sel = $('camSelect');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">Automatisch — losse webcam als die er is</option>';
+  sel.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = t('Automatisch — losse webcam als die er is');
+  sel.appendChild(auto);
   devs.forEach((d, i) => {
     const o = document.createElement('option');
     o.value = d.deviceId;
-    o.textContent = (d.label || ('Camera ' + (i + 1))) + (camRang(d) === 1 ? ' (ingebouwd)' : '');
+    const naam = d.label || t('Camera {n}', { n: i + 1 });
+    o.textContent = camRang(d) === 1 ? t('{naam} (ingebouwd)', { naam }) : naam;
     sel.appendChild(o);
   });
   const ids = devs.map(d => d.deviceId);
@@ -6003,12 +6629,14 @@ async function gewensteCamera() {
   return besteCamera(devs) || app.camId || undefined;
 }
 
+/** De hele melding als de camera niet wil starten. */
 function cameraFout(e) {
   const n = e && e.name;
-  if (n === 'NotAllowedError' || n === 'SecurityError') return 'de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan';
-  if (n === 'NotReadableError' || n === 'AbortError') return 'de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw';
-  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'geen camera gevonden — sluit je webcam aan';
-  return (e && e.message) || 'onbekende fout';
+  if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan');
+  if (n === 'NotReadableError' || n === 'AbortError') return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return t('Camera mislukt: geen camera gevonden — sluit je webcam aan');
+  if (e && e.message) return t('Camera mislukt: {fout}', { fout: e.message });
+  return t('Camera mislukt: onbekende fout');
 }
 
 async function startCamera() {
@@ -6032,13 +6660,13 @@ async function startCamera() {
       }
     }
     if (wil && id && wil !== id) {
-      status('De gekozen camera deed het niet (bezet?) — nu: ' + label, 'err');
+      status(t('De gekozen camera deed het niet (bezet?) — nu: {naam}', { naam: label }), 'err');
     }
     // Na een camerawissel of herstart hoort de uitsnede weer bij de kalibratie.
     if (app.H) {
       applyRoi();
       if (app.calCam && id && app.calCam !== id) {
-        status('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"', 'err');
+        status(t('Andere camera dan bij de kalibratie — klik "Alles automatisch instellen"'), 'err');
       }
     }
     if (track) {
@@ -6046,7 +6674,7 @@ async function startCamera() {
       track.addEventListener('ended', () => {
         vision.ready = false;
         step('cam', 0);
-        status('De camera is weggevallen — controleer de kabel en klik "Camera starten"', 'err');
+        status(t('De camera is weggevallen — controleer de kabel en klik "Camera starten"'), 'err');
       });
     }
     // Een camera kan een handmatige belichting uit een vorige sessie onthouden. Altijd
@@ -6057,19 +6685,19 @@ async function startCamera() {
       // witbalans staat, geeft een te donker of verkleurd beeld.
       const st = track && track.getSettings ? track.getSettings() : {};
       if (st.exposureMode === 'manual' || st.whiteBalanceMode === 'manual') {
-        status('De camera staat nog op vaste belichting — trek de camera er even uit en weer in', 'err');
+        status(t('De camera staat nog op vaste belichting — trek de camera er even uit en weer in'), 'err');
       }
     }
     if (!(app.camChosen && wil && id && wil !== id)) app.camId = id || app.camId;
     app.lastVideoTime = -1; app.videoStill = 0;
     step('cam', 1);
     save();
-    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status('Camera actief: ' + label, 'ok');
+    if (!(wil && id && wil !== id) && !(app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
     bekendeCams = new Set((await vision.devices()).map(d => d.deviceId));
     return true;
   } catch (e) {
     step('cam', 0);
-    status('Camera mislukt: ' + cameraFout(e), 'err');
+    status(cameraFout(e), 'err');
     return false;
   }
 }
@@ -6084,31 +6712,32 @@ async function cameraGewisseld() {
   const nieuw = devs.filter(d => !vorige.has(d.deviceId) && camRang(d) < 2);
   if (nieuw.length) {
     const d = nieuw[0];
-    const naam = d.label || 'nieuwe camera';
+    // zonder naam: pas bij het tonen vertalen, dan wisselt het mee met de taal
+    const naam = d.label || (() => t('nieuwe camera'));
     // Een losse webcam die je nu insteekt wil je gebruiken — tenzij je bewust een
     // andere hebt gekozen, of we midden in het instellen zitten.
     if (app.busy || (app.camChosen && nu.has(app.camId))) {
-      status('Webcam gevonden: ' + naam + ' — kies hem bovenaan bij Camera', 'ok');
+      status(t('Webcam gevonden: {naam} — kies hem bovenaan bij Camera', { naam }), 'ok');
       return;
     }
     app.camChosen = true; app.camId = d.deviceId;
     $('camSelect').value = d.deviceId;
     save();
     if (!vision.ready) {
-      status('Webcam gevonden en gekozen: ' + naam + ' — klik op "Alles automatisch instellen"', 'ok');
+      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen"', { naam }), 'ok');
       return;
     }
     await runExclusive(startCamera);
     const tr = vision.stream && vision.stream.getVideoTracks()[0];
     if (tr && tr.getSettings && tr.getSettings().deviceId === d.deviceId) {
-      status('Webcam gevonden en gekozen: ' + naam + ' — klik op "Alles automatisch instellen" om hem af te stellen', 'ok');
+      status(t('Webcam gevonden en gekozen: {naam} — klik op "Alles automatisch instellen" om hem af te stellen', { naam }), 'ok');
     }
     return;
   }
   const actief = vision.stream && vision.stream.getVideoTracks()[0];
   const actiefId = actief && actief.getSettings ? actief.getSettings().deviceId : '';
   if (actiefId && !nu.has(actiefId)) {
-    status('De webcam is losgekoppeld — steek hem er weer in, of kies bovenaan een andere camera', 'err');
+    status(t('De webcam is losgekoppeld — steek hem er weer in, of kies bovenaan een andere camera'), 'err');
   }
 }
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
@@ -6127,7 +6756,7 @@ $('camSelect').onchange = () => {
   if (v) app.camId = v;
   save();
   if (vision.ready) runExclusive(startCamera);
-  else status(v ? 'Camera gekozen — klik op "Alles automatisch instellen"' : 'Camera: automatisch', 'ok');
+  else status(v ? t('Camera gekozen — klik op "Alles automatisch instellen"') : t('Camera: automatisch'), 'ok');
 };
 
 // ---------------------------------------------------------------- beamer
@@ -6146,12 +6775,12 @@ async function openProjector(auto) {
   const w = window.open('', 'stickyclash_projector', feat);
   if (!w) {
     step('proj', 0);
-    status('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw', 'err');
+    status(t('Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw'), 'err');
     return false;
   }
   w.document.open();
   w.document.write(
-    '<!doctype html><html><head><meta charset="utf-8"><title>Sticky Clash — beamer</title>' +
+    '<!doctype html><html><head><meta charset="utf-8"><title>' + t('Sticky Clash — beamer') + '</title>' +
     '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}' +
     'canvas{display:block;width:100%;height:100%}' +
     'html.fs,html.fs body{cursor:none}</style>' +
@@ -6177,7 +6806,7 @@ async function openProjector(auto) {
     const full = !!w.document.fullscreenElement;
     if (full !== app.projFull) {
       app.projFull = full;
-      if (!full) status('Klik één keer in het beamervenster voor volledig scherm');
+      if (!full) status(t('Klik één keer in het beamervenster voor volledig scherm'));
     }
     w.document.documentElement.classList.toggle('fs', full);
   };
@@ -6250,14 +6879,14 @@ function projectorScreen() {
 
 $('btnScreens').onclick = async () => {
   if (!('getScreenDetails' in window)) {
-    status('Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer', 'err');
+    status(t('Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer'), 'err');
     return;
   }
   const det = await loadScreens(true);
-  if (!det) { status('Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer', 'err'); return; }
+  if (!det) { status(t('Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer'), 'err'); return; }
   const scr = projectorScreen();
-  if (!scr) { status('Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw', 'err'); return; }
-  status('Beamer gevonden (' + scr.width + '×' + scr.height + ') — het beamervenster opent daar voortaan vanzelf', 'ok');
+  if (!scr) { status(t('Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw'), 'err'); return; }
+  status(t('Beamer gevonden ({b}×{h}) — het beamervenster opent daar voortaan vanzelf', { b: scr.width, h: scr.height }), 'ok');
   if (projOk()) {
     app.proj.moveTo(scr.availLeft, scr.availTop);
     app.proj.resizeTo(scr.availWidth, scr.availHeight);
@@ -6309,10 +6938,11 @@ async function diffAgainst(pattern, ref, settle) {
  * alleen als die goed genoeg te zien zijn.
  */
 async function autoCalibrate(silent) {
-  if (!vision.ready) { if (!silent) status('Start eerst de camera', 'err'); return false; }
-  if (!projOk()) { if (!silent) status('Open eerst het beamervenster', 'err'); return false; }
+  if (!vision.ready) { if (!silent) status(t('Start eerst de camera'), 'err'); return false; }
+  if (!projOk()) { if (!silent) status(t('Open eerst het beamervenster'), 'err'); return false; }
   step('cal', 2);
   const wasWiz = app.wiz;
+  // title en sub zijn Nederlandse zinnen; drawWizard vertaalt ze bij het tekenen
   app.wiz = { title: 'Kalibreren', sub: 'even niet voor de beamer gaan staan' };
   // Op het volledige beeld kalibreren: na een verschoven beamer kan het vlak best
   // buiten de vorige uitsnede liggen. En met een camera die zich weer aanpast.
@@ -6336,8 +6966,8 @@ async function autoCalibrate(silent) {
   const white = await diffAgainst({ kind: 'white' }, ref, 900);
   app.calDiag = { wit: Math.round(white.max) };
   if (white.max < 9) {
-    return fail('De camera ziet het beamerbeeld niet (contrast ' + Math.round(white.max) +
-      '). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?');
+    return fail(t('De camera ziet het beamerbeeld niet (contrast {n}). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?',
+      { n: Math.round(white.max) }));
   }
   const thr = Math.max(7, white.max * 0.45);
   const cols = vision.cols;
@@ -6355,13 +6985,13 @@ async function autoCalibrate(silent) {
     if (t < blV) { blV = t; bl = [cx, cy]; }
   }
   if (n < white.d.length * 0.02 || !tl || !tr || !br || !bl) {
-    return fail('Het beamervlak is te klein in beeld. Richt de camera op de muur.');
+    return fail(t('Het beamervlak is te klein in beeld. Richt de camera op de muur.'));
   }
   const toPx = (p) => [(p[0] + 0.5) * vision.cell, (p[1] + 0.5) * vision.cell];
   const rough = [tl, tr, br, bl].map(toPx);
-  if (!quadOk(rough)) return fail('Het beamervlak ligt niet volledig in beeld.');
+  if (!quadOk(rough)) return fail(t('Het beamervlak ligt niet volledig in beeld.'));
   let H = computeHomography(rough.map(p => vision.camNorm(p[0], p[1])), [[0, 0], [1, 0], [1, 1], [0, 1]]);
-  if (!H) return fail('Kalibratie mislukt.');
+  if (!H) return fail(t('Kalibratie mislukt.'));
 
   // ---- stap 2: verfijnen met vier stippen ----
   const pts = [];
@@ -6403,8 +7033,8 @@ async function autoCalibrate(silent) {
 
   if (!silent) {
     status(refined
-      ? 'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt'
-      : 'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)', 'ok');
+      ? t('Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt')
+      : t('Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)'), 'ok');
   }
   return true;
 }
@@ -6412,8 +7042,8 @@ async function autoCalibrate(silent) {
 $('btnCalAuto').onclick = () => runExclusive(() => autoCalibrate(false));
 
 $('btnCal').onclick = () => {
-  if (!projOk()) { status('Open eerst het beamervenster', 'err'); return; }
-  if (!vision.ready) { status('Start eerst de camera', 'err'); return; }
+  if (!projOk()) { status(t('Open eerst het beamervenster'), 'err'); return; }
+  if (!vision.ready) { status(t('Start eerst de camera'), 'err'); return; }
   app.calibrating = true;
   app.calPts = [];
   updateCal();
@@ -6428,12 +7058,12 @@ $('btnCalReset').onclick = () => {
 function updateCal() {
   const st = $('calState');
   if (app.calibrating) {
-    st.textContent = 'Klik punt ' + (app.calPts.length + 1) + ' van 4 in het camerabeeld';
+    st.textContent = t('Klik punt {n} van 4 in het camerabeeld', { n: app.calPts.length + 1 });
     st.className = 'badge';
   } else if (app.H) {
-    st.textContent = 'Gekalibreerd'; st.className = 'badge ok';
+    st.textContent = t('Gekalibreerd'); st.className = 'badge ok';
   } else {
-    st.textContent = 'Niet gekalibreerd'; st.className = 'badge';
+    st.textContent = t('Niet gekalibreerd'); st.className = 'badge';
   }
 }
 
@@ -6479,7 +7109,7 @@ async function learnWall(withCountdown) {
       await vision.unlockCamera();
       await sleep(600);
       vast = [];
-      status('Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch', 'err');
+      status(t('Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch'), 'err');
     }
   }
   // Een seconde aan beelden: met maar acht werd de ruis naast scherpe randen
@@ -6497,9 +7127,17 @@ async function learnWall(withCountdown) {
   app.calPattern = null;
   app.wiz = null;
   step('bg', 1);
-  status('Muur geleerd' + (vast.length ? ' en camera vastgezet (' + vast.join(', ') + ')' : '') +
-    (al ? ' — ' + al + (al === 1 ? ' voorwerp hing' : ' voorwerpen hingen') + ' er al, die tellen gewoon mee'
-        : ' — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
+  // vision.lockCamera noemt wat hij vastzette: 'belichting', 'witbalans'
+  const wat = () => vast.map(w => t(w)).join(', ');
+  if (!vast.length) {
+    status(al ? tAantal(al, 'Muur geleerd — {n} voorwerp hing er al, dat telt gewoon mee',
+      'Muur geleerd — {n} voorwerpen hingen er al, die tellen gewoon mee')
+      : t('Muur geleerd — alles wat je er nu voor zet, kaatst de ballen'), 'ok');
+  } else {
+    status(al ? tAantal(al, 'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerp hing er al, dat telt gewoon mee',
+      'Muur geleerd en camera vastgezet ({wat}) — {n} voorwerpen hingen er al, die tellen gewoon mee', { wat })
+      : t('Muur geleerd en camera vastgezet ({wat}) — alles wat je er nu voor zet, kaatst de ballen', { wat }), 'ok');
+  }
   return true;
 }
 
@@ -6548,12 +7186,12 @@ async function findBin() {
 
   if (!best) {
     step('goal', 0);
-    status('Geen bak gevonden — probeer "Doel aanwijzen" en klik erop in het camerabeeld', 'err');
+    status(t('Geen bak gevonden — probeer "Doel aanwijzen" en klik erop in het camerabeeld'), 'err');
     return false;
   }
   setGoalFromBlob(best);
   step('goal', 1);
-  status('Doel gevonden — verplaats de bak gerust tijdens het spel', 'ok');
+  status(t('Doel gevonden — verplaats de bak gerust tijdens het spel'), 'ok');
   return true;
 }
 
@@ -6578,7 +7216,7 @@ function setGoalFromBlob(b) {
 
 $('btnGoal').onclick = () => {
   app.pickGoal = true;
-  status('Klik op de bak in het camerabeeld links');
+  status(t('Klik op de bak in het camerabeeld links'));
 };
 
 // ---------------------------------------------------------------- de wizard
@@ -6615,16 +7253,21 @@ function autoSetup() {
     app.wiz = { title: 'Klaar', sub: 'veel plezier' };
     await sleep(1200);
     app.wiz = null;
-    $('btnAuto').textContent = 'Opnieuw instellen';
-    if (bak) status('Alles staat klaar — klik op "Start ronde"', 'ok');
-    else status('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak', 'err');
+    app.ingesteld = true;
+    toonAutoKnop();
+    if (bak) status(t('Alles staat klaar — klik op "Start ronde"'), 'ok');
+    else status(t('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak'), 'err');
     return true;
   });
 }
 
+/** De grote knop bovenaan: na de eerste keer instellen heet hij "Opnieuw instellen". */
+function toonAutoKnop() {
+  $('btnAuto').textContent = app.ingesteld ? t('Opnieuw instellen') : t('Alles automatisch instellen');
+}
+
 $('btnAuto').onclick = autoSetup;
-$('btnAbort').onclick = () => { app.abort = true; status('Afgebroken'); };
-$('btnBg').title = 'Leer opnieuw hoe de lege muur eruitziet';
+$('btnAbort').onclick = () => { app.abort = true; status(t('Afgebroken')); };
 
 // ---------------------------------------------------------------- speelmodus
 
@@ -6634,13 +7277,17 @@ function setMode(m) {
   game.lowLight = (m === 'object');
   game.best = app.best[m] || 0;
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-  $('modeHint').textContent = m === 'object'
-    ? 'Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.'
-    : 'Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".';
+  toonModeHint();
   document.querySelectorAll('.steps li[data-k="bg"], .steps li[data-k="goal"]')
     .forEach(li => li.classList.toggle('hidden', m !== 'object'));
   vision.tracks.length = 0;
   save();
+}
+
+function toonModeHint() {
+  $('modeHint').textContent = vision.mode === 'object'
+    ? t('Alles wat je voor de muur houdt kaatst de ballen — boek, doos, hand, wat je maar pakt. Leer eerst de lege muur.')
+    : t('Oranje post-its sturen de ballen naar de bak, blauwe blokkeren. Leer de twee kleuren onder "Meer instellingen".');
 }
 
 document.querySelectorAll('#modeSeg button').forEach(b => {
@@ -6657,10 +7304,10 @@ function renderClasses() {
     row.className = 'cls';
     row.innerHTML =
       '<span class="dot" style="background:' + c.css + '"></span>' +
-      '<span class="nm">' + c.label + '</span>' +
+      '<span class="nm">' + t(c.label) + '</span>' +
       '<span class="cnt" data-cnt="' + c.id + '">0</span>';
     const b = document.createElement('button');
-    b.textContent = app.learning === i ? 'Klik…' : 'Leren';
+    b.textContent = app.learning === i ? t('Klik…') : t('Leren');
     if (app.learning === i) b.className = 'learning';
     b.onclick = () => { app.learning = app.learning === i ? -1 : i; renderClasses(); };
     row.appendChild(b);
@@ -6679,7 +7326,7 @@ debug.addEventListener('click', (e) => {
 
   if (app.pickGoal) {
     app.pickGoal = false;
-    if (!app.H) { status('Eerst kalibreren', 'err'); return; }
+    if (!app.H) { status(t('Eerst kalibreren'), 'err'); return; }
     const near = vision.tracks.filter(t => Math.hypot(t.cx - x, t.cy - y) < 40)
       .sort((a, b) => b.cells - a.cells)[0];
     if (near && setGoalFromBlob(near)) { /* bak gevonden */ }
@@ -6689,7 +7336,7 @@ debug.addEventListener('click', (e) => {
       game.goal.auto = false; app.goalTrack = null;
     }
     step('goal', 1);
-    status('Doel gezet', 'ok');
+    status(t('Doel gezet'), 'ok');
     return;
   }
 
@@ -6700,7 +7347,7 @@ debug.addEventListener('click', (e) => {
       C.hue = hsv[0];
       C.sMin = Math.max(0.15, hsv[1] * 0.55);
       C.vMin = Math.max(0.12, hsv[2] * 0.45);
-      status(C.label + ' geleerd: tint ' + Math.round(hsv[0]) + '°', 'ok');
+      status(t('{kleur} geleerd: tint {tint}°', { kleur: () => t(C.label), tint: Math.round(hsv[0]) }), 'ok');
       save();
     }
     app.learning = -1;
@@ -6717,10 +7364,10 @@ debug.addEventListener('click', (e) => {
         app.calibrating = false;
         step('cal', 1); save();
         applyRoi();
-        status('Kalibratie gelukt', 'ok');
+        status(t('Kalibratie gelukt'), 'ok');
       } else {
         app.calPts = [];
-        status('Kalibratie mislukt — klik de punten in de juiste volgorde', 'err');
+        status(t('Kalibratie mislukt — klik de punten in de juiste volgorde'), 'err');
       }
     }
     updateCal();
@@ -6729,8 +7376,12 @@ debug.addEventListener('click', (e) => {
 
 // ---------------------------------------------------------------- schuifregelaars
 
+// per regelaar het getal ernaast, om na het wisselen van taal opnieuw te schrijven ("uit")
+const schuifTeksten = [];
+
 function bindSlider(id, fmt, apply) {
   const el = $(id), out = $(id + 'Out');
+  schuifTeksten.push(() => { out.textContent = fmt(+el.value); });
   const upd = () => { out.textContent = fmt(+el.value); apply(+el.value); };
   el.oninput = () => { upd(); save(); };
   upd();
@@ -6767,7 +7418,7 @@ bindSlider('srcSpeed', v => (v / 10).toFixed(1), v => {
 bindSlider('goalSpeed', v => (v / 10).toFixed(1), v => {
   game.goalSweep = $('moveGoal').checked ? v / 10 : 0;
 });
-bindSlider('wind', v => (v ? String(v) : 'uit'), v => { game.wind = v; });
+bindSlider('wind', v => (v ? String(v) : t('uit')), v => { game.wind = v; });
 
 function syncSweeps() {
   game.sourceSweep = $('moveSource').checked ? +$('srcSpeed').value / 10 : 0;
@@ -6792,24 +7443,24 @@ $('fill').oninput = () => {
   $('fillOut').textContent = $('fill').value + '%';
   game.fill = app.fill;
   save();
-  if (vision.hasBackground) status('Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning');
+  if (vision.hasBackground) status(t('Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning'));
 };
 $('fillAuto').onchange = e => { app.fillAuto = e.target.checked; save(); };
 $('lockExp').onchange = e => {
   app.lockExposure = e.target.checked;
   save();
   if (!app.lockExposure && vision.ready) vision.unlockCamera();
-  status(app.lockExposure ? 'Belichting wordt vastgezet bij het leren van de muur' : 'Belichting weer automatisch', 'ok');
+  status(app.lockExposure ? t('Belichting wordt vastgezet bij het leren van de muur') : t('Belichting weer automatisch'), 'ok');
 };
 $('skin').onchange = e => { vision.skinFilter = e.target.checked; save(); };
 $('resident').onchange = e => {
   app.resident = e.target.checked;
   save();
   if (!vision.hasBackground) return;
-  if (!app.resident) { vision.dropResident(); status('Wat er al hing telt niet meer mee', 'ok'); return; }
+  if (!app.resident) { vision.dropResident(); status(t('Wat er al hing telt niet meer mee'), 'ok'); return; }
   const al = vision.findResident(inProjection);
-  status(al ? al + (al === 1 ? ' voorwerp hing' : ' voorwerpen hingen') + ' er al, die tellen nu mee'
-            : 'Er hing niets op de muur toen hij geleerd werd', 'ok');
+  status(al ? tAantal(al, '{n} voorwerp hing er al, dat telt nu mee', '{n} voorwerpen hingen er al, die tellen nu mee')
+            : t('Er hing niets op de muur toen hij geleerd werd'), 'ok');
 };
 $('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
 $('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
@@ -6817,21 +7468,21 @@ $('effecten').onchange = e => { game.effects = e.target.checked; save(); };
 $('outline').onchange = e => { game.showOutlines = e.target.checked; save(); };
 $('testMode').onchange = e => {
   app.testMode = e.target.checked;
-  status(app.testMode ? 'Testmodus: sleep met de muis in de rechter weergave' : 'Testmodus uit');
+  status(app.testMode ? t('Testmodus: sleep met de muis in de rechter weergave') : t('Testmodus uit'));
 };
 
 // ---------------------------------------------------------------- spelvorm en extra's
 
 /** Korte tips die op de muur rouleren zolang er niet gespeeld wordt. */
 function updateTips() {
-  const t = ['Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen',
-             'Bouw een baan naar de groene bak'];
-  if (app.special) t.push('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken');
-  if (app.gold) t.push('Een gouden bal in de bak is 3 punten waard');
-  if (app.bonus) t.push('De kleine gouden bak geeft 3 punten, en verspringt steeds');
-  if (app.levels) t.push('Uitdaging: haal elk level op tijd — het wordt steeds moeilijker');
-  t.push('Druk op spatie om te beginnen');
-  game.tips = t;
+  const tips = [t('Plak briefjes of houd voorwerpen tegen de muur: de ballen kaatsen ertegen'),
+                t('Bouw een baan naar de groene bak')];
+  if (app.special) tips.push(t('Rood briefje = trampoline · groen = turbo · blauw = breekt na 5 tikken'));
+  if (app.gold) tips.push(t('Een gouden bal in de bak is 3 punten waard'));
+  if (app.bonus) tips.push(t('De kleine gouden bak geeft 3 punten, en verspringt steeds'));
+  if (app.levels) tips.push(t('Uitdaging: haal elk level op tijd — het wordt steeds moeilijker'));
+  tips.push(t('Druk op spatie om te beginnen'));
+  game.tips = tips;
 }
 
 function applySpel() {
@@ -6849,7 +7500,7 @@ for (const k of ['special', 'gold', 'bonus']) {
 $('spelvorm').onchange = e => {
   app.levels = e.target.value === 'levels';
   if (game.state === 'play' || game.state === 'paused' || game.state === 'count') {
-    game.reset(); $('btnPlay').textContent = 'Start ronde';
+    game.reset(); toonPlayKnop();
   }
   applySpel(); save();
 };
@@ -6871,14 +7522,14 @@ function toonRang() {
   ol.innerHTML = '';
   if (!l.length) {
     const li = document.createElement('li');
-    li.className = 'leeg'; li.textContent = 'Nog geen scores — speel een ronde';
+    li.className = 'leeg'; li.textContent = t('Nog geen scores — speel een ronde');
     ol.appendChild(li);
   }
   for (const e of l.slice(0, 10)) {
     const li = document.createElement('li'), b = document.createElement('b');
     b.textContent = e.name;                           // textContent: een naam kan nooit code worden
     li.appendChild(b);
-    li.append(' — ' + (game.levelMode ? 'level ' + e.score : e.score + (e.score === 1 ? ' punt' : ' punten')));
+    li.append(' — ' + (game.levelMode ? t('level {n}', { n: e.score }) : tAantal(e.score, '{n} punt', '{n} punten')));
     ol.appendChild(li);
   }
   game.highscores = l.slice(0, 5).map(e => ({ name: e.name, score: e.score }));
@@ -6890,16 +7541,21 @@ function rondeVoorbij() {
   if (!(score > 0)) return;
   const l = rangLijst();
   if (l.length >= 10 && score <= l[l.length - 1].score) return;
-  app.pendingScore = { soort: rangSoort(), score };
-  $('naamVraag').textContent = (game.levelMode ? 'Level ' + score : score + (score === 1 ? ' punt' : ' punten')) +
-    ' — dat haalt de ranglijst! Hoe heet je?';
+  app.pendingScore = { soort: rangSoort(), score, levels: game.levelMode };
+  toonNaamVraag();
   $('naam').value = app.lastName || '';
   $('naamInvoer').classList.remove('hidden');
   $('naam').focus(); $('naam').select();
 }
+/** De vraag boven het naamvak (de telefoon krijgt hem ook, zie vraagTekst hieronder). */
+function toonNaamVraag() {
+  const p = app.pendingScore;
+  $('naamVraag').textContent = p.levels ? t('Level {n} — dat haalt de ranglijst! Hoe heet je?', { n: p.score })
+    : tAantal(p.score, '{n} punt — dat haalt de ranglijst! Hoe heet je?', '{n} punten — dat haalt de ranglijst! Hoe heet je?');
+}
 function bewaarNaam() {
   if (!app.pendingScore) return;
-  const naam = ($('naam').value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || 'Anoniem';
+  const naam = ($('naam').value || '').replace(/\s+/g, ' ').trim().slice(0, 16) || t('Anoniem');
   app.lastName = naam;
   const r = leesRang(), soort = app.pendingScore.soort;
   const l = rangLijst(soort);
@@ -6911,12 +7567,12 @@ function bewaarNaam() {
   $('naamInvoer').classList.add('hidden');
   save();
   toonRang();
-  status('Opgeslagen in de ranglijst: ' + naam, 'ok');
+  status(t('Opgeslagen in de ranglijst: {naam}', { naam }), 'ok');
 }
 $('btnNaam').onclick = bewaarNaam;
 $('naam').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); bewaarNaam(); } });
 $('btnScoresWis').onclick = () => {
-  if (!confirm('De ranglijst van deze spelvorm wissen?')) return;
+  if (!confirm(t('De ranglijst van deze spelvorm wissen?'))) return;
   const r = leesRang();
   delete r[rangSoort()];
   try { localStorage.setItem(RANG, JSON.stringify(r)); } catch { /* opslag geblokkeerd */ }
@@ -6954,51 +7610,55 @@ function diagnoseFoto() {
     g.imageSmoothingEnabled = !scherp;
     g.drawImage(src, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
   };
-  const kop = (t, x, y) => { g.fillStyle = '#8b93a5'; g.font = '600 15px system-ui, sans-serif'; g.fillText(t, x, y); };
+  const kop = (tekst, x, y) => { g.fillStyle = '#8b93a5'; g.font = '600 15px system-ui, sans-serif'; g.fillText(tekst, x, y); };
   // camera met omlijningen: even het gewone beeld tekenen, ook als het tabblad op masker staat
   const view = app.debugView;
   app.debugView = 'video'; drawDebug(tracks);
   fit(debug, 10, 34, 680, 400);
   app.debugView = view; drawDebug(tracks);
-  kop('Camera, met wat het spel herkent', 12, 24);
+  kop(t('Camera, met wat het spel herkent'), 12, 24);
   fit(world, 710, 34, 680, 400);
-  kop('Wat de beamer laat zien', 712, 24);
+  kop(t('Wat de beamer laat zien'), 712, 24);
   if (vision.maskImage && vision.cols) {
     const m = document.createElement('canvas');
     m.width = vision.cols; m.height = vision.rows;
     m.getContext('2d').putImageData(vision.maskImage, 0, 0);
     fit(m, 10, 470, 680, 400, true);
   }
-  kop('Wat het spel als voorwerp ziet (licht = voorgrond)', 12, 460);
+  kop(t('Wat het spel als voorwerp ziet (licht = voorgrond)'), 12, 460);
   const st = vision.stream && vision.stream.getVideoTracks()[0];
+  const ja = (v) => (v ? t('ja') : t('nee'));
+  const aan = (v) => (v ? t('aan') : t('uit'));
+  // het oordeel per spoor en de soort briefje zijn korte codes uit main.js en vision.js
+  const code = (c) => (c ? t(c) : '—');
   const regels = [
-    'Sticky Clash — ' + new Date().toLocaleString('nl-NL'),
-    'Camera: ' + ((st && st.label) || '—') + '  ' + (vision.video.videoWidth || 0) + 'x' + (vision.video.videoHeight || 0) +
-      (vision.roi ? '  (uitsnede)' : ''),
-    'Kalibratie: ' + (app.H ? 'ja' : 'nee') + '   Muur geleerd: ' + (vision.hasBackground ? 'ja' : 'nee') +
-      '   Modus: ' + vision.mode + (app.levels ? ' / uitdaging' : ''),
-    'Gevoeligheid ' + $('sens').value + '   Muurverlichting ' + Math.round(app.fill * 100) + '%   Huid negeren ' +
-      (vision.skinFilter ? 'aan' : 'uit') + '   Mensen negeren ' + (app.noPeople ? 'aan' : 'uit'),
-    'Camera ziet helderheid ' + Math.round(app.camLuma) + '/255   voorgrond ' + (vision.fgFraction * 100).toFixed(1) +
-      '%   lichtcorrectie ' + (vision.gain || 1).toFixed(2) + '   ' + $('fps').textContent,
-    'Teller: ' + $('live').textContent,
+    'Sticky Clash — ' + new Date().toLocaleString(huidigeTaal() === 'en' ? 'en-US' : 'nl-NL'),
+    t('Camera: {naam}  {b}x{h}', { naam: (st && st.label) || '—', b: vision.video.videoWidth || 0, h: vision.video.videoHeight || 0 }) +
+      (vision.roi ? '  ' + t('(uitsnede)') : ''),
+    t('Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}', { kal: ja(app.H), muur: ja(vision.hasBackground),
+      modus: vision.mode + (app.levels ? ' / ' + t('uitdaging') : '') }),
+    t('Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}', { sens: $('sens').value,
+      licht: Math.round(app.fill * 100), huid: aan(vision.skinFilter), mensen: aan(app.noPeople) }),
+    t('Camera ziet helderheid {l}/255   voorgrond {fg}%   lichtcorrectie {gain}   {fps}', { l: Math.round(app.camLuma),
+      fg: (vision.fgFraction * 100).toFixed(1), gain: (vision.gain || 1).toFixed(2), fps: $('fps').textContent }),
+    t('Teller: {teller}', { teller: $('live').textContent }),
     '',
-    'Sporen (id · cellen · oordeel · huid · schaduw · vertrouwd · stil · trilling · soort):',
+    t('Sporen (id · cellen · oordeel · huid · schaduw · vertrouwd · stil · trilling · soort):'),
   ];
-  for (const t of tracks.slice(0, 18)) {
-    regels.push('#' + t.id + ' · ' + t.cells + ' · ' + (app.reasonById.get(t.id) || '—') + ' · ' +
-      (t.skinFrac || 0).toFixed(2) + ' · ' + (t.shadowFrac || 0).toFixed(2) + ' · ' + (t.trusted ? 'ja' : 'nee') + ' · ' +
-      (t.stillT || 0).toFixed(1) + 's · ' + (Number.isFinite(t.jitter) ? t.jitter.toFixed(2) : '—') + ' · ' + (t.kind || '—'));
+  for (const sp of tracks.slice(0, 18)) {
+    regels.push('#' + sp.id + ' · ' + sp.cells + ' · ' + code(app.reasonById.get(sp.id)) + ' · ' +
+      (sp.skinFrac || 0).toFixed(2) + ' · ' + (sp.shadowFrac || 0).toFixed(2) + ' · ' + ja(sp.trusted) + ' · ' +
+      (sp.stillT || 0).toFixed(1) + 's · ' + (Number.isFinite(sp.jitter) ? sp.jitter.toFixed(2) : '—') + ' · ' + code(sp.kind));
   }
-  if (tracks.length > 18) regels.push('… en nog ' + (tracks.length - 18));
+  if (tracks.length > 18) regels.push(t('… en nog {n}', { n: tracks.length - 18 }));
   g.fillStyle = '#e8eaf0'; g.font = '13px ui-monospace, Consolas, monospace';
   regels.forEach((r, i) => g.fillText(r, 712, 480 + i * 18, 670));
   const a = document.createElement('a');
   const nu = new Date(), z = (n) => String(n).padStart(2, '0');
-  a.download = 'sticky-clash-foto-' + nu.getFullYear() + z(nu.getMonth() + 1) + z(nu.getDate()) + '-' + z(nu.getHours()) + z(nu.getMinutes()) + '.png';
+  a.download = t('sticky-clash-foto') + '-' + nu.getFullYear() + z(nu.getMonth() + 1) + z(nu.getDate()) + '-' + z(nu.getHours()) + z(nu.getMinutes()) + '.png';
   a.href = c.toDataURL('image/png');
   document.body.appendChild(a); a.click(); a.remove();
-  status('Foto opgeslagen in je map Downloads (' + a.download + ')', 'ok');
+  status(t('Foto opgeslagen in je map Downloads ({bestand})', { bestand: a.download }), 'ok');
 }
 $('btnDiag').onclick = diagnoseFoto;
 
@@ -7021,34 +7681,39 @@ function checkVerschuiving(dt) {
 }
 async function herstelNaVerschuiving() {
   if (!projOk()) {
-    status('De camera of beamer is verschoven — klik op "Alles automatisch instellen"', 'err');
+    status(t('De camera of beamer is verschoven — klik op "Alles automatisch instellen"'), 'err');
     return;
   }
   const speelde = game.state === 'play';
-  if (speelde) { game.togglePause(); $('btnPlay').textContent = 'Pauze opheffen'; }
-  status('De camera of beamer is verschoven — ik stel alles opnieuw in', 'err');
+  if (speelde) { game.togglePause(); toonPlayKnop(); }
+  status(t('De camera of beamer is verschoven — ik stel alles opnieuw in'), 'err');
   await runExclusive(async () => {
     if (!(await autoCalibrate(true))) {
-      status('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"', 'err');
+      status(t('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"'), 'err');
       return false;
     }
     app.goalTrack = null;                          // in camerapunten; die kloppen niet meer
     if (vision.mode === 'object' && !(await learnWall(true))) return false;
-    status('Opnieuw ingesteld' + (speelde ? ' — klik op "Pauze opheffen" om verder te spelen' : ''), 'ok');
+    status(speelde ? t('Opnieuw ingesteld — klik op "Pauze opheffen" om verder te spelen') : t('Opnieuw ingesteld'), 'ok');
     return true;
   });
+}
+
+/** Tekst van de startknop, bij de stand van het spel. */
+function toonPlayKnop() {
+  const s = game.state;
+  $('btnPlay').textContent = s === 'paused' ? t('Pauze opheffen') : (s === 'play' || s === 'count') ? t('Pauze') : t('Start ronde');
 }
 
 $('btnPlay').onclick = () => {
   sfx.resume();
   if (game.state === 'count') return;                     // aftellen loopt al
-  if (game.state === 'play') { game.togglePause(); $('btnPlay').textContent = 'Pauze opheffen'; return; }
-  if (game.state === 'paused') { game.togglePause(); $('btnPlay').textContent = 'Pauze'; return; }
+  if (game.state === 'play' || game.state === 'paused') { game.togglePause(); toonPlayKnop(); return; }
   game.start(+$('roundLen').value);
-  $('btnPlay').textContent = 'Pauze';
+  toonPlayKnop();
 };
 
-$('btnReset').onclick = () => { game.reset(); $('btnPlay').textContent = 'Start ronde'; };
+$('btnReset').onclick = () => { game.reset(); toonPlayKnop(); };
 
 document.querySelectorAll('.tabs button').forEach(b => {
   b.onclick = () => {
@@ -7175,7 +7840,7 @@ function applyRoi() {
   if (roi.sw * roi.sh > W * H * 0.80) { setRoi(null); return false; }
   setRoi(roi);
   const zoom = Math.sqrt((W * H) / (roi.sw * roi.sh));
-  status('Beeld bijgesneden tot het beamervlak — ' + zoom.toFixed(1) + '× meer detail', 'ok');
+  status(t('Beeld bijgesneden tot het beamervlak — {zoom}× meer detail', { zoom: zoom.toFixed(1) }), 'ok');
   return true;
 }
 
@@ -7374,7 +8039,7 @@ async function autoLight() {
   app.camLuma = gemeten;
   save();
   if (gemeten < 45) {
-    status('Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan', 'err');
+    status(t('Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan'), 'err');
   }
   return true;
 }
@@ -7404,7 +8069,7 @@ function drawPattern(ctx, w, h) {
     ctx.fillStyle = '#3ddc84';
     ctx.font = '700 ' + Math.round(h * 0.055) + 'px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Gekalibreerd', w / 2, h * 0.5);
+    ctx.fillText(t('Gekalibreerd'), w / 2, h * 0.5);
   }
 }
 
@@ -7416,11 +8081,12 @@ function drawWizard(ctx, w, h) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
   ctx.font = '800 ' + Math.round(110 * s) + 'px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(app.wiz.title, w / 2, h * 0.40);
+  // Nederlandse zinnen, hier pas vertaald: zo wisselt de aanwijzing op de muur meteen mee
+  ctx.fillText(t(app.wiz.title), w / 2, h * 0.40);
   if (app.wiz.sub) {
     ctx.fillStyle = '#8b93a5';
     ctx.font = '500 ' + Math.round(46 * s) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(app.wiz.sub, w / 2, h * 0.52);
+    ctx.fillText(t(app.wiz.sub), w / 2, h * 0.52);
   }
   if (app.wiz.count) {
     ctx.fillStyle = '#ff8a1e';
@@ -7429,6 +8095,8 @@ function drawWizard(ctx, w, h) {
   }
   ctx.textBaseline = 'top';
 }
+
+const KRUIS_TEKST = new TaalTeller('Klik kruis {n} aan in het camerabeeld op de laptop');
 
 function drawCalibration(ctx, w, h) {
   ctx.fillStyle = '#0a0a0a';
@@ -7453,7 +8121,7 @@ function drawCalibration(ctx, w, h) {
   ctx.fillStyle = '#999';
   ctx.font = '600 26px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Klik kruis ' + Math.min(4, app.calPts.length + 1) + ' aan in het camerabeeld op de laptop', w / 2, h * 0.5);
+  ctx.fillText(KRUIS_TEKST.tekst(Math.min(4, app.calPts.length + 1)), w / 2, h * 0.5);
   ctx.textBaseline = 'top';
 }
 
@@ -7469,7 +8137,7 @@ function drawScene(ctx, w, h) {
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(200,205,215,.8)';
     ctx.font = '600 ' + Math.max(12, Math.round(h * 0.026)) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Klik één keer in dit venster voor volledig scherm', w / 2, h * 0.975);
+    ctx.fillText(t('Klik één keer in dit venster voor volledig scherm'), w / 2, h * 0.975);
     ctx.restore();
   }
 
@@ -7483,9 +8151,9 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '800 ' + Math.round(bh * 0.34) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('NIET GEKALIBREERD', w / 2, h - bh * 0.62);
+    ctx.fillText(t('NIET GEKALIBREERD'), w / 2, h - bh * 0.62);
     ctx.font = '500 ' + Math.round(bh * 0.2) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"', w / 2, h - bh * 0.25);
+    ctx.fillText(t('voorwerpen raken de ballen niet — klik op "Alles automatisch instellen"'), w / 2, h - bh * 0.25);
     ctx.textBaseline = 'top';
   } else if (vision.mode === 'object' && !vision.hasBackground && !app.testMode && vision.ready) {
     const bh = h * 0.11;
@@ -7495,7 +8163,7 @@ function drawScene(ctx, w, h) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 ' + Math.round(bh * 0.3) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Muur nog niet geleerd', w / 2, h - bh * 0.5);
+    ctx.fillText(t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
 
@@ -7518,14 +8186,14 @@ function drawDebug(tracks) {
     c.drawImage(maskTmp, 0, 0, debug.width, debug.height);
     if (vision.mode === 'object' && !vision.hasBackground) {
       c.fillStyle = '#ffab8f'; c.font = '13px system-ui'; c.textAlign = 'center';
-      c.fillText('Muur nog niet geleerd', debug.width / 2, debug.height / 2);
+      c.fillText(t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
     }
   } else if (vision.ready) {
     c.drawImage(vision.cv, 0, 0);
   } else {
     c.fillStyle = '#111'; c.fillRect(0, 0, debug.width, debug.height);
     c.fillStyle = '#666'; c.font = '13px system-ui'; c.textAlign = 'center';
-    c.fillText('Camera nog niet gestart', debug.width / 2, debug.height / 2);
+    c.fillText(t('Camera nog niet gestart'), debug.width / 2, debug.height / 2);
   }
 
   for (const t of tracks) {
@@ -7603,6 +8271,12 @@ function fitCanvas(cv) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
 }
 
+// Waarom een vlek niet meetelt, voor de teller onder "Doel aanwijzen" (zie buildObstacles).
+const REDENEN = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
+                  hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
+                  schaduw: 'donker of schaduw (telt als het stil hangt)',
+                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
+
 let last = performance.now();
 let visionAcc = 0;
 let tracks = [];
@@ -7633,10 +8307,10 @@ function frame(now) {
       app.videoStill += dt;
       if (app.videoStill > 2 && !app.stillWarned) {
         app.stillWarned = true;
-        status('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera', 'err');
+        status(t('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera'), 'err');
       }
     }
-    if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status('Camerabeeld is terug', 'ok'); }
+    if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status(t('Camerabeeld is terug'), 'ok'); }
   }
   checkVerschuiving(dt);
   if (app.syncTip) app.syncTip();
@@ -7661,12 +8335,12 @@ function frame(now) {
     if (game.state === 'over') {
       app.best[vision.mode] = Math.max(app.best[vision.mode] || 0, game.best);
       save();
-      $('btnPlay').textContent = 'Start ronde';
-      status(game.levelMode ? 'Uitdaging voorbij: je haalde level ' + (game.levelReached || 1)
-        : (game.newRecord ? 'Nieuw record: ' + game.best + ' doelpunten' : 'Ronde afgelopen'), 'ok');
+      toonPlayKnop();
+      status(game.levelMode ? t('Uitdaging voorbij: je haalde level {n}', { n: game.levelReached || 1 })
+        : (game.newRecord ? tAantal(game.best, 'Nieuw record: {n} doelpunt', 'Nieuw record: {n} doelpunten') : t('Ronde afgelopen')), 'ok');
       rondeVoorbij();
     } else if (game.state === 'play' && before === 'count') {
-      $('btnPlay').textContent = 'Pauze';
+      toonPlayKnop();
     }
   }
   telefoon.bijwerken(now);
@@ -7684,26 +8358,22 @@ function frame(now) {
   if (liveAcc > 0.25) {
     liveAcc = 0;
     const el = $('live');
-    if (app.testMode) el.textContent = game.obstacles.length + ' obstakels (testmodus)';
-    else if (!app.H) el.textContent = 'Niet gekalibreerd — voorwerpen raken de ballen niet';
-    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = 'Muur nog niet geleerd';
-    else if (staleBg > 2) el.textContent = 'Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw';
-    else if (vision.floodGuard && vision.mode === 'object') el.textContent = 'Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw';
-    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = 'De camera ziet te weinig licht (' + Math.round(app.camLuma) + '/255) — zet Muurverlichting hoger of doe een lamp aan';
+    if (app.testMode) el.textContent = tAantal(game.obstacles.length, '{n} obstakel (testmodus)', '{n} obstakels (testmodus)');
+    else if (!app.H) el.textContent = t('Niet gekalibreerd — voorwerpen raken de ballen niet');
+    else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = t('Muur nog niet geleerd');
+    else if (staleBg > 2) el.textContent = t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
+    else if (vision.floodGuard && vision.mode === 'object') el.textContent = t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
+    else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = t('De camera ziet te weinig licht ({n}/255) — zet Muurverlichting hoger of doe een lamp aan', { n: Math.round(app.camLuma) });
     else {
-      const woorden = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
-                        hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
-                        schaduw: 'donker of schaduw (telt als het stil hangt)',
-                        huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
       const uitleg = Object.keys(app.reasons || {})
-        .map(k => app.reasons[k] + '× ' + (woorden[k] || k)).join(', ');
-      let txt = app.active + ' voorwerp' + (app.active === 1 ? '' : 'en') + ' actief'
-        + (app.rejected ? ' · genegeerd: ' + uitleg : '');
+        .map(k => app.reasons[k] + '× ' + (REDENEN[k] ? t(REDENEN[k]) : k)).join(', ');
+      let txt = tAantal(app.active, '{n} voorwerp actief', '{n} voorwerpen actief')
+        + (app.rejected ? ' · ' + t('genegeerd: {lijst}', { lijst: uitleg }) : '');
       // Het lastigste geval om zelf te zien: er wordt wél iets opgemerkt, maar het
       // valt onder de minimale grootte. Dan zwijgt de teller normaal helemaal.
       if (!app.active && vision.tooSmall > 0) {
-        const klein = vision.tooSmall + ' vlek' + (vision.tooSmall === 1 ? '' : 'ken') +
-          ' te klein — zet Min. grootte lager, of Gevoeligheid hoger';
+        const klein = tAantal(vision.tooSmall, '{n} vlek te klein — zet Min. grootte lager, of Gevoeligheid hoger',
+          '{n} vlekken te klein — zet Min. grootte lager, of Gevoeligheid hoger');
         txt = app.rejected ? txt + ' · ' + klein : klein;
       }
       el.textContent = txt;
@@ -7721,8 +8391,55 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---------------------------------------------------------------- taal (NL | EN)
+
+/** De knoppen NL en EN bovenin: de gekozen taal licht op. */
+function toonTaalKnoppen() {
+  document.querySelectorAll('#taalKeuze button').forEach(b => {
+    const aan = b.dataset.taal === huidigeTaal();
+    b.classList.toggle('on', aan);
+    b.setAttribute('aria-pressed', aan ? 'true' : 'false');
+  });
+}
+
+/** Het losse bestand (file://) vraagt bij elke start om de camera: dat zegt de hint bovenaan. */
+function toonLosHint() {
+  if (location.protocol !== 'file:') return;
+  $('wizHint').textContent = t('Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.');
+}
+
+/**
+ * Na het wisselen van taal alles opnieuw: de vaste teksten van de pagina, en wat main.js
+ * en telefoon.js zelf schrijven. De muur vertaalt al bij het tekenen, en de teller onder
+ * "Doel aanwijzen" schrijft zichzelf vier keer per seconde opnieuw.
+ */
+function nieuweTaal() {
+  vertaalPagina(document.body);
+  document.title = t('Sticky Clash — projection mapping game');
+  toonTaalKnoppen();
+  if (statusBron) status(t(statusBron.nl, statusBron.vars), statusBron.kind);
+  toonAutoKnop();
+  toonPlayKnop();
+  toonModeHint();
+  toonLosHint();
+  renderClasses();
+  updateCal();
+  updateTips();
+  toonRang();
+  if (app.pendingScore) toonNaamVraag();
+  for (const f of schuifTeksten) f();
+  fillDevices();
+  telefoon.toonStatus();
+  if (projOk()) app.proj.document.title = t('Sticky Clash — beamer');
+  liveAcc = 1;                                     // de teller meteen, niet pas over een kwart seconde
+}
+
 // ---------------------------------------------------------------- start
 
+// De vaste teksten van index.html in de gekozen taal (in het Nederlands verandert er niets).
+vertaalPagina(document.body);
+document.title = t('Sticky Clash — projection mapping game');
+toonTaalKnoppen();
 load();
 renderClasses();
 applySliders();
@@ -7748,14 +8465,11 @@ fillDevices();
 // beveiligde omgeving — dus de gewone browserstring als reserve.
 const chromium = !!navigator.userAgentData || /Chrome\/|Edg\//.test(navigator.userAgent);
 if (!window.isSecureContext) {
-  status('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij', 'err');
+  status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
 } else if (!chromium) {
-  status('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen', 'err');
+  status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
 }
-if (location.protocol === 'file:') {
-  $('wizHint').textContent = 'Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. ' +
-    'Wil je dat hij het onthoudt, start dan via start.bat.';
-}
+toonLosHint();
 loadScreens(false);
 startApp();
 vision.insideFn = inProjection;
@@ -7763,8 +8477,12 @@ vision.onFormatChange = () => {
   debug.width = vision.vw; debug.height = vision.vh;
   applySliders();
   step('bg', 0);
-  status('De camera wisselde van beeldformaat — leer de muur opnieuw', 'err');
+  status(t('De camera wisselde van beeldformaat — leer de muur opnieuw'), 'err');
 };
+opTaal(nieuweTaal);
+// Na het kiezen de knop weer loslaten: anders drukt spatie daarna die knop in, in plaats
+// van de ronde te starten.
+document.querySelectorAll('#taalKeuze button').forEach(b => { b.onclick = () => { zetTaal(b.dataset.taal); b.blur(); }; });
 requestAnimationFrame(frame);
 
 // handig bij het afstellen: in de console beschikbaar als window.sc

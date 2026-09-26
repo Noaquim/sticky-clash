@@ -13,6 +13,8 @@
   die het spel laat zien (Telefoon koppelen). Het stuk na # in het adres is de kamercode.
   Alles zit in dit ene bestand, zonder bibliotheken. De knoppen gaan via ntfy.sh naar de
   laptop; zie js/telefoon.js voor hoe dat werkt.
+  De pagina volgt de taal van de telefoon: Nederlands, of anders Engels. Het Engels staat
+  in het woordenboek EN, bovenaan het script hieronder.
 -->
 <style>
 :root{
@@ -95,6 +97,113 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
   const ID_OPSLAG = 'stickyclash.telefoon.id';       // blijft alleen in dit tabblad
   const $ = (id) => document.getElementById(id);
 
+  // ---- taal: Nederlands als de telefoon op Nederlands staat, anders Engels.
+  // Links de Nederlandse tekst zoals hij in deze pagina staat, rechts het Engels; {n} is een
+  // getal. Onderaan wat de laptop stuurt (meldingen en de naamvraag): dat komt in de taal van
+  // de laptop, en vertalen we hier naar die van de telefoon. Houd dat gelijk aan js/taal-en.js.
+  const EN = {
+    'Sticky Clash — bediening': 'Sticky Clash — remote',
+    'Verbinden…': 'Connecting…',
+    'Even verbinden…': 'Connecting…',
+    'Tijd': 'Time',
+    'Gespeeld': 'Played',
+    'Doelpunten': 'Goals',
+    'Aanvaller – verdediger': 'Attacker – defender',
+    'Start ronde': 'Start round',
+    'Pauze': 'Pause',
+    'Verder': 'Resume',
+    'Nieuwe ronde': 'New round',
+    'Opnieuw verbinden': 'Reconnect',
+    'Je haalt de ranglijst! Hoe heet je?': "You made the leaderboard! What's your name?",
+    'Naam': 'Name',
+    'Opslaan': 'Save',
+    'Laptop en telefoon hebben allebei internet nodig. Via ntfy.sh gaan alleen je knoppen, de stand en de naam die je typt; er wordt niets bewaard.':
+      'The laptop and the phone both need internet. Only your button presses, the score and the name you type go through ntfy.sh; nothing is stored.',
+    'Verbonden met het spel': 'Connected to the game',
+    'Verbonden — spel zoeken…': 'Connected — looking for the game…',
+    'Geen verbinding — opnieuw over {n} s': 'No connection — retrying in {n} s',
+    'Verbinding weg — opnieuw verbinden…': 'Connection lost — reconnecting…',
+    'Andere versie': 'Different version',
+    'Deze bediening past niet bij de versie van het spel op de laptop. Ververs deze pagina, of werk het spel bij.':
+      "This remote doesn't match the version of the game on the laptop. Refresh this page, or update the game.",
+    'Gestopt': 'Stopped',
+    'ntfy.sh laat even niets door (te veel berichten) — probeer het over een minuut nog eens':
+      "ntfy.sh isn't letting anything through right now (too many messages) — try again in a minute",
+    'Niet verstuurd — heeft je telefoon internet?': 'Not sent — does your phone have internet?',
+    'ntfy.sh is even druk — opnieuw over {n} s': 'ntfy.sh is busy — retrying in {n} s',
+    'Geen antwoord': 'No answer',
+    'Geen antwoord van het spel — staat de laptop nog aan?': 'No answer from the game — is the laptop still on?',
+    'Wachten op het spel…': 'Waiting for the game…',
+    'Het spel antwoordt niet': "The game isn't answering",
+    'Staat "Telefoon koppelen" nog aan op de laptop, en heeft die internet?': 'Is "Connect phone" still active on the laptop, and does it have internet?',
+    'Koppeling gestopt': 'Connection stopped',
+    'Scan de nieuwe code in het spel om weer te koppelen.': 'Scan the new code in the game to connect again.',
+    'Klaar om te starten': 'Ready to start',
+    'Begint over {n}': 'Starts in {n}',
+    'zet je voorwerpen klaar': 'get your objects ready',
+    'Ronde loopt': 'Round in progress',
+    'Pauze (fase)': 'Paused',
+    'Afgelopen': 'Round over',
+    'Level {n}': 'Level {n}',
+    'Het spel stelt zich in — even geduld': 'The game is setting up — please wait',
+    'op de muur': 'on the wall',
+    'Geen code': 'No code',
+    'Geen spelcode gevonden': 'No game code found',
+    'Klik in het spel op "Telefoon koppelen" en scan de QR-code opnieuw.': 'In the game, click "Connect phone" and scan the QR code again.',
+    // van de laptop (js/telefoon.js en js/main.js)
+    'Even wachten: het spel is nog aan het instellen': 'One moment: the game is still setting up',
+    'Even wachten: het spel stelt zich opnieuw in': 'One moment: the game is setting itself up again',
+    'De ronde begint al': 'The round is already starting',
+    'Er loopt al een ronde': 'A round is already running',
+    'Staat al op pauze': 'Already paused',
+    'Er loopt geen ronde': 'No round is running',
+    'Het spel loopt al': 'The game is already running',
+    'Er is geen pauze': "The game isn't paused",
+    'Zet de ronde eerst op pauze': 'Pause the round first',
+    'Er wordt nu geen naam gevraagd': 'No name is being asked for right now',
+    'Opgeslagen in de ranglijst': 'Saved to the leaderboard',
+    '{n} punt — dat haalt de ranglijst! Hoe heet je?': "{n} point — that makes the leaderboard! What's your name?",
+    '{n} punten — dat haalt de ranglijst! Hoe heet je?': "{n} points — that makes the leaderboard! What's your name?",
+    'Level {n} — dat haalt de ranglijst! Hoe heet je?': "Level {n} — that makes the leaderboard! What's your name?",
+  };
+  const ENGELS = !/^nl/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
+  const NAAR_EN = new Map(Object.entries(EN));
+  const NAAR_NL = new Map(Object.entries(EN).map(([nl, en]) => [en, nl]));
+
+  /** Tekst in de taal van de telefoon, met {n} ingevuld. `sleutel` als dezelfde Nederlandse tekst elders iets anders betekent. */
+  function t(nl, n, sleutel) {
+    const s = ENGELS ? (NAAR_EN.get(sleutel || nl) || nl) : nl;
+    return n === undefined || n === null ? s : s.replace('{n}', () => String(n));
+  }
+
+  /** Van de laptop, in de taal van de laptop: naar die van de telefoon. Getallen tellen bij het opzoeken niet mee. */
+  function vanLaptop(tekst) {
+    const getallen = [];
+    const sleutel = tekst.replace(/\d+/g, (g) => { getallen.push(g); return '{n}'; });
+    const v = (ENGELS ? NAAR_EN : NAAR_NL).get(sleutel);
+    if (!v) return tekst;
+    let i = 0;
+    return v.replace(/\{n\}/g, () => getallen[i++] || '');
+  }
+
+  /** De vaste teksten van de pagina in het Engels: tekst, en de attributen placeholder, title en aria-label. */
+  function vertaalVast(el) {
+    for (let k = el.firstChild; k; k = k.nextSibling) {
+      if (k.nodeType === 3) {
+        const kern = k.data.trim(), en = kern && NAAR_EN.get(kern);
+        if (en) k.data = k.data.replace(kern, () => en);
+      } else if (k.nodeType === 1 && k.nodeName !== 'SCRIPT' && k.nodeName !== 'STYLE') {
+        for (const a of ['placeholder', 'title', 'aria-label']) {
+          const en = k.hasAttribute(a) && NAAR_EN.get(k.getAttribute(a).trim());
+          if (en) k.setAttribute(a, en);
+        }
+        vertaalVast(k);
+      }
+    }
+  }
+  document.documentElement.lang = ENGELS ? 'en' : 'nl';
+  if (ENGELS) { document.title = t(document.title); vertaalVast(document.body); }
+
   const kamer = (location.hash || '').slice(1);
   const ik = eigenId();                              // om telefoons te tellen, meer niet
   let es = null, herFouten = 0, herTimer = 0, openGezien = false;
@@ -141,7 +250,7 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     if (weg) return;
     if (es) es.close();
     clearTimeout(herTimer);
-    verbinding('Verbinden…');
+    verbinding(t('Verbinden…'));
     const bron = new EventSource(RELAY + '/sc-' + kamer + '-t/sse');
     es = bron;
     // ntfy stuurt na het openen zelf ook een 'open': per verbinding maar één keer hallo zeggen
@@ -150,7 +259,7 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
       if (es !== bron || openGezien) return;
       openGezien = true;
       herFouten = 0;
-      verbinding(contact ? 'Verbonden met het spel' : 'Verbonden — spel zoeken…', contact ? 'ok' : '');
+      verbinding(contact ? t('Verbonden met het spel') : t('Verbonden — spel zoeken…'), contact ? 'ok' : '');
       zegHallo();
     };
     bron.onmessage = (e) => { if (es === bron) ontvang(e.data); };
@@ -161,11 +270,11 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
         // De browser geeft het op (bijvoorbeeld "te veel verzoeken"): zelf opnieuw, steeds later.
         bron.close(); es = null;
         herFouten++;
-        const t = Math.min(30000, 3000 * Math.pow(2, Math.min(4, herFouten - 1)));
-        verbinding('Geen verbinding — opnieuw over ' + Math.round(t / 1000) + ' s', 'fout');
-        herTimer = setTimeout(verbind, t);
+        const ms = Math.min(30000, 3000 * Math.pow(2, Math.min(4, herFouten - 1)));
+        verbinding(t('Geen verbinding — opnieuw over {n} s', Math.round(ms / 1000)), 'fout');
+        herTimer = setTimeout(verbind, ms);
       } else {
-        verbinding('Verbinding weg — opnieuw verbinden…', 'fout');
+        verbinding(t('Verbinding weg — opnieuw verbinden…'), 'fout');
       }
     };
   }
@@ -188,8 +297,8 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     const s = leesStand(e.message);
     if (!s) return;
     if (s.andereVersie) {
-      verbinding('Andere versie', 'fout');
-      melding('Deze bediening past niet bij de versie van het spel op de laptop. Ververs deze pagina, of werk het spel bij.', true);
+      verbinding(t('Andere versie'), 'fout');
+      melding(t('Deze bediening past niet bij de versie van het spel op de laptop. Ververs deze pagina, of werk het spel bij.'), true);
       return;
     }
     stand = s; ontvangen = performance.now(); contact = true; stilte = false;
@@ -198,9 +307,9 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     if (s.fase === 'weg') {
       weg = true;
       if (es) { es.close(); es = null; }
-      verbinding('Gestopt', 'fout');
-    } else verbinding('Verbonden met het spel', 'ok');
-    if (s.melding) melding(s.melding);
+      verbinding(t('Gestopt'), 'fout');
+    } else verbinding(t('Verbonden met het spel'), 'ok');
+    if (s.melding) melding(vanLaptop(s.melding));
     toon();
   }
 
@@ -258,14 +367,15 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
       if (b.pogingen >= 3) {
         bezigMet = null; wacht = false;
         if (b.wat === 'naam') verstuurdeVraag = 0;     // het naamvak weer laten zien
-        melding(druk ? 'ntfy.sh laat even niets door (te veel berichten) — probeer het over een minuut nog eens'
-                     : 'Niet verstuurd — heeft je telefoon internet?', true);
+        melding(druk ? t('ntfy.sh laat even niets door (te veel berichten) — probeer het over een minuut nog eens')
+                     : t('Niet verstuurd — heeft je telefoon internet?'), true);
         if (b.wat === 'hallo') geenAntwoord(); else toon();
         return;
       }
-      const t = (druk ? 10000 : 2000) * Math.pow(2, b.pogingen - 1);
-      melding((druk ? 'ntfy.sh is even druk' : 'Geen verbinding') + ' — opnieuw over ' + Math.round(t / 1000) + ' s', true);
-      b.timer = setTimeout(() => { if (b === bezigMet) probeer(b); }, t);
+      const ms = (druk ? 10000 : 2000) * Math.pow(2, b.pogingen - 1);
+      melding(druk ? t('ntfy.sh is even druk — opnieuw over {n} s', Math.round(ms / 1000))
+                   : t('Geen verbinding — opnieuw over {n} s', Math.round(ms / 1000)), true);
+      b.timer = setTimeout(() => { if (b === bezigMet) probeer(b); }, ms);
     });
   }
 
@@ -273,8 +383,8 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     wacht = false;
     if (weg) return;
     stilte = true;
-    verbinding('Geen antwoord', 'fout');
-    if (contact) melding('Geen antwoord van het spel — staat de laptop nog aan?', true);
+    verbinding(t('Geen antwoord'), 'fout');
+    if (contact) melding(t('Geen antwoord van het spel — staat de laptop nog aan?'), true);
     $('kOpnieuw').classList.remove('verborgen');
     toon();
   }
@@ -304,17 +414,17 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     const s = stand, f = faseNu();
     getoondeFase = f;
     const zichtbaar = { kStart: false, kPauze: false, kVerder: false, kNieuw: false };
-    let fase = 'Wachten op het spel…', sub = '';
-    if (!s && stilte) { fase = 'Het spel antwoordt niet'; sub = 'Staat "Telefoon koppelen" nog aan op de laptop, en heeft die internet?'; }
+    let fase = t('Wachten op het spel…'), sub = '';
+    if (!s && stilte) { fase = t('Het spel antwoordt niet'); sub = t('Staat "Telefoon koppelen" nog aan op de laptop, en heeft die internet?'); }
     if (s) {
-      if (f === 'weg') { fase = 'Koppeling gestopt'; sub = 'Scan de nieuwe code in het spel om weer te koppelen.'; }
-      else if (f === 'idle') { fase = 'Klaar om te starten'; zichtbaar.kStart = true; }
-      else if (f === 'count') { fase = 'Begint over ' + Math.max(1, Math.ceil(s.aftel - (performance.now() - ontvangen) / 1000)); sub = 'zet je voorwerpen klaar'; }
-      else if (f === 'play') { fase = 'Ronde loopt'; zichtbaar.kPauze = true; }
-      else if (f === 'paused') { fase = 'Pauze'; zichtbaar.kVerder = true; zichtbaar.kNieuw = true; }
-      else if (f === 'over') { fase = 'Afgelopen'; zichtbaar.kNieuw = true; }
-      if (s.level && f !== 'weg') sub = 'Level ' + s.level + (sub ? ' — ' + sub : '');
-      if (s.bezig && f !== 'weg') sub = 'Het spel stelt zich in — even geduld';
+      if (f === 'weg') { fase = t('Koppeling gestopt'); sub = t('Scan de nieuwe code in het spel om weer te koppelen.'); }
+      else if (f === 'idle') { fase = t('Klaar om te starten'); zichtbaar.kStart = true; }
+      else if (f === 'count') { fase = t('Begint over {n}', Math.max(1, Math.ceil(s.aftel - (performance.now() - ontvangen) / 1000))); sub = t('zet je voorwerpen klaar'); }
+      else if (f === 'play') { fase = t('Ronde loopt'); zichtbaar.kPauze = true; }
+      else if (f === 'paused') { fase = t('Pauze', null, 'Pauze (fase)'); zichtbaar.kVerder = true; zichtbaar.kNieuw = true; }
+      else if (f === 'over') { fase = t('Afgelopen'); zichtbaar.kNieuw = true; }
+      if (s.level && f !== 'weg') sub = t('Level {n}', s.level) + (sub ? ' — ' + sub : '');
+      if (s.bezig && f !== 'weg') sub = t('Het spel stelt zich in — even geduld');
     }
     $('fase').textContent = fase;
     $('sub').textContent = sub;
@@ -328,16 +438,16 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     // doelpunten: tijdens de ronde staan ze op de muur, en die telefoon krijgt ze pas bij pauze of einde
     const sc = $('score');
     if (!s || f === 'weg') { sc.textContent = '–'; sc.className = ''; }
-    else if (f === 'play' || f === 'count') { sc.textContent = 'op de muur'; sc.className = 'klein'; }
+    else if (f === 'play' || f === 'count') { sc.textContent = t('op de muur'); sc.className = 'klein'; }
     else { sc.textContent = s.duel ? s.score + ' – ' + s.tegen : String(s.score); sc.className = ''; }
-    $('scoreLabel').textContent = s && s.duel ? 'Aanvaller – verdediger' : 'Doelpunten';
-    $('tijdLabel').textContent = s && s.telOp ? 'Gespeeld' : 'Tijd';
+    $('scoreLabel').textContent = s && s.duel ? t('Aanvaller – verdediger') : t('Doelpunten');
+    $('tijdLabel').textContent = s && s.telOp ? t('Gespeeld') : t('Tijd');
     $('tijd').textContent = s && f !== 'weg' ? tijdNu() : '–';
     // naam voor de ranglijst
     const vraag = s && f === 'over' && s.vraag && s.vraag !== verstuurdeVraag;
     const vak = $('naamVak');
     if (vraag && vak.classList.contains('verborgen')) {
-      $('naamVraag').textContent = s.vraagTekst || 'Je haalt de ranglijst! Hoe heet je?';
+      $('naamVraag').textContent = s.vraagTekst ? vanLaptop(s.vraagTekst) : t('Je haalt de ranglijst! Hoe heet je?');
       let bewaard = '';
       try { bewaard = localStorage.getItem(NAAM_OPSLAG) || ''; } catch (x) { /* opslag geblokkeerd */ }
       if (!$('naam').value) $('naam').value = bewaard.slice(0, 16);
@@ -372,7 +482,7 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
   knop('kNieuw', 'nieuw');
   $('kOpnieuw').addEventListener('click', () => {
     $('kOpnieuw').classList.add('verborgen');
-    verbinding('Verbinden…');
+    verbinding(t('Verbinden…'));
     halloTijd = -1e9;
     if (!es) verbind(); else zegHallo();
   });
@@ -396,9 +506,9 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
 
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(kamer)) {
     weg = true;                                      // nergens mee verbinden, ook niet later
-    verbinding('Geen code', 'fout');
-    $('fase').textContent = 'Geen spelcode gevonden';
-    $('sub').textContent = 'Klik in het spel op "Telefoon koppelen" en scan de QR-code opnieuw.';
+    verbinding(t('Geen code'), 'fout');
+    $('fase').textContent = t('Geen spelcode gevonden');
+    $('sub').textContent = t('Klik in het spel op "Telefoon koppelen" en scan de QR-code opnieuw.');
     return;
   }
   toon();

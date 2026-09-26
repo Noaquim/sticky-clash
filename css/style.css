@@ -18,6 +18,11 @@ h1 em{font-style:normal; color:var(--acc)}
 .status{font-size:12px; color:var(--dim)}
 .status.err{color:#ff6b6b}
 .status.ok{color:var(--ok)}
+/* taalkeuze NL | EN, rechts in de kopbalk */
+.taal{margin-left:auto; flex:none; display:flex; align-items:center; gap:1px; font-size:11px; color:#3a404d}
+.taal button{flex:none; padding:3px 7px; border:0; border-radius:5px; background:none; color:var(--dim); font-size:11px; font-weight:600; letter-spacing:.06em}
+.taal button:hover{background:#1d2029; color:var(--ink)}
+.taal button.on{background:#2f3542; color:#fff}
 
 main{flex:1; display:flex; min-height:0}
 
@@ -77,7 +82,8 @@ canvas{
 button.big{padding:12px; font-size:15px; font-weight:600}
 .quick{background:#181b22}
 .camkeuze{display:block; margin-top:10px; font-size:12px; color:var(--dim)}
-.camkeuze select{margin:4px 0 0}
+/* rechts weinig ruimte: zo past ook de langste Engelse keuze naast het pijltje */
+.camkeuze select{margin:4px 0 0; padding:7px 2px 7px 6px}
 .installeer{margin-top:10px}
 input[type=text]{flex:1; min-width:0; padding:7px; border-radius:7px; background:#1d2029; color:var(--ink); border:1px solid var(--line); font:inherit}
 .scores{margin:6px 0 8px; padding-left:22px; font-size:13px}

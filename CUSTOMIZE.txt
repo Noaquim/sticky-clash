@@ -1,0 +1,138 @@
+﻿STICKY CLASH - CUSTOMIZE IT YOURSELF
+
+Everything is plain JavaScript. Open a file in a text editor, change something, save.
+Nothing needs to be installed or compiled.
+In het Nederlands: lees ZELF AANPASSEN.txt.
+
+EDITOR
+  Visual Studio Code is free and the nicest to work in (code.visualstudio.com): open
+  the whole folder in it via File > Open Folder. Notepad works too.
+
+HOW TO WORK
+  1. First make a copy of the whole folder. That way you can always go back.
+  2. Start the game with "Sticky Clash" (or start.bat). The game then loads the
+     separate files from js/ and css/, so you see every change right away.
+  3. Change a file and save it.
+  4. Press F5 in the browser.
+
+  Something stopped working? Press F12 and look under "Console": the error is shown
+  there, with the file name and line number.
+
+  Note: sticky-clash.html (the single file) does not update by itself. Want to share
+  your version as one file? Double-click "Los bestand maken" (= "build single file").
+  That works on any Windows PC; Node.js is not needed.
+
+  Installed the game as an app through start.bat? Then run start.bat first, or the
+  app won't see your change.
+
+WHAT IS WHERE
+  js/game.js            the game itself: balls, gravity, points, the bin, colors,
+                        and the effects on the wall (confetti, sparkles, COMBO, fireworks)
+  js/main.js            the panel, the buttons, the wizard, what goes on the projector
+  js/vision.js          the camera and recognizing objects (tricky, be careful)
+  js/homography.js      converting the camera image to the projector image (math)
+  js/audio.js           the sound effects
+  js/muziek.js          the background music
+  js/telefoon.js        your phone as a remote control; it opens telefoon.html
+  js/qr.js              the QR code you scan with your phone
+  js/app.js             installing as an app
+  js/taal.js            the NL | EN language choice
+  js/taal-en.js         all English texts (see CHANGING TEXTS)
+  css/style.css         how the panel looks
+  index.html            which buttons, sliders and texts are in the panel
+  telefoon.html         the page on your phone, with its own English texts
+  sw.js                 playing without internet: which files the browser keeps
+  manifest.webmanifest  name, icon and colors of the app
+
+EASY CHANGES
+  Press Ctrl+F and search for the bit of code in the second column, exactly as it
+  is written. Whatever is in brackets after it is explanation; don't search for that.
+
+  In js/game.js:
+    Ball size                   r: 11,                        (bigger number = bigger ball)
+    Ball color                  ctx.fillStyle = b.gold ? '#ffd479' : '#fff';
+                                (in drawBalls: '#fff' is a normal ball, '#ffd479' a
+                                 gold one; the line below it is the glow around it)
+    Most balls at once          this.balls.length > 70
+    Points per goal             1 + Math.floor(Math.min(9, this.combo) / 3)
+                                (in scored: 1 point, +1 for every 3 in a row, at most 4)
+    Bin size                    r: 110, auto: false           (in the constructor)
+    Bin color                   this.drawBin(ctx, this.goal, '#3ddc84'
+                                (in drawGoal; the '61,220,132' right after it is the
+                                 same color as red,green,blue numbers, for the glow)
+    Ball source color           ctx.strokeStyle = '#ff4fa3';  (in drawSource)
+    Sparks when you score       this.burst(bin.x, bin.y - 20, '#ffd479'  (in scored)
+    Color of the points (+1)    '+' + pts, '#ffd479'          (in scored)
+  Special notes (in js/game.js):
+    Trampoline strength         const TRAMPOLINE_MAX = 1600;
+    How hard the turbo pushes   const BOOST_KICK = 550;
+    Hits before blue breaks     const BREAK_HITS = 5;
+    How long blue stays gone    const BREAK_TIME = 5;     (in seconds)
+    Bonus bin moves every       const BONUS_MOVE = 20;    (in seconds)
+  Which color does what (in js/vision.js):
+    Red, green and blue         function noteKindOf(      (the hues in degrees, 0 to 360)
+  Effects on the wall (in js/game.js):
+    Most particles at once      const FX_MAX_PARTS = 250;  (more = heavier for the computer)
+    Confetti colors             const FX_CONFETTI
+  Music (in js/muziek.js):
+    Louder or softer            const MUZIEK_VOLUME = 0.18;  (higher = louder, 0 = silent)
+    Tempo                       const MUZIEK_TEMPO = 120;    (beats per minute)
+    Faster at the end           const MUZIEK_SPURT = 1.25;   (1.25 = a quarter faster)
+    The tune itself             const MUZIEK_AKKOORDEN       (four bars, as MIDI notes)
+  Changing a number that is also in a text (5 hits, 20 seconds)? Then change that
+  text too: see CHANGING TEXTS.
+  Sound, music and effects can each be turned off under More settings > Game.
+
+  Colors are written as #rrggbb, for example '#ff0000' for red. Search the internet
+  for "color picker" to choose one.
+
+  In index.html (the starting position of the sliders, at value="..."):
+    Round time                  id="roundLen"             (in seconds; 180 = 3 minutes)
+    Gravity                     id="gravity"
+    Bounce                      id="bounce"
+    Ball rate                   id="rate"                 (10 = one ball per second)
+    Wind                        id="wind"                 (0 = no wind)
+  The game remembers your last settings. Don't see your new starting position? Press
+  F12, type in the Console:  localStorage.clear()  and press Enter, then F5. That also
+  clears the calibration, the leaderboard and your language choice: click "Set up
+  everything automatically" again afterwards.
+
+  The English (see CHANGING TEXTS below), in js/taal-en.js:
+    The English dictionary      export const TAAL_EN = {
+  And for the page on your phone, in telefoon.html:
+    English on the phone        const EN = {
+
+  For whoever edits this list: a line with four spaces in front is the explanation,
+  then at least two spaces, then the bit of code. The file is named in the line above
+  it that ends with a colon. node test/gids.mjs checks that every bit of code is in
+  that file exactly once, here and in ZELF AANPASSEN.txt.
+
+CHANGING TEXTS
+  The game comes in Dutch and English: the NL | EN buttons at the top right.
+  The Dutch text is the key, and it is simply in the code (search for the Dutch):
+    - the fixed texts in the panel: index.html
+    - the messages, the counter under "Mark goal", the instructions and tips on the
+      wall and the photo of what the camera sees: js/main.js
+    - the texts on the wall during play (LEVEL, COMBO, RANGLIJST): js/game.js
+    - the messages for your phone: js/telefoon.js
+    - the names of the colors (Aanvaller, Verdediger, Doel, Balbron): js/vision.js
+    - the page on your phone: telefoon.html
+  The English is in js/taal-en.js: on the left the Dutch sentence, exactly as it is
+  in the code, on the right the English. The page on your phone has its own list, at
+  the top of telefoon.html.
+
+  To change only the English: change the right-hand side in js/taal-en.js.
+  To change a Dutch text: change it in the code or in index.html, and then also on
+  the left in js/taal-en.js. Forget that, and the text stays Dutch in English mode;
+  node test/taal.mjs tells you which one.
+  Leave {naam}, {n} and the like as they are: the game fills in a name or number.
+  Keep the big titles on the wall short, or they won't fit on the projector.
+  A message sent to the phone is in js/taal-en.js and in telefoon.html, with the
+  same English.
+
+WANT TO GO FURTHER?
+  README.md explains how everything works (detection, physics, calibration, phone).
+  Have Node.js? Then you can run the tests, for example:  node test/spel.mjs
+  They say "alles goed" ("all good") if you haven't broken anything.
+  Made a new file in js/? Then also add it to the NODIG list in sw.js, or the app
+  won't have it without internet. node test/app.mjs tells you if you forget.

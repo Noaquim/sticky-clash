@@ -2,7 +2,7 @@
 // zoekers, tijdlijnen, uitlijning, formaat- en versie-informatie (BCH), de foutcorrectie
 // van elk blok (alle syndromen nul) en de inhoud zelf. Plus: de kleinste versie die past,
 // en het masker met de minste strafpunten. Dat een telefoon ze echt leest is los
-// nagemeten met OpenCV (zie README, "Bedienen met je telefoon").
+// nagemeten met OpenCV (zie README.nl.md, "Bedienen met je telefoon").
 import { check, klaar, rng } from './hulp.mjs';
 import { qrMaak, qrCapaciteit, QR_MAX_VERSIE } from '../js/qr.js';
 
