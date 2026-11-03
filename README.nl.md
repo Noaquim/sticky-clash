@@ -9,10 +9,12 @@ muur; jij stuurt ze met echte voorwerpen de bak in.
 
 Draait volledig in de browser. Geen installatie, geen libraries.
 
-**Speel meteen online: https://noaquim.github.io/sticky-clash/** — open de link in Chrome of
-Edge, sta de camera toe, klaar. Niets downloaden of installeren. Geen beamer, of zelfs geen
-camera? Dan kan het ook, zie hieronder. Liever zonder internet? Download `sticky-clash.html`
-(het hele spel in één bestand) of de hele map via *Code → Download ZIP*.
+**Speel meteen online: https://noaquim.github.io/sticky-clash/** — open de link in een
+recente browser (Chrome, Edge, Firefox of Safari), sta de camera toe, klaar. Niets
+downloaden of installeren. Geen beamer, of zelfs geen camera? Dan kan het ook, zie
+hieronder. Liever zonder internet? Download `sticky-clash.html`, het hele spel in één
+bestand (in het online spel: *Download het spel als één bestand*, onderaan het paneel), of
+de hele map via *Code → Download ZIP*.
 
 ![Ballen stuiteren over briefjes op een muur naar de bak](docs/demo.gif)
 
@@ -131,19 +133,20 @@ USB-stick zetten of mailen; het werkt op zichzelf.
 | computer | zo start je |
 |---|---|
 | **Windows** | dubbelklik `sticky-clash.html`, of de snelkoppeling **Sticky Clash** op het bureaublad |
-| **Mac** | open `sticky-clash.html` met Chrome (rechtermuisknop → Open met → Google Chrome) |
-| **Linux** | open `sticky-clash.html` met Chrome of Chromium, of draai `./start.sh` |
-| **Chromebook** | open `sticky-clash.html` vanuit de app Bestanden |
+| **Mac** | dubbelklik `sticky-clash.html` (of rechtermuisknop → Open met → Chrome, Firefox of Safari) |
+| **Linux** | open `sticky-clash.html` in je browser, of in een terminal: `sh start.sh` |
+| **Chromebook** | open `sticky-clash.html` vanuit de app Bestanden, of speel online en installeer het |
+| **iPad / tablet** | speel online: *Scherm* of *Demo* |
 
-Gebruik **Chrome of Edge**. In Safari en Firefox is het niet getest; het spel meldt het
-als je een andere browser gebruikt.
+Het werkt in **Chrome, Edge, Firefox en Safari**. Zie [Elke computer](#elke-computer)
+voor de kleine verschillen, en wat je doet als iets blokkeert.
 
 **Eén verschil**: vanuit het losse bestand vraagt de browser bij élke start opnieuw om de
 camera — klik dan gewoon op Toestaan. Wil je dat hij het onthoudt, start dan via een kleine
 lokale server. Daarvoor is er op Windows `start.bat` (en de snelkoppeling), die zelf de
 beste manier kiest:
 
-1. staat **Node.js** erop → `node serve.mjs`
+1. staat **Node.js** 16 of nieuwer erop → `node serve.mjs`
 2. anders **PowerShell** (zit op elke Windows-computer) → `serve.ps1`, zonder installatie
    en zonder beheerdersrechten
 3. mag ook dat niet, zoals op sommige schoolcomputers → gewoon het losse bestand
@@ -153,8 +156,11 @@ adres, en dan zou je kalibratie en cameratoestemming kwijt zijn. Draait het spel
 openen ze alleen de pagina; zit er een ander programma op 8123, dan openen ze het losse
 bestand.
 
-Op een Mac of Linux doet `start.command` / `start.sh` hetzelfde (met Node.js als dat er
-is). Na het kopiëren eerst uitvoerbaar maken: `chmod +x start.command`.
+Op een Mac of Linux doet `start.command` / `start.sh` hetzelfde (met Node.js 16 of nieuwer;
+op Linux ook met Python 3). Start dubbelklikken het niet, typ dan in een terminal
+`sh start.command` of `sh start.sh`: dat werkt altijd, ook als het bestand niet uitvoerbaar
+is. (Een Node.js ouder dan 16, zoals op Ubuntu 22.04? Dan slaan de scripts die over en
+nemen ze de volgende manier.)
 
 De snelkoppeling op het bureaublad opnieuw maken (bijvoorbeeld na het verplaatsen van de
 map, of op een andere Windows-computer):
@@ -184,14 +190,35 @@ in en zet hem naast of op de beamer, gericht op de muur.
 
 ### Beamer op het tweede scherm
 
-Klik één keer op **Meer instellingen → Beamer → Beamerscherm herkennen** en sta het toe.
-Daarna opent het beamervenster voortaan vanzelf op de beamer — ook als de beamer je
-hoofdscherm is. Dan nog één klik in dat venster voor volledig scherm; zonder klik mag geen
-enkele website volledig scherm openen. Zolang dat nog niet gebeurd is staat er klein onderin
-het beamerbeeld "Klik één keer in dit venster voor volledig scherm" — maar alleen als er
-niet gespeeld wordt, en als deel van het beeld zelf, zodat de camera het niet voor een
-voorwerp aanziet. Het spel merkt dat het beamervlak veranderd is en kalibreert zichzelf dan
-opnieuw.
+Zet de beamer eerst op **uitbreiden**, niet op dupliceren (anders staat het paneel op de
+muur). Windows: <kbd>Win</kbd>+<kbd>P</kbd> → *Uitbreiden*. Mac: *Systeeminstellingen →
+Beeldschermen*, gebruik hem als uitgebreid beeldscherm. Chromebook: *Instellingen →
+Beeldschermen*, vink *Ingebouwd scherm spiegelen* uit. Linux: *Instellingen →
+Beeldschermen → Samenvoegen*.
+
+**Chrome en Edge** kunnen het beamervenster zelf op de beamer zetten: klik één keer op
+**Meer instellingen → Beamer → Beamerscherm herkennen** en sta het toe. Daarna opent het
+beamervenster voortaan vanzelf op de beamer — ook als de beamer je hoofdscherm is.
+
+**Firefox en Safari** (en Chrome zolang je dat nog niet toestond) weten niet waar de beamer
+hangt. Dan opent *Alles automatisch instellen* het beamervenster op je laptopscherm, en
+wacht: in het venster zelf staat *Sleep dit venster naar de beamer*. Sleep het erheen
+(Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>, Chromebook:
+<kbd>Zoeken</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
+<kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>) en klik erin, of druk op <kbd>F</kbd>, voor
+volledig scherm: dan gaat het instellen vanzelf verder. Staat het al goed? Klik in het
+paneel op **Verder**. (Op Linux met Wayland, de standaard van Ubuntu, mag geen enkele
+browser zijn vensters zelf neerzetten; daar sleep je het dus altijd.)
+
+Zonder klik mag geen enkele website volledig scherm openen, dus: één klik in het
+beamervenster. Zolang dat nog niet gebeurd is staat er klein onderin het beamerbeeld "Klik
+één keer in dit venster voor volledig scherm" — maar alleen als er niet gespeeld wordt, en
+als deel van het beeld zelf, zodat de camera het niet voor een voorwerp aanziet. Het spel
+merkt dat het beamervlak veranderd is (volledig scherm, naar een ander scherm gesleept) en
+kalibreert zichzelf dan opnieuw, en leert de muur opnieuw.
+
+Zolang het beamervenster of het speelscherm openstaat, vraagt het spel de computer om het
+scherm aan te laten: dan gaan de laptop en de beamer niet midden in een ronde op zwart.
 
 ### Als app installeren
 
@@ -200,7 +227,10 @@ installeren als los programma, met een eigen venster en een pictogram in het sta
 
 - **Installeren:** klik in Chrome of Edge op het installeer-pictogram rechts in de
   adresbalk, of op de knop **Installeer als app** bovenaan het paneel. Die knop verschijnt
-  alleen als de browser zegt dat het kan.
+  alleen als de browser zegt dat het kan. In **Safari**: op een Mac *Archief → Voeg toe aan
+  Dock*, op een iPad of iPhone *Deel → Zet op beginscherm* (dat zegt het paneel ook).
+  **Firefox** kan geen web-apps installeren, maar na één bezoek online start het spel daar
+  ook zonder internet.
 - **Zonder internet:** daarna start het spel ook offline — de browser bewaart een kopie
   van alle bestanden. Ben je online, dan haalt hij altijd eerst de nieuwste versie: een
   update op GitHub, of je eigen wijziging na F5, zie je dus meteen. Geïnstalleerd via
@@ -265,6 +295,41 @@ Een tekst veranderen:
   melding voor ontwikkelaars in de console, in `js/app.js`.
 
 Daarna, zoals bij elke wijziging: `sticky-clash.html` opnieuw maken.
+
+## Elke computer
+
+Sticky Clash is gewone HTML en JavaScript zonder bibliotheken, en draait dus in elke
+recente browser: Chrome, Edge, Brave, Opera en Vivaldi op Windows, Mac, Linux en
+Chromebook, Firefox (ook de ESR-versies van scholen), en Safari op een Mac, iPad en iPhone.
+Oudere werken ook, ongeveer vanaf Chrome 66, Firefox 78 en Safari 13. Een browser die echt
+te oud is, zegt *Deze browser is te oud* in plaats van een pagina waarop niets werkt.
+
+| | makkelijkst | als iets blokkeert |
+|---|---|---|
+| **Windows** | zip uitpakken (rechtermuisknop → *Alles uitpakken*), dubbelklik `sticky-clash.html`; of `start.bat`, die onthoudt de camera | *Smart App Control heeft … geblokkeerd* of *Windows heeft uw pc beschermd*: rechtermuisknop op de **zip** → *Eigenschappen* → vink *Blokkering opheffen* aan → OK, en pak hem opnieuw uit. Nooit vanuit de zip starten. |
+| **Mac** | dubbelklik `sticky-clash.html`, of speel online (Safari: *Archief → Voeg toe aan Dock*) | `start.command` geweigerd (*Apple kan niet controleren …*): sla hem over, of *Systeeminstellingen → Privacy en beveiliging → Open toch*, of in Terminal: `sh start.command` |
+| **Linux** | open `sticky-clash.html` in je browser, of in een terminal: `sh start.sh` (Node.js 16+ of Python 3) | dubbelklikken opent het script in een teksteditor: gebruik `sh start.sh` |
+| **Chromebook** | speel online en installeer het, of open `sticky-clash.html` vanuit de app Bestanden | een school-Chromebook blokkeert bestanden: speel online |
+| **School- of werk-pc** | dubbelklik `sticky-clash.html`, of speel online | scripts of PowerShell geblokkeerd: die heb je niet nodig. Camera geblokkeerd door de beheerder: speel de demo. |
+| **iPad / Android-tablet** | speel online: *Scherm* of *Demo* | *Muur + beamer* kan alleen met een laptop of computer: een tablet opent het beamervenster als tabblad |
+
+**Firefox en Safari** spelen alles. De verschillen: ze weten niet waar de beamer hangt
+(sleep het beamervenster er zelf heen, zie [Beamer op het tweede
+scherm](#beamer-op-het-tweede-scherm)), Firefox heeft geen knop *Installeer als app*, en
+*Belichting vastzetten* is grijs waar de browser of de camera dat niet kan.
+
+**De computer zelf houdt de camera tegen** (het spel zegt het): Windows: *Instellingen →
+Privacy en beveiliging → Camera*, sta bureaublad-apps toe. Mac: *Systeeminstellingen →
+Privacy en beveiliging → Camera*, zet je browser aan.
+
+**Een trage of oude computer?** Het spel merkt zelf dat tekenen te lang duurt, en tekent
+dan wat eenvoudiger: geen gloed om de ballen en minder confetti (*zuinig 1*), een kleiner
+speelveld (*zuinig 2*), en de herkenning hooguit 15 keer per seconde (*zuinig 3*). Een
+camera die daarna start, start kleiner. Het spel zelf verandert niet, en wat als voorwerp
+telt ook niet; de klok van de ronde loopt altijd op echte snelheid, ook bij 7 beeldjes per
+seconde. Rechtsboven staan de beeldjes per seconde, hoe lang de herkenning duurt
+(*herkenning … ms*) en de stand *zuinig*. Op een gewone computer verandert er niets.
+Testen met de volle kwaliteit? Zet `?kwaliteit=vol` achter het adres.
 
 ## Donkere kamer: de beamer verlicht de muur
 
@@ -562,6 +627,8 @@ node test/telefoon.mjs      # bedienen met je telefoon: berichten, zuinig verstu
 node test/taal.mjs          # Engelse versie: alles vertaald, geen Nederlands buiten t(), telefoon.html
 node test/gids.mjs          # ZELF AANPASSEN.txt en CUSTOMIZE.txt: elk stukje code staat echt in dat bestand
 node test/speelplek.mjs     # drie speelplekken: welkomstkeuze, demo-opstelling (en speelt hij?), briefjes, scherm, camera ingesloten
+node test/kwaliteit.mjs     # trage computers: een gewone verandert nooit, een trage tekent eenvoudiger en loopt nooit in slow motion
+node test/apparaat.mjs      # elke computer: volledig scherm in oude Safari, iPad en tablets, besturingssysteem, "browser te oud"
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code

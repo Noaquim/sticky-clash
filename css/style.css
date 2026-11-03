@@ -1,4 +1,6 @@
 :root{
+  /* donkere keuzelijsten en schuifbalken van de browser zelf, passend bij het paneel */
+  color-scheme:dark;
   --bg:#0c0d10; --panel:#15171c; --line:#252932; --ink:#e8eaf0; --dim:#8b93a5;
   --acc:#ff8a1e; --acc2:#3aa0ff; --ok:#3ddc84;
 }
@@ -163,7 +165,8 @@ body.welkom-open .pane-head .alleen-demo{display:inline !important}
 
 /* het speelscherm, over het hele venster */
 body.sv-open{overflow:hidden}
-.speelvenster{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:#07080b}
+/* top/right/bottom/left in plaats van inset: dat kennen oudere Safari's en Chromebooks niet */
+.speelvenster{position:fixed; top:0; right:0; bottom:0; left:0; z-index:50; display:flex; flex-direction:column; background:#07080b}
 .sv-balk{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:8px 12px; background:#101217; border-bottom:1px solid var(--line)}
 .sv-balk button{flex:none; padding:7px 12px}
 .sv-naam{font-size:14px; white-space:nowrap}
@@ -171,8 +174,12 @@ body.sv-open{overflow:hidden}
 .sv-status.err{color:#ff6b6b}
 .sv-status.ok{color:var(--ok)}
 .sv-icoon{font-size:17px; line-height:1; padding:6px 10px !important}
-.sv-veld{flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:8px; overflow:hidden}
-#svCanvas{flex:none; width:auto; border-radius:8px; touch-action:none; cursor:crosshair}
+.sv-veld{position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:8px; overflow:hidden}
+#svCanvas{position:relative; z-index:1; flex:none; width:auto; border-radius:8px; touch-action:none; cursor:crosshair}
+/* op een scherm: de camera als video onder het speelveld (zie koppelSvVideo in js/main.js) */
+#svVideo{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); border-radius:8px; object-fit:cover; background:#000; pointer-events:none}
+#svVideo.spiegel{transform:translate(-50%,-50%) scaleX(-1)}
+#svCanvas.op-video{background:transparent}
 .sv-voet{padding:8px 12px 12px; background:#101217; border-top:1px solid var(--line)}
 .sv-voet .hint{margin:6px 0 0}
 .sv-palet{display:flex; flex-wrap:wrap; gap:6px}
@@ -209,4 +216,17 @@ body.sv-open{overflow:hidden}
   .sv-status{order:9; flex-basis:100%}
   .sv-veld{padding:4px}
   .sv-voet{padding:6px 8px 10px}
+}
+
+/* Op een iPad of iPhone zoomt Safari in op een invulvak kleiner dan 16px, en blijft dan
+   ingezoomd. Met de vinger dus 16px. */
+@media (pointer: coarse){
+  input[type=text], select{font-size:16px}
+}
+
+/* Oudere browsers (Safari voor 14.1, Chrome voor 84) kennen gap niet in een flex-rij: dan
+   lagen de knoppen tegen elkaar. Die browsers kennen ook inset niet, vandaar deze vraag. */
+@supports not (inset:0){
+  .row > * + *, .sv-balk > * + *, .sv-palet > * + *, .sv-cta > * + *, .plekkeuze > * + *{margin-left:8px}
+  .steps > li + li, .welkom > * + *{margin-top:6px}
 }

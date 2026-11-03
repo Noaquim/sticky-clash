@@ -35,7 +35,12 @@ export class Sfx {
       this.master.gain.value = this.geluidAan ? 0.28 : 0;
       this.master.connect(this.ctx.destination);
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    // Niet alleen na 'suspended': Safari op een iPad of iPhone zet het geluid op 'interrupted'
+    // na een telefoontje, Siri of een andere app. resume() komt hier altijd uit een klik.
+    if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') {
+      const p = this.ctx.resume();
+      if (p && p.catch) p.catch(() => {});
+    }
   }
 
   /** Eén toon. `delay` = zoveel seconden later, op de klok van de geluidskaart. */

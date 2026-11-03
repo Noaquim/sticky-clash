@@ -254,10 +254,19 @@ check('index.html: knoppen NL en EN bovenin', /id="taalKeuze"/.test(index) && /d
   const zinnen = teksten.map(x => ({ ...x, v: x.v.trim() })).filter(x => vertaalbaar(x.v));
   const mist = zinnen.filter(x => !EN.has(x.v)).map(x => JSON.stringify(x.v) + '  ' + x.waar);
   check('index.html: elke zichtbare tekst heeft een vertaling', zinnen.length > 100 && mist.length === 0, zinnen.length + ' teksten' + lijst(mist));
-  // de melding als het spel niet laadt, staat in de pagina zelf (zonder js/taal.js)
-  const fout = (/onerror="([^"]*)"/.exec(index) || [])[1] || '';
-  const [nl, en] = [...fout.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => vm.runInNewContext("'" + m[1] + "'")).filter(s => /spel|game/.test(s));
-  check('index.html: melding als het spel niet laadt, in beide talen', !!nl && !!en && EN.get(nl) === en, en || '(niet gevonden)');
+  // de meldingen als het spel niet kan starten (te oude browser, niet geladen, vastgelopen)
+  // staan in het kleine script bovenin de pagina zelf, zonder js/taal.js: var T = { soort: [nl, en] }
+  const meldingen = startMeldingen(index);
+  const anders = meldingen.filter(([nl, en]) => EN.get(nl) !== en).map(([nl]) => JSON.stringify(nl));
+  check('index.html: meldingen als het spel niet start, in beide talen', meldingen.length === 3 && anders.length === 0,
+    meldingen.length + ' meldingen' + lijst(anders));
+}
+
+/** De [nl, en]-paren uit `var T = {…};` in het startscript van index.html. */
+function startMeldingen(html) {
+  const code = htmlTeksten(html).scripts.map(s => s.code).find(c => c.includes('scGestart')) || '';
+  const obj = (/var T = (\{[\s\S]*?\n {2}\});/.exec(code) || [])[1];
+  try { return Object.values(vm.runInNewContext('(' + obj + ')')); } catch { return []; }
 }
 
 // ---------------------------------------------------------------- 2. sleutels in js/*.js
@@ -500,7 +509,7 @@ check('herkomst alleen van de laatste t()', tHerkomst('iets anders') === null);
 {
   const gebruikt = new Set([...alleSleutels.map(s => s.nl)]);
   for (const x of htmlTeksten(index).teksten) gebruikt.add(x.v.trim());
-  gebruikt.add('Kon het spel niet laden — open sticky-clash.html, of start via start.bat');   // index.html, onerror
+  for (const [nl] of startMeldingen(index)) gebruikt.add(nl);   // het startscript bovenin index.html
   const ongebruikt = [...EN.keys()].filter(k => !gebruikt.has(k));
   console.log('\n     (' + EN.size + ' zinnen in taal-en.js' + (ongebruikt.length ? '; niet (meer) gebruikt: ' + ongebruikt.map(k => JSON.stringify(k)).join(', ') : '') + ')');
 }

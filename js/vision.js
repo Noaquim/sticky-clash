@@ -13,7 +13,9 @@ export const DEFAULT_CLASSES = [
   { id: 'source', label: 'Balbron',    hue: 320, hTol: 22, sMin: 0.34, vMin: 0.22, css: '#ff4fa3', minCells: 8  },
 ];
 
-function rgb2hsv(r, g, b) {
+// uit: een rijtje van drie om in te schrijven, zodat er niet elke cel een nieuw rijtje
+// gemaakt wordt (dat gaf op trage computers merkbare pauzes om op te ruimen).
+function rgb2hsv(r, g, b, uit) {
   r /= 255; g /= 255; b /= 255;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
   let h = 0;
@@ -23,7 +25,9 @@ function rgb2hsv(r, g, b) {
     else h = 60 * ((r - g) / d + 4);
     if (h < 0) h += 360;
   }
-  return [h, mx < 1e-6 ? 0 : d / mx, mx];
+  const s = mx < 1e-6 ? 0 : d / mx;
+  if (uit) { uit[0] = h; uit[1] = s; uit[2] = mx; return uit; }
+  return [h, s, mx];
 }
 
 function hueDist(a, b) {
@@ -234,6 +238,7 @@ export class Vision {
     this.skinFilter = true;
     this.supTmp = new Float32Array(NDIR);
     this.balTmp = [0, 0, 0];
+    this.hsvTmp = [0, 0, 0];
     this.wobbleMax = 0.115;      // hoeveel de omtrek mag ademen voor het een mens is
     this.fgFraction = 0;         // aandeel voorgrond, om een verlopen muur te merken
     this.tooSmall = 0;           // vlekken die net onder de minimale grootte vielen
@@ -297,7 +302,12 @@ export class Vision {
     this.stream = null; this.ready = false;
   }
 
-  async start(deviceId) {
+  /**
+   * De camera starten. maat: { w, h } als ideale grootte; zonder maat 1280×720. Een trage
+   * computer (zie js/kwaliteit.js) vraagt een kleiner beeld: het werkbeeld hieronder blijft
+   * even groot, er is alleen minder om te verkleinen.
+   */
+  async start(deviceId, maat) {
     this.stop();
     // Nieuwe camera: de oude uitsnede en sporen horen bij een ander beeld.
     this.roi = null;
@@ -305,9 +315,10 @@ export class Vision {
     this.lostTracks = [];
     // 'ideal' en niet 'exact': op een andere computer bestaat de opgeslagen camera
     // niet, en dan moet hij gewoon de standaardcamera nemen in plaats van te weigeren.
+    const w = (maat && maat.w) || 1280, h = (maat && maat.h) || 720;
     const video = deviceId
-      ? { deviceId: { ideal: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      : { width: { ideal: 1280 }, height: { ideal: 720 } };
+      ? { deviceId: { ideal: deviceId }, width: { ideal: w }, height: { ideal: h } }
+      : { width: { ideal: w }, height: { ideal: h } };
     // Bewust géén vaste beeldsnelheid vragen: in een donkere kamer mag de camera
     // langer belichten (en dus minder beelden per seconde maken). Met 30 beelden per
     // seconde als eis blijft er in het donker een bijna zwart beeld over.
@@ -534,7 +545,7 @@ export class Vision {
         r /= 4; g /= 4; b /= 4;
         this.cr[idx] = r; this.cg[idx] = g; this.cb[idx] = b;
         this.cl[idx] = 0.299 * r + 0.587 * g + 0.114 * b;
-        const hsv = rgb2hsv(r, g, b);
+        const hsv = rgb2hsv(r, g, b, this.hsvTmp);
         this.ch[idx] = hsv[0]; this.cs[idx] = hsv[1]; this.cvv[idx] = hsv[2];
       }
     }
@@ -1059,29 +1070,37 @@ export class Vision {
    * b om en om) voor gekleurd licht. Met het lichtmodel (hasResponse) voorspelt
    * classifyObject daaruit hoe de muur er onder ons licht uit hoort te zien.
    */
-  setProjection(luma, lw, lh, toUV, signed) {
+  setProjection(luma, lw, lh, toUV, signed, sleutel) {
     const p = this.projLuma, pI = this.projI;
     if (!luma || !toUV) { p.fill(0); this.projPrev.fill(0); this.resetSigned(); return; }
     // k: 1 = grijs licht (één sterkte per cel), 3 = gekleurd (r, g, b om en om)
     const k = !signed ? 0 : signed.length === lw * lh * 3 ? 3 : signed.length === lw * lh ? 1 : 0;
     if (k && k !== this.projStride) { this.resetSigned(); this.projStride = k; }
     const cols = this.cols, rows = this.rows, cell = this.cell;
+    // Op welke plek in de voorspelling elke cel valt, hangt alleen van de kalibratie en de
+    // uitsnede af. Geeft main.js daar een sleutel bij, dan rekenen we het één keer uit in
+    // plaats van elk beeldje (dat maakte per beeldje duizenden kleine rijtjes aan).
+    const kaart = sleutel ? this.projKaartVoor(sleutel, lw, lh, toUV) : null;
     for (let cy = 0; cy < rows; cy++) {
       for (let cx = 0; cx < cols; cx++) {
         const idx = cy * cols + cx;
-        const uv = toUV((cx + 0.5) * cell, (cy + 0.5) * cell);
-        const u = uv[0], v = uv[1];
-        if (u < 0 || v < 0 || u > 1 || v > 1) {
+        let s;
+        if (kaart) s = kaart[idx];
+        else {
+          const uv = toUV((cx + 0.5) * cell, (cy + 0.5) * cell);
+          const u = uv[0], v = uv[1];
+          s = (u < 0 || v < 0 || u > 1 || v > 1) ? -1
+            : Math.min(lh - 1, (v * lh) | 0) * lw + Math.min(lw - 1, (u * lw) | 0);
+        }
+        if (s < 0) {
           p[idx] = 0;
           if (k === 1) pI[idx] = 0;
           else if (k) pI[idx * 3] = pI[idx * 3 + 1] = pI[idx * 3 + 2] = 0;
           continue;
         }
-        const sx = Math.min(lw - 1, (u * lw) | 0), sy = Math.min(lh - 1, (v * lh) | 0);
-        p[idx] = luma[sy * lw + sx];
+        p[idx] = luma[s];
         if (!k) continue;
         // Niet uitgesmeerd: dit is wat er precies op deze cel valt.
-        const s = sy * lw + sx;
         if (k === 1) pI[idx] = unitClamp(signed[s]);
         else {
           const o = idx * 3;
@@ -1091,6 +1110,29 @@ export class Vision {
     }
     this.spreadProjection();
     if (k) { this.spreadSigned(k); this.projSigned = true; } else if (this.projSigned) this.resetSigned();
+  }
+
+  /**
+   * Per cel de plek in de voorspelling (lw × lh), of -1 buiten het beamervlak. Bewaard zolang
+   * de sleutel (een rijtje waarden, zoals de kalibratie en de uitsnede) gelijk blijft.
+   */
+  projKaartVoor(sleutel, lw, lh, toUV) {
+    const n = this.cols * this.rows, oud = this.projKaartSleutel;
+    let zelfde = !!this.projKaart && this.projKaart.length === n && !!oud && oud.length === sleutel.length + 2 &&
+      oud[0] === lw && oud[1] === lh;
+    for (let i = 0; zelfde && i < sleutel.length; i++) zelfde = oud[i + 2] === sleutel[i];
+    if (zelfde) return this.projKaart;
+    const kaart = new Int32Array(n), cols = this.cols, cell = this.cell;
+    for (let idx = 0; idx < n; idx++) {
+      const cx = idx % cols, cy = (idx - cx) / cols;
+      const uv = toUV((cx + 0.5) * cell, (cy + 0.5) * cell);
+      const u = uv[0], v = uv[1];
+      kaart[idx] = (u < 0 || v < 0 || u > 1 || v > 1) ? -1
+        : Math.min(lh - 1, (v * lh) | 0) * lw + Math.min(lw - 1, (u * lw) | 0);
+    }
+    this.projKaart = kaart;
+    this.projKaartSleutel = [lw, lh].concat(sleutel);
+    return kaart;
   }
 
   resetSigned() {

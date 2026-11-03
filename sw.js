@@ -5,21 +5,25 @@
 // Altijd eerst het netwerk. Wie een bestand aanpast en op F5 drukt, of een nieuwe versie
 // op GitHub zet, ziet die dus meteen. Pas als het netwerk (of de server op deze computer)
 // niet antwoordt, komt het bestand uit de opgeslagen kopie. Elke verse versie die wél
-// binnenkomt, vervangt die kopie.
+// binnenkomt, vervangt die kopie. Ook op een heel trage verbinding (school-wifi, 3G) wachten
+// we op het netwerk: de kopie pakken zodra één bestand traag is, gaf net na een nieuwe versie
+// een mengsel van oude en nieuwe bestanden, en dan startte het spel niet.
 //
 // Heeft het spel een nieuw bestand nodig? Zet het in NODIG en verhoog VERSIE.
 // test/app.mjs controleert dat alles in de lijst ook echt bestaat.
 
-const VERSIE = 'sticky-clash-v3';
+const VERSIE = 'sticky-clash-v4';
 const NODIG = [
   './',
   'index.html',
   'css/style.css',
   'js/main.js',
   'js/app.js',
+  'js/apparaat.js',
   'js/audio.js',
   'js/game.js',
   'js/homography.js',
+  'js/kwaliteit.js',
   'js/muziek.js',
   'js/qr.js',
   'js/speelplek.js',
@@ -51,8 +55,9 @@ self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(VERSIE);
     const bewaar = async (f) => {
-      // 'reload': rechtstreeks van de server, niet uit de gewone browsercache
-      const res = await fetch(new Request(f, { cache: 'reload' }));
+      // 'no-cache': de server bevestigt dat wat de browser net voor de pagina ophaalde nog
+      // klopt, of stuurt het nieuwe. Zo komt niets twee keer helemaal binnen.
+      const res = await fetch(new Request(f, { cache: 'no-cache' }));
       if (res.status !== 200) throw new Error(f + ': ' + res.status);
       await cache.put(f, altijdNavragen(res));
     };
@@ -88,18 +93,23 @@ async function netwerkEerst(e) {
   // code krijgen.
   const sleutel = req.mode === 'navigate' ? req.url.split('?')[0].replace(/\/index\.html$/, '/') : req;
   try {
-    // 'no-cache': altijd bij de server navragen, ook als de browser nog een kopie heeft
-    const res = await fetch(req, { cache: 'no-cache' });
-    // alleen een gewoon, geslaagd antwoord bewaren (geen 404, geen doorverwijzing)
-    if (res.status !== 200 || res.type !== 'basic') return res;
-    const vers = altijdNavragen(res);
-    const kopie = vers.clone();
-    e.waitUntil(caches.open(VERSIE).then((c) => c.put(sleutel, kopie)).catch(() => {}));
-    return vers;
+    return await haalVers(e, req, sleutel);
   } catch (fout) {
     // Geen netwerk: de opgeslagen kopie.
     const oud = await (await caches.open(VERSIE)).match(sleutel);
     if (oud) return oud;
     throw fout;
   }
+}
+
+/** Het verse antwoord van de server; een gewoon, geslaagd antwoord wordt de nieuwe kopie. */
+async function haalVers(e, req, sleutel) {
+  // 'no-cache': altijd bij de server navragen, ook als de browser nog een kopie heeft
+  const res = await fetch(req, { cache: 'no-cache' });
+  // alleen een gewoon, geslaagd antwoord bewaren (geen 404, geen doorverwijzing)
+  if (res.status !== 200 || res.type !== 'basic') return res;
+  const vers = altijdNavragen(res);
+  const kopie = vers.clone();
+  e.waitUntil(caches.open(VERSIE).then((c) => c.put(sleutel, kopie)).catch(() => {}));
+  return vers;
 }

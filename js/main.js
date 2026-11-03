@@ -7,8 +7,16 @@ import { Telefoon } from './telefoon.js';
 import { t, tAantal, tHerkomst, huidigeTaal, zetTaal, opTaal, vertaalPagina, TaalTeller } from './taal.js';
 import { SPEELPLEKKEN, DEMO_KLEUREN, DEMO_SPECIAAL, DEMO_MAX, SPEL_ADRES, bepaalSpeelplek, bewaarSpeelplek, schermHomografie, pasVeld, demoOpstelling,
   briefjeUitSleep, briefjeOp, kruisjeVan, schuifBriefje, briefjesMee, demoMee, dubbeltik, cameraReden, eigenTabblad } from './speelplek.js';
+import { vsElement, vsKan, vsAan, vsUit, isIOS, apartVensterKan, besturing } from './apparaat.js';
+import { Kwaliteit, kwaliteitBijStart, inStapjes } from './kwaliteit.js';
 
 const $ = (id) => document.getElementById(id);
+// Wat deze computer kan (zie js/apparaat.js). Niet de naam van de browser: Firefox en Safari
+// spelen alles, ze kunnen alleen het beamerscherm niet zelf vinden.
+const SCHERMEN_HERKENNEN = 'getScreenDetails' in window;   // Chrome en Edge
+const OP_IOS = isIOS(navigator);                           // iPhone of iPad, in welke browser ook
+const APART_VENSTER = apartVensterKan(window);              // geen tablet: het beamervenster kan apart
+const BESTURING = besturing(navigator);                     // alleen voor de juiste tip
 const CAL_TARGETS = [[0.08, 0.10], [0.92, 0.10], [0.92, 0.90], [0.08, 0.90]];
 const STORE = 'stickyclash.v5';
 const STORE_OLD = 'stickyclash.v4';
@@ -87,6 +95,14 @@ const app = {
   camReden: null,         // waarom de camera hier niet kan (zie cameraReden), of null
   camGeweigerd: false,    // de browser weigerde de camera al eens
   popupNiet: false,       // het beamervenster mocht hier niet open (ingesloten venster)
+  beeldNr: 0,             // zoveel echte camerabeelden kwamen binnen (zie volgCamerabeelden)
+  beeldT: 0,              // wanneer het laatste (performance.now), 0 = dat kan deze browser niet
+  verwerktNr: -1,         // het camerabeeld dat de herkenning het laatst zag
+  calVoor: null,          // { w, h } van het beamervenster bij de laatste kalibratie
+  halfIngesteld: false,   // de wizard bleef steken na de camera (beamervenster niet op de beamer?)
+  wachtBeamer: false,     // de wizard wacht tot het beamervenster op de beamer staat
+  verder: false,          // daarop geklikt: niet langer wachten
+  kanVastzetten: true,    // kan deze camera (en browser) de belichting vastzetten?
 };
 
 const debug = $('debug');
@@ -358,11 +374,54 @@ function cameraFout(e) {
   if ((n === 'NotAllowedError' || n === 'SecurityError') && ingesloten()) {
     return t('Camera mislukt: in een ingesloten venster mag het spel de camera niet gebruiken — open het spel in een eigen tabblad');
   }
-  if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan');
-  if (n === 'NotReadableError' || n === 'AbortError') return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
+  // Houdt de computer zelf de camera tegen (de privacy-instellingen van Windows of macOS),
+  // dan helpt het camera-icoon in de browser niet. Chrome en Edge zeggen dat erbij.
+  if (n === 'NotAllowedError' && /system/i.test((e && e.message) || '')) return systeemCameraTekst();
+  if (n === 'NotAllowedError' || n === 'SecurityError') return t('Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon, zet de camera op Toestaan (in Firefox: haal de blokkade weg met ×) en probeer opnieuw');
+  if (n === 'NotReadableError' || n === 'AbortError') {
+    if (BESTURING === 'windows') return t('Camera mislukt: de camera is bezet of staat uit — sluit Teams, Zoom, OBS of de Camera-app. Helpt dat niet: Instellingen > Privacy en beveiliging > Camera, en zet de toegang voor bureaublad-apps aan');
+    if (BESTURING === 'mac') return t('Camera mislukt: de camera is bezet of staat uit — sluit Teams, Zoom, OBS of FaceTime. Helpt dat niet: Systeeminstellingen > Privacy en beveiliging > Camera, en zet je browser aan');
+    return t('Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw');
+  }
   if (n === 'NotFoundError' || n === 'OverconstrainedError') return t('Camera mislukt: geen camera gevonden — sluit je webcam aan');
   if (e && e.message) return t('Camera mislukt: {fout}', { fout: e.message });
   return t('Camera mislukt: onbekende fout');
+}
+
+/** De computer zelf houdt de camera tegen: waar je dat op dit besturingssysteem verandert. */
+function systeemCameraTekst() {
+  if (BESTURING === 'mac') return t('Camera mislukt: je Mac houdt de camera tegen — Systeeminstellingen > Privacy en beveiliging > Camera, zet je browser aan en start de browser opnieuw');
+  if (BESTURING === 'windows') return t('Camera mislukt: Windows houdt de camera tegen — Instellingen > Privacy en beveiliging > Camera, en zet de toegang voor apps en bureaublad-apps aan');
+  return t('Camera mislukt: je computer houdt de camera tegen — kijk in de privacy-instellingen of de browser de camera mag gebruiken');
+}
+
+/**
+ * Hoe groot de camera moet starten. Een trage computer (stand 2 of hoger, zie
+ * js/kwaliteit.js) vraagt een kleiner beeld: de herkenning werkt toch op 426×240, en zo hoeft
+ * er per beeld veel minder verkleind te worden. Op de muur iets ruimer, omdat het beeld daar
+ * nog tot het beamervlak bijgesneden wordt. Anders null: 1280×720, zoals altijd.
+ */
+function cameraMaat() {
+  if (kw.niveau < 2) return null;
+  return app.speelplek === 'scherm' ? { w: 640, h: 360 } : { w: 960, h: 540 };
+}
+
+/**
+ * Nieuwe camerabeelden tellen. video.currentTime loopt in Chrome en Firefox elk beeldje
+ * door, ook als de camera geen nieuw beeld gaf: dan werd hetzelfde beeld twee keer
+ * herkend, en merkte niemand dat de camera stil stond. requestVideoFrameCallback zegt het
+ * wél precies. Browsers zonder (oudere Safari) gebruiken gewoon currentTime, zie frame().
+ */
+function volgCamerabeelden() {
+  app.beeldNr = 0; app.beeldT = 0; app.verwerktNr = -1;
+  const v = vision.video, stroom = vision.stream;
+  if (!stroom || typeof v.requestVideoFrameCallback !== 'function') return;
+  const opBeeld = () => {
+    if (vision.stream !== stroom) return;          // een andere camera telt zelf
+    app.beeldNr++; app.beeldT = performance.now();
+    v.requestVideoFrameCallback(opBeeld);
+  };
+  v.requestVideoFrameCallback(opBeeld);
 }
 
 async function startCamera() {
@@ -376,7 +435,7 @@ async function startCamera() {
   step('cam', 2);
   try {
     const wil = await gewensteCamera();
-    const label = await vision.start(wil);
+    const label = await vision.start(wil, cameraMaat());
     debug.width = vision.vw; debug.height = vision.vh;
     applySliders();
     await fillDevices();
@@ -422,8 +481,15 @@ async function startCamera() {
         status(t('De camera staat nog op vaste belichting — trek de camera er even uit en weer in'), 'err');
       }
     }
+    // Kan deze camera de belichting vastzetten? Firefox en Safari bieden dat niet aan, en
+    // veel camera's ook niet: dan geen vinkje dat stil niets doet.
+    const kan = track && track.getCapabilities ? track.getCapabilities() : null;
+    app.kanVastzetten = !!(kan && ((kan.exposureMode && kan.exposureMode.includes('manual')) ||
+      (kan.whiteBalanceMode && kan.whiteBalanceMode.includes('manual'))));
+    toonVastzetHint();
     if (!(app.camChosen && wil && id && wil !== id)) app.camId = id || app.camId;
     app.lastVideoTime = -1; app.videoStill = 0;
+    volgCamerabeelden();
     step('cam', 1);
     save();
     if (!(wil && id && wil !== id) && !(app.speelplek === 'muur' && app.H && app.calCam && id && app.calCam !== id)) status(t('Camera actief: {naam}', { naam: label }), 'ok');
@@ -551,14 +617,13 @@ async function openProjector(auto) {
   app.proj = w;
   app.projCtx = c.getContext('2d');
 
+  // Volledig scherm met de hulpjes uit js/apparaat.js: Safari vóór 16.4 kent alleen de
+  // webkit-namen. Altijd het document van het beamervenster zelf meegeven.
   const goFull = () => {
-    if (!w.document.fullscreenElement) {
-      const p = w.document.documentElement.requestFullscreen();
-      if (p && p.catch) p.catch(() => {});
-    }
+    if (!vsElement(w.document)) vsAan(w.document.documentElement).catch(() => {});
   };
   const syncTip = () => {
-    const full = !!w.document.fullscreenElement;
+    const full = !!vsElement(w.document);
     if (full !== app.projFull) {
       app.projFull = full;
       if (!full) status(t('Klik één keer in het beamervenster voor volledig scherm'));
@@ -568,28 +633,41 @@ async function openProjector(auto) {
   app.syncTip = syncTip;
   w.document.addEventListener('click', goFull);
   w.document.addEventListener('fullscreenchange', syncTip);
+  w.document.addEventListener('webkitfullscreenchange', syncTip);
 
+  // Het beamervlak is veranderd — bijvoorbeeld doordat het venster nu volledig scherm is,
+  // of naar de beamer gesleept. De oude kalibratie klopt dan niet meer, en de geleerde muur
+  // hoort bij het oude beeld: allebei opnieuw (zie stelOpnieuwIn).
   let resizeTimer = 0;
+  const naResize = async () => {
+    if (!vision.ready || !projOk()) return;
+    // Midden in het instellen? Dan straks nog eens kijken.
+    if (app.busy) { resizeTimer = setTimeout(naResize, 1000); return; }
+    // Net op precies dit formaat gekalibreerd (de wizard wachtte erop): niets te doen.
+    if (app.calVoor && app.calVoor.w === c.width && app.calVoor.h === c.height) return;
+    // De wizard bleef steken omdat de camera het beamerbeeld niet zag. Nu het venster
+    // verplaatst of volledig scherm is, gaat hij vanzelf verder.
+    if (app.halfIngesteld) { runExclusive(instellenNaCamera); return; }
+    if (!app.H) return;
+    const wasPlaying = game.state === 'play';
+    if (wasPlaying) { game.togglePause(); toonPlayKnop(); }
+    const ok = await runExclusive(stelOpnieuwIn);
+    if (ok) status(t('Opnieuw ingesteld'), 'ok');
+    else if (!app.abort) status(t('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"'), 'err');
+    if (wasPlaying && game.state === 'paused') { game.togglePause(); toonPlayKnop(); }
+  };
   const resize = () => {
     if (c.width === w.innerWidth && c.height === w.innerHeight) return;
     c.width = w.innerWidth; c.height = w.innerHeight;
-    // Het beamervlak is veranderd — bijvoorbeeld doordat het venster nu volledig
-    // scherm is. De oude kalibratie klopt dan niet meer, dus die doen we opnieuw.
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(async () => {
-      if (!vision.ready || app.busy || !projOk() || !app.H) return;
-      const wasPlaying = game.state === 'play';
-      if (wasPlaying) game.togglePause();
-      await runExclusive(() => autoCalibrate(true));
-      if (wasPlaying && game.state === 'paused') game.togglePause();
-    }, 900);
+    resizeTimer = setTimeout(naResize, 900);
   };
   resize();
   w.addEventListener('resize', resize);
-  w.addEventListener('pagehide', () => { app.proj = null; app.projCtx = null; app.syncTip = null; step('proj', 0); });
+  w.addEventListener('pagehide', () => { app.proj = null; app.projCtx = null; app.syncTip = null; step('proj', 0); lusAan(); });
   w.document.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
-    if (k === 'f') { if (w.document.fullscreenElement) w.document.exitFullscreen(); else goFull(); }
+    if (k === 'f') { if (vsElement(w.document)) vsUit(w.document); else goFull(); }
     if (k === ' ') {
       e.preventDefault();
       if (game.state === 'over' || game.state === 'idle') $('btnPlay').click();
@@ -617,7 +695,10 @@ async function loadScreens(ask) {
   if (!('getScreenDetails' in window)) return null;
   try {
     if (!ask && navigator.permissions) {
-      const st = await navigator.permissions.query({ name: 'window-management' });
+      // Chrome 100 tot 110 (zoals op oudere Chromebooks) noemde het nog 'window-placement'.
+      let st;
+      try { st = await navigator.permissions.query({ name: 'window-management' }); }
+      catch { st = await navigator.permissions.query({ name: 'window-placement' }); }
       if (st.state !== 'granted') return null;
     }
     screenInfo = await window.getScreenDetails();
@@ -632,13 +713,34 @@ function projectorScreen() {
   return screenInfo.screens.find(s => s !== here) || null;
 }
 
+/**
+ * Hoe je het beamervenster zelf naar de beamer krijgt, met de sneltoets van dit
+ * besturingssysteem. Klein begonnen: het komt achter een dubbele punt of streepje.
+ */
+function sleepTip() {
+  if (BESTURING === 'windows') return t('sleep het beamervenster naar de beamer (of Win+Shift+→) en klik erin of druk op F voor volledig scherm');
+  if (BESTURING === 'chromeos') return t('sleep het beamervenster naar de beamer (of Zoeken+Alt+M) en klik erin of druk op F voor volledig scherm');
+  if (BESTURING === 'linux') return t('sleep het beamervenster naar de beamer (of Super+Shift+→) en klik erin of druk op F voor volledig scherm');
+  return t('sleep het beamervenster naar de beamer en klik erin of druk op F voor volledig scherm');
+}
+
+/**
+ * Zonder schermen herkennen (Firefox, Safari) geen knop die alleen "kan niet" zegt, maar
+ * hoe het daar wél gaat. Opnieuw na het wisselen van taal.
+ */
+function toonSchermenHint() {
+  if (SCHERMEN_HERKENNEN) return;
+  $('btnScreens').classList.add('hidden');
+  $('schermenHint').textContent = t('Deze browser zet het beamervenster niet zelf op de beamer: {tip}.', { tip: sleepTip });
+}
+
 $('btnScreens').onclick = async () => {
-  if (!('getScreenDetails' in window)) {
-    status(t('Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer'), 'err');
+  if (!SCHERMEN_HERKENNEN) {
+    status(t('Deze browser kan geen schermen herkennen — {tip}', { tip: sleepTip }), 'err');
     return;
   }
   const det = await loadScreens(true);
-  if (!det) { status(t('Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer'), 'err'); return; }
+  if (!det) { status(t('Geen toestemming gekregen — {tip}', { tip: sleepTip }), 'err'); return; }
   const scr = projectorScreen();
   if (!scr) { status(t('Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw'), 'err'); return; }
   status(t('Beamer gevonden ({b}×{h}) — het beamervenster opent daar voortaan vanzelf', { b: scr.width, h: scr.height }), 'ok');
@@ -775,6 +877,7 @@ async function autoCalibrate(silent) {
   app.H = H; app.Hinv = invertH(H);
   app.calPts = [];
   app.calCam = app.camId || '';
+  app.calVoor = projOk() ? { w: app.projCtx.canvas.width, h: app.projCtx.canvas.height } : null;
   step('cal', 1);
   updateCal();
   save();
@@ -794,7 +897,17 @@ async function autoCalibrate(silent) {
   return true;
 }
 
-$('btnCalAuto').onclick = () => runExclusive(() => autoCalibrate(false));
+// Opnieuw kalibreren snijdt het camerabeeld opnieuw bij, en dan hoort de geleerde muur bij het
+// oude beeld. Was de muur al geleerd, dan leren we hem meteen opnieuw.
+$('btnCalAuto').onclick = () => runExclusive(async () => {
+  const hadMuur = vision.hasBackground;
+  if (!(await autoCalibrate(false))) return false;
+  if (hadMuur && !vision.hasBackground && vision.mode === 'object') {
+    app.goalTrack = null;
+    return learnWall(true);
+  }
+  return true;
+});
 
 $('btnCal').onclick = () => {
   if (!projOk()) { status(t('Open eerst het beamervenster'), 'err'); return; }
@@ -805,7 +918,7 @@ $('btnCal').onclick = () => {
 };
 
 $('btnCalReset').onclick = () => {
-  app.H = null; app.Hinv = null; app.calPts = []; app.calibrating = false;
+  app.H = null; app.Hinv = null; app.calPts = []; app.calibrating = false; app.calVoor = null;
   setRoi(null);
   step('cal', 0); save(); updateCal();
 };
@@ -989,42 +1102,101 @@ function autoSetup() {
   // Kan de camera hier helemaal niet (ingesloten venster, geen https)? Dan zeggen we dat
   // meteen, zonder eerst een beamervenster te openen dat toch niets kan.
   if (app.camReden && app.camReden !== 'geweigerd') { status(camRedenTekst(app.camReden), 'err'); return false; }
+  // Een iPad, iPhone of tablet opent het beamervenster als tabblad: dan zijn het paneel en de
+  // camera weg zodra je het beamerbeeld ziet. Dan niet beginnen, maar zeggen wat wel kan.
+  if (!APART_VENSTER) { toonMuurStart(); return false; }
   // Het venster moet binnen de klik open, vóór alles wat wacht.
+  const nieuw = !projOk();
   const opened = projOk() || openProjector(true);
   return runExclusive(async () => {
     if (!(await opened)) return false;
     if (app.abort || !projOk()) return;
+    // Weet de browser niet waar de beamer hangt (Firefox, Safari, of Chrome zonder
+    // toestemming), dan staat het nieuwe venster op hetzelfde scherm als het paneel. Eerst
+    // wachten tot het op de beamer staat: anders ziet de camera niets om te kalibreren.
+    if (nieuw && !projectorScreen() && !(await wachtOpBeamer())) {
+      // Het beamervenster ging dicht tijdens het wachten: dan niet blijven zeggen dat je het
+      // moet slepen (bij Afbreken staat er al "Afgebroken").
+      if (!app.abort) status(t('Het beamervenster ging dicht — klik op "Alles automatisch instellen" om opnieuw te beginnen'));
+      return;
+    }
     await sleep(500);
 
     if (!vision.ready && !(await startCamera())) return;
     if (app.abort) return;
     await sleep(600);
-
-    if (!(await autoCalibrate(false))) return;
-    if (app.abort) return;
-
-    if (app.fillAuto) {
-      await autoLight();
-      if (app.abort) return;
-    }
-
-    let bak = true;
-    if (vision.mode === 'object') {
-      if (!(await learnWall(true))) return;
-      if (app.abort) return;
-      bak = await findBin();
-    }
-    if (app.abort) return;
-
-    app.wiz = { title: 'Klaar', sub: 'veel plezier' };
-    await sleep(1200);
-    app.wiz = null;
-    app.ingesteld = true;
-    toonAutoKnop();
-    if (bak) status(t('Alles staat klaar — klik op "Start ronde"'), 'ok');
-    else status(t('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak'), 'err');
-    return true;
+    return instellenNaCamera();
   });
+}
+
+/**
+ * De rest van de wizard, met de camera aan: kalibreren, licht afstellen, de muur leren en
+ * de bak zoeken. Lukt kalibreren niet (het beamervenster stond nog niet op de beamer), dan
+ * gaat het vanzelf verder zodra het beamervenster verplaatst of volledig scherm wordt (zie
+ * openProjector).
+ */
+async function instellenNaCamera() {
+  app.halfIngesteld = true;
+  if (!(await autoCalibrate(false))) return false;
+  if (app.abort) return false;
+
+  if (app.fillAuto) {
+    await autoLight();
+    if (app.abort) return false;
+  }
+
+  let bak = true;
+  if (vision.mode === 'object') {
+    if (!(await learnWall(true))) return false;
+    if (app.abort) return false;
+    bak = await findBin();
+  }
+  if (app.abort) return false;
+  app.halfIngesteld = false;
+
+  app.wiz = { title: 'Klaar', sub: 'veel plezier' };
+  await sleep(1200);
+  app.wiz = null;
+  app.ingesteld = true;
+  toonAutoKnop();
+  if (bak) status(t('Alles staat klaar — klik op "Start ronde"'), 'ok');
+  else status(t('Klaar, maar geen bak gevonden — sleep het doel in de rechter weergave naar je bak'), 'err');
+  return true;
+}
+
+/**
+ * Het nieuwe beamervenster staat nog op het scherm van het paneel: wachten tot het op de
+ * beamer staat. Verder zodra het volledig scherm is (de klik erin), of als je op Verder
+ * klikt. Op de muur staat intussen in het venster zelf wat je moet doen. (Niet raden aan
+ * de plek van het venster: Firefox verbergt de maten van de schermen tegen vingerafdrukken.)
+ * Geeft false bij Afbreken of als het venster dicht ging.
+ */
+async function wachtOpBeamer() {
+  app.wiz = { title: 'Sleep dit venster naar de beamer', sub: 'en klik erin voor volledig scherm' };
+  app.wachtBeamer = true; app.verder = false;
+  $('btnVerder').classList.remove('hidden');
+  status(t('Sleep het beamervenster naar de beamer en klik erin voor volledig scherm — of klik op Verder'));
+  try {
+    while (!app.abort && projOk() && !app.projFull && !app.verder) await sleep(200);
+  } finally {
+    app.wachtBeamer = false;
+    $('btnVerder').classList.add('hidden');
+    app.wiz = null;
+  }
+  return !app.abort && projOk();
+}
+
+/**
+ * Opnieuw kalibreren, en daarna ook de muur opnieuw leren. Kalibreren snijdt het
+ * camerabeeld opnieuw bij, en de geleerde muur hoort bij het oude beeld: zonder die tweede
+ * stap telde daarna geen enkel voorwerp meer. Voor een verschoven camera of beamer, en een
+ * beamervenster dat van formaat veranderde (volledig scherm, naar de beamer gesleept).
+ */
+async function stelOpnieuwIn() {
+  if (!(await autoCalibrate(true))) return false;
+  app.goalTrack = null;                          // in camerapunten; die kloppen niet meer
+  if (vision.mode === 'object' && !(await learnWall(true))) return false;
+  return true;
 }
 
 /** De grote knop bovenaan: na de eerste keer instellen heet hij "Opnieuw instellen". */
@@ -1033,7 +1205,8 @@ function toonAutoKnop() {
 }
 
 $('btnAuto').onclick = autoSetup;
-$('btnAbort').onclick = () => { app.abort = true; status(t('Afgebroken')); };
+$('btnAbort').onclick = () => { app.abort = true; app.halfIngesteld = false; status(t('Afgebroken')); };
+$('btnVerder').onclick = () => { app.verder = true; };
 
 // ---------------------------------------------------------------- speelmodus
 
@@ -1127,11 +1300,16 @@ debug.addEventListener('click', (e) => {
     if (app.calPts.length === 4) {
       const H = computeHomography(app.calPts.map(p => vision.camNorm(p[0], p[1])), CAL_TARGETS);
       if (H && quadOk(app.calPts)) {
+        const hadMuur = vision.hasBackground;
         app.H = H; app.Hinv = invertH(H);
         app.calibrating = false;
+        app.calVoor = projOk() ? { w: app.projCtx.canvas.width, h: app.projCtx.canvas.height } : null;
+        app.goalTrack = null;
         step('cal', 1); save();
         applyRoi();
-        status(t('Kalibratie gelukt'), 'ok');
+        // het beeld is opnieuw bijgesneden: de geleerde muur hoort bij het oude
+        if (hadMuur && !vision.hasBackground) { step('bg', 0); status(t('Kalibratie gelukt — klik nu op "Muur opnieuw leren"'), 'ok'); }
+        else status(t('Kalibratie gelukt'), 'ok');
       } else {
         app.calPts = [];
         status(t('Kalibratie mislukt — klik de punten in de juiste volgorde'), 'err');
@@ -1278,9 +1456,19 @@ $('autoRecal').onchange = e => { app.autoRecal = e.target.checked; save(); };
 
 // Ranglijst: per spelvorm de beste tien, alleen op deze computer.
 const RANG = 'stickyclash.ranglijst';
+// Mag de browser niets bewaren (cookies en opslag geblokkeerd, zoals op sommige school-
+// computers, of de privémodus van een oude Safari), dan houden we de ranglijst hier vast,
+// zolang de pagina openstaat. Na de eerste score is dit altijd de nieuwste.
+let rangGeheugen = null;
 function leesRang() {
+  if (rangGeheugen) return rangGeheugen;
   try { const r = JSON.parse(localStorage.getItem(RANG) || '{}'); return r && typeof r === 'object' ? r : {}; }
   catch { return {}; }
+}
+/** De ranglijst bewaren. Geeft false als de browser niets mag bewaren. */
+function bewaarRang(r) {
+  rangGeheugen = r;
+  try { localStorage.setItem(RANG, JSON.stringify(r)); return true; } catch { return false; }
 }
 // De demo heeft een eigen ranglijst: met de muis is het een ander spel.
 function rangSoort() {
@@ -1338,12 +1526,13 @@ function bewaarNaam() {
   l.push({ name: naam, score: app.pendingScore.score, t: Date.now() });
   l.sort((a, b) => b.score - a.score || a.t - b.t);
   r[soort] = l.slice(0, 10);
-  try { localStorage.setItem(RANG, JSON.stringify(r)); } catch { /* opslag geblokkeerd */ }
+  const bewaard = bewaarRang(r);
   app.pendingScore = null;
   $('naamInvoer').classList.add('hidden');
   save();
   toonRang();
-  status(t('Opgeslagen in de ranglijst: {naam}', { naam }), 'ok');
+  status(bewaard ? t('Opgeslagen in de ranglijst: {naam}', { naam })
+    : t('Opgeslagen in de ranglijst: {naam} — alleen zolang deze pagina openstaat (deze browser bewaart niets)', { naam }), 'ok');
 }
 $('btnNaam').onclick = bewaarNaam;
 $('naam').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); bewaarNaam(); } });
@@ -1351,7 +1540,7 @@ $('btnScoresWis').onclick = () => {
   if (!confirm(t('De ranglijst van deze spelvorm wissen?'))) return;
   const r = leesRang();
   delete r[rangSoort()];
-  try { localStorage.setItem(RANG, JSON.stringify(r)); } catch { /* opslag geblokkeerd */ }
+  bewaarRang(r);
   toonRang();
 };
 
@@ -1393,7 +1582,9 @@ function diagnoseFoto() {
   app.debugView = view; drawDebug(tracks);
   kop(t('Camera, met wat het spel herkent'), 12, 24);
   fit(world, 710, 34, 680, 400);
-  kop(t('Wat de beamer laat zien'), 712, 24);
+  // op een scherm is er geen beamer, geen kalibratie en geen muurverlichting
+  const scherm = app.speelplek === 'scherm';
+  kop(scherm ? t('Het speelveld, over het camerabeeld') : t('Wat de beamer laat zien'), 712, 24);
   if (vision.maskImage && vision.cols) {
     const m = document.createElement('canvas');
     m.width = vision.cols; m.height = vision.rows;
@@ -1410,10 +1601,14 @@ function diagnoseFoto() {
     'Sticky Clash — ' + new Date().toLocaleString(huidigeTaal() === 'en' ? 'en-US' : 'nl-NL'),
     t('Camera: {naam}  {b}x{h}', { naam: (st && st.label) || '—', b: vision.video.videoWidth || 0, h: vision.video.videoHeight || 0 }) +
       (vision.roi ? '  ' + t('(uitsnede)') : ''),
-    t('Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}', { kal: ja(app.H), muur: ja(vision.hasBackground),
-      modus: vision.mode + (app.levels ? ' / ' + t('uitdaging') : '') }),
-    t('Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}', { sens: $('sens').value,
-      licht: Math.round(app.fill * 100), huid: aan(vision.skinFilter), mensen: aan(app.noPeople) }),
+    scherm ? t('Speelplek: scherm   Spiegelen: {spiegel}   Ondergrond geleerd: {muur}   Modus: {modus}', { spiegel: ja(app.schermSpiegel),
+      muur: ja(vision.hasBackground), modus: vision.mode + (app.levels ? ' / ' + t('uitdaging') : '') })
+      : t('Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}', { kal: ja(app.H), muur: ja(vision.hasBackground),
+        modus: vision.mode + (app.levels ? ' / ' + t('uitdaging') : '') }),
+    scherm ? t('Gevoeligheid {sens}   Huid negeren {huid}   Mensen negeren {mensen}', { sens: $('sens').value,
+      huid: aan(vision.skinFilter), mensen: aan(app.noPeople) })
+      : t('Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}', { sens: $('sens').value,
+        licht: Math.round(app.fill * 100), huid: aan(vision.skinFilter), mensen: aan(app.noPeople) }),
     t('Camera ziet helderheid {l}/255   voorgrond {fg}%   lichtcorrectie {gain}   {fps}', { l: Math.round(app.camLuma),
       fg: (vision.fgFraction * 100).toFixed(1), gain: (vision.gain || 1).toFixed(2), fps: $('fps').textContent }),
     t('Teller: {teller}', { teller: $('live').textContent }),
@@ -1467,12 +1662,10 @@ async function herstelNaVerschuiving() {
   if (speelde) { game.togglePause(); toonPlayKnop(); }
   status(t('De camera of beamer is verschoven — ik stel alles opnieuw in'), 'err');
   await runExclusive(async () => {
-    if (!(await autoCalibrate(true))) {
-      status(t('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"'), 'err');
+    if (!(await stelOpnieuwIn())) {
+      if (!app.abort) status(t('Opnieuw instellen lukte niet — klik op "Alles automatisch instellen"'), 'err');
       return false;
     }
-    app.goalTrack = null;                          // in camerapunten; die kloppen niet meer
-    if (vision.mode === 'object' && !(await learnWall(true))) return false;
     status(speelde ? t('Opnieuw ingesteld — klik op "Pauze opheffen" om verder te spelen') : t('Opnieuw ingesteld'), 'ok');
     return true;
   });
@@ -1868,13 +2061,22 @@ function drawWizard(ctx, w, h) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
-  ctx.font = '800 ' + Math.round(110 * s) + 'px ui-sans-serif, system-ui, sans-serif';
+  // Te breed voor het venster (een lange Engelse zin, of een smal beamervenster)? Dan kleiner:
+  // anders viel "Drag this window to the projector" aan beide kanten van het beeld af.
+  const letter = (tekst, gewicht, px) => {
+    ctx.font = gewicht + ' ' + px + 'px ui-sans-serif, system-ui, sans-serif';
+    const b = ctx.measureText ? ctx.measureText(tekst).width : 0;
+    if (b > w * 0.92) ctx.font = gewicht + ' ' + Math.max(8, Math.floor(px * w * 0.92 / b)) + 'px ui-sans-serif, system-ui, sans-serif';
+  };
   // Nederlandse zinnen, hier pas vertaald: zo wisselt de aanwijzing op de muur meteen mee
-  ctx.fillText(t(app.wiz.title), w / 2, h * 0.40);
+  const titel = t(app.wiz.title);
+  letter(titel, '800', Math.round(110 * s));
+  ctx.fillText(titel, w / 2, h * 0.40);
   if (app.wiz.sub) {
     ctx.fillStyle = '#8b93a5';
-    ctx.font = '500 ' + Math.round(46 * s) + 'px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText(t(app.wiz.sub), w / 2, h * 0.52);
+    const sub = t(app.wiz.sub);
+    letter(sub, '500', Math.round(46 * s));
+    ctx.fillText(sub, w / 2, h * 0.52);
   }
   if (app.wiz.count) {
     ctx.fillStyle = '#ff8a1e';
@@ -1987,14 +2189,14 @@ function drawDebug(tracks) {
     c.imageSmoothingEnabled = false;
     c.drawImage(maskTmp, 0, 0, debug.width, debug.height);
     if (vision.mode === 'object' && !vision.hasBackground) {
-      c.fillStyle = '#ffab8f'; c.font = '13px system-ui'; c.textAlign = 'center';
+      c.fillStyle = '#ffab8f'; c.font = '13px system-ui, sans-serif'; c.textAlign = 'center';
       c.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), debug.width / 2, debug.height / 2);
     }
   } else if (vision.ready) {
     c.drawImage(vision.cv, 0, 0);
   } else {
     c.fillStyle = '#111'; c.fillRect(0, 0, debug.width, debug.height);
-    c.fillStyle = '#666'; c.font = '13px system-ui'; c.textAlign = 'center';
+    c.fillStyle = '#666'; c.font = '13px system-ui, sans-serif'; c.textAlign = 'center';
     c.fillText(t('Camera nog niet gestart'), debug.width / 2, debug.height / 2);
   }
 
@@ -2033,7 +2235,7 @@ function drawDebug(tracks) {
   app.calPts.forEach((p, i) => {
     c.strokeStyle = '#3ddc84'; c.lineWidth = 2;
     c.beginPath(); c.arc(p[0], p[1], 9, 0, 7); c.stroke();
-    c.fillStyle = '#3ddc84'; c.font = '700 12px system-ui'; c.textAlign = 'center';
+    c.fillStyle = '#3ddc84'; c.font = '700 12px system-ui, sans-serif'; c.textAlign = 'center';
     c.fillText(String(i + 1), p[0], p[1] - 12);
   });
   c.restore();
@@ -2063,15 +2265,28 @@ function updateProjectionMask() {
     projLumaArr[i] = Math.abs(l - fl);
     projSignedArr[i] = Math.max(0, l - fl) / span;
   }
-  vision.setProjection(projLumaArr, pw, PRED_H, toProj, projSignedArr);
+  // Waar elke cel in deze voorspelling valt, verandert alleen met de kalibratie, de uitsnede,
+  // het spiegelen of het camerabeeld: vision.js onthoudt het zolang deze sleutel gelijk blijft.
+  const v = vision.video;
+  projSleutel[0] = app.H; projSleutel[1] = vision.roi; projSleutel[2] = vision.mirror;
+  projSleutel[3] = vision.cols; projSleutel[4] = vision.rows; projSleutel[5] = v.videoWidth; projSleutel[6] = v.videoHeight;
+  vision.setProjection(projLumaArr, pw, PRED_H, toProj, projSignedArr, projSleutel);
 }
+const projSleutel = [null, null, false, 0, 0, 0, 0];
 
 // ---------------------------------------------------------------- hoofdlus
 
-function fitCanvas(cv) {
-  const r = cv.getBoundingClientRect();
-  const w = Math.max(2, Math.round(r.width)), h = Math.max(2, Math.round(r.height));
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+/**
+ * De weergave rechts zo groot als zijn vak, maar nooit smaller dan het speelveld (verhouding
+ * ar): op een staand scherm (een iPad rechtop) wordt het doek dan lager, en zet object-fit:
+ * contain het in het midden. Anders vielen de teksten op de muur over elkaar of buiten beeld.
+ */
+function fitWereld(ar) {
+  const r = world.getBoundingClientRect();
+  const w = Math.max(2, Math.round(r.width));
+  let h = Math.max(2, Math.round(r.height));
+  if (ar > 0 && w / h < ar) h = Math.max(2, Math.round(w / ar));
+  if (world.width !== w || world.height !== h) { world.width = w; world.height = h; }
 }
 
 // Waarom een vlek niet meetelt, voor de teller onder "Doel aanwijzen" (zie buildObstacles).
@@ -2086,34 +2301,102 @@ let tracks = [];
 let fpsAcc = 0, fpsN = 0;
 let liveAcc = 0;
 let staleBg = 0;
+let beeldjeNr = 0;               // telt de beeldjes, om iets maar eens per zoveel te doen
+let nieuwVoorDebug = true;       // kwam er een nieuw herkend camerabeeld sinds drawDebug?
 
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+// Hoe vlot het loopt, voor de wacht op trage computers (zie js/kwaliteit.js) en om zelf te
+// zien: sc.prestatie in de console, en rechtsboven naast de fps.
+const prestatie = { fps: 0, beeldMs: 0, herkenningMs: 0, niveau: 0 };
+const ema = (oud, nu) => (oud ? oud + (nu - oud) * 0.1 : nu);
+
+// De wacht voor trage computers begint altijd op alles, behalve als hij vastgezet is: met
+// ?kwaliteit=vol in het adres (de tests), of stickyclash.kwaliteit = 'vol' in de opslag.
+// Zie js/kwaliteit.js.
+const kw = (() => {
+  let bewaard = null;
+  try { bewaard = localStorage.getItem('stickyclash.kwaliteit'); } catch { /* opslag geblokkeerd */ }
+  const b = kwaliteitBijStart(location.search, bewaard);
+  const k = new Kwaliteit(b.niveau);
+  if (b.vast) k.vast(b.niveau);
+  return k;
+})();
+const VOL_DEELTJES = game.maxDeeltjes;
+let kwGemeld = false;
+const spelStap = (h) => game.update(h);
+
+/** De stand van de wacht doorvoeren (zie js/kwaliteit.js). gewisseld: hij veranderde net. */
+function pasKwaliteitToe(gewisseld) {
+  const n = kw.niveau;
+  prestatie.niveau = n;
+  game.gloed = n < 1;
+  game.maxDeeltjes = n < 1 ? VOL_DEELTJES : 80;
+  svVak.b = -1;                                  // het speelscherm opnieuw op maat (scherpte)
+  if (!gewisseld) return;
+  if (n > 0 && !kwGemeld && !app.busy) {
+    kwGemeld = true;
+    status(t('Deze computer heeft het zwaar — het spel tekent nu wat eenvoudiger, zodat het vlot blijft'));
+  }
+  toonFps();
+}
+
+/** Rechtsboven: beeldjes per seconde, hoe lang het herkennen duurt, en of het spel zuinig tekent. */
+function toonFps() {
+  let s = Math.round(prestatie.fps) + ' fps';
+  if (vision.ready && prestatie.herkenningMs) s += ' · ' + t('herkenning {n} ms', { n: Math.round(prestatie.herkenningMs) });
+  if (kw.niveau) s += ' · ' + t('zuinig {n}', { n: kw.niveau });
+  $('fps').textContent = s;
+}
+
+function frame() {
+  // De tijd van dit venster, niet die van rAF: soms tekent het beamervenster de lus (zie
+  // volgendBeeld), en dat heeft zijn eigen klok.
+  const now = performance.now();
+  const ruw = Math.max(0, (now - last) / 1000);
+  const dt = Math.min(0.05, ruw);
   last = now;
-  fpsAcc += dt; fpsN++;
-  if (fpsAcc > 0.5) { $('fps').textContent = Math.round(fpsN / fpsAcc) + ' fps'; fpsAcc = 0; fpsN = 0; }
+  // Echte beeldjes per seconde, ook onder de 20 (met dt bleef dat steken op 20).
+  fpsAcc += ruw; fpsN++;
+  if (fpsAcc > 0.5) { prestatie.fps = fpsN / fpsAcc; toonFps(); fpsAcc = 0; fpsN = 0; }
+  // De wacht voor trage computers: niet tijdens het instellen, en niet als niemand het ziet.
+  const gewisseld = kw.meet(ruw * 1000, document.visibilityState === 'visible' && !app.busy && !app.calPattern);
+  if (gewisseld || prestatie.niveau !== kw.niveau) pasKwaliteitToe(gewisseld);
+  beeldjeNr++;
 
-  fitCanvas(world);
   if (app.svOpen) svMaat();
   if (app.proj && app.proj.closed) { app.proj = null; app.projCtx = null; step('proj', 0); }
   const ar = veldVerhouding();
+  fitWereld(ar);
   if (app.speelplek === 'demo') demoVeld(ar);
   game.setAspect(ar);
 
   // Alleen verwerken als de camera echt een nieuw beeld heeft. Dubbele beelden gaven
-  // schokkerige snelheden; en blijft het beeld staan, dan zeggen we dat.
+  // schokkerige snelheden; en blijft het beeld staan, dan zeggen we dat. De echte beelden
+  // telt volgCamerabeelden; kan deze browser dat niet, of is het paneel verborgen (dan
+  // telt hij niet), dan kijken we of video.currentTime veranderde.
   visionAcc += dt;
   if (vision.ready && !app.busy) {
-    const vt = vision.video.currentTime;
-    if (vt !== app.lastVideoTime) {
-      app.lastVideoTime = vt; app.videoStill = 0;
-      if (visionAcc >= 1 / 40) { tracks = vision.detect(Math.min(0.1, visionAcc)); visionAcc = 0; }
+    const echt = app.beeldT > 0 && document.visibilityState === 'visible';
+    let nieuw;
+    if (echt) {
+      nieuw = app.beeldNr !== app.verwerktNr;
+      app.videoStill = Math.max(0, (now - app.beeldT) / 1000);
     } else {
-      app.videoStill += dt;
-      if (app.videoStill > 2 && !app.stillWarned) {
-        app.stillWarned = true;
-        status(t('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera'), 'err');
-      }
+      const vt = vision.video.currentTime;
+      nieuw = vt !== app.lastVideoTime;
+      if (nieuw) { app.lastVideoTime = vt; app.videoStill = 0; } else app.videoStill += dt;
+    }
+    // Op een heel trage computer (stand 3) hooguit 15 keer per seconde herkennen, zodat er
+    // tijd overblijft om te tekenen.
+    if (nieuw && visionAcc >= (kw.niveau >= 3 ? 1 / 15 : 1 / 40)) {
+      app.verwerktNr = app.beeldNr;
+      const t0 = performance.now();
+      tracks = vision.detect(Math.min(0.1, visionAcc)); visionAcc = 0;
+      prestatie.herkenningMs = ema(prestatie.herkenningMs, performance.now() - t0);
+      nieuwVoorDebug = true;
+    }
+    if (app.videoStill > 2 && !app.stillWarned) {
+      app.stillWarned = true;
+      status(t('Het camerabeeld staat stil — sluit programma\'s die de camera gebruiken, of kies een andere camera'), 'err');
     }
     if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status(t('Camerabeeld is terug'), 'ok'); }
   }
@@ -2135,7 +2418,11 @@ function frame(now) {
   }
 
   const before = game.state;
-  game.update(dt);
+  // Eén stap is hooguit 0,05 s, anders vliegt een bal door een briefje heen. Een traag
+  // beeldje (minder dan 20 per seconde) krijgt daarom meer stapjes: zonder die stapjes liep
+  // op een oude computer alles in slow motion, ook de klok van de ronde. Op een gewone
+  // computer is het altijd één stap, precies zoals het was.
+  inStapjes(ruw, spelStap);
   // Een versleept briefje beweegt alleen in het beeldje waarin je het verschoof (zie wijzerBeweeg).
   if (app.speelplek === 'demo') {
     for (let i = 0; i < app.demoBriefjes.length; i++) { app.demoBriefjes[i].vx = 0; app.demoBriefjes[i].vy = 0; }
@@ -2197,16 +2484,77 @@ function frame(now) {
     if (vision.ready && vision.data) app.camLuma = vision.meanLuma(inProjection);
     el.className = 'live' + ((!app.active && vision.tooSmall > 0) || !app.H || staleBg > 2 || (vision.floodGuard && vision.mode === 'object') ||
       (app.camLuma >= 0 && app.camLuma < 40) || (vision.mode === 'object' && !vision.hasBackground) ? ' warn' : '');
+    houdWakker();
   }
 
   if (projOk()) drawScene(app.projCtx, app.projCtx.canvas.width, app.projCtx.canvas.height);
-  // Het speelscherm dekt het paneel af: dan hoeft de weergave rechts niet getekend.
-  if (app.svOpen) drawScene(svCtx, svCanvas.width, svCanvas.height);
-  else drawScene(wctx, world.width, world.height);
+  // Het speelscherm dekt het paneel af: dan hoeft de weergave rechts niet getekend. Op een
+  // trage computer (stand 1 en hoger) met de beamer open is die weergave alleen een
+  // voorbeeld: dan eens per vier beeldjes.
+  if (app.svOpen) { koppelSvVideo(); drawScene(svCtx, svCanvas.width, svCanvas.height); }
+  else if (!kw.niveau || !projOk() || beeldjeNr % 4 === 0) drawScene(wctx, world.width, world.height);
   updateProjectionMask();
-  drawDebug(tracks);
+  // Het camerabeeld in het paneel: op een trage computer alleen als het te zien is en er
+  // een nieuw herkend beeld is.
+  if (!kw.niveau || (nieuwVoorDebug && !app.svOpen && document.visibilityState === 'visible')) {
+    drawDebug(tracks);
+    nieuwVoorDebug = false;
+  }
+  prestatie.beeldMs = ema(prestatie.beeldMs, performance.now() - now);
+  volgendBeeld();
+}
 
-  requestAnimationFrame(frame);
+// ---- de lus aan de gang houden
+//
+// Normaal tekent requestAnimationFrame van dit venster de lus. Maar een verborgen venster
+// krijgt geen beeldjes meer: minimaliseer je het paneel (of staat het achter een ander
+// venster), dan bevroor de muur. Is het paneel verborgen en het beamervenster open, dan
+// tekent daarom dat venster de lus.
+let lusVenster = null, lusId = 0;
+function volgendBeeld() {
+  const w = projOk() && document.visibilityState === 'hidden' ? app.proj : window;
+  try { lusId = w.requestAnimationFrame(frame); lusVenster = w; }
+  catch { lusId = requestAnimationFrame(frame); lusVenster = window; }
+}
+/** Het juiste venster tekent niet (meer) de lus: daar opnieuw beginnen. */
+function lusAan() {
+  const wil = projOk() && document.visibilityState === 'hidden' ? app.proj : window;
+  if (lusVenster === wil) return;
+  if (lusVenster) { try { lusVenster.cancelAnimationFrame(lusId); } catch { /* venster al dicht */ } }
+  volgendBeeld();
+}
+document.addEventListener('visibilitychange', () => {
+  // Weer in beeld (na een ander tabblad, of een geminimaliseerd paneel): zolang het venster
+  // verborgen was, telde volgCamerabeelden geen beelden. Dan niet meteen "het camerabeeld
+  // staat stil" zeggen; staat hij echt stil, dan komt die melding twee seconden later alsnog.
+  if (document.visibilityState === 'visible' && app.beeldT) app.beeldT = performance.now();
+  lusAan(); houdWakker();
+});
+
+// ---- het scherm wakker houden
+//
+// Tijdens het spelen raakt niemand de laptop aan: dan zette de computer na een paar minuten
+// het scherm uit, en de beamer ook. Zolang het beamervenster of het speelscherm open is, of
+// er een ronde loopt, vragen we de browser het scherm aan te laten (waar dat kan).
+let wakker = null, wakkerVenster = null, wakkerBezig = false, wakkerNiet = 0;
+function houdWakker() {
+  const wil = projOk() || app.svOpen || game.state === 'play' || game.state === 'count' || game.state === 'paused';
+  // ging het venster dicht dat hem vroeg (het beamervenster), dan is hij ook weg
+  if (wakker && wakkerVenster && wakkerVenster.closed) wakker = null;
+  if (wakkerBezig || wil === !!wakker) return;
+  if (!wil) { const w = wakker; wakker = null; try { w.release().catch(() => {}); } catch { /* al los */ } return; }
+  // Vragen mag alleen vanuit een zichtbaar venster: het paneel, of anders het beamervenster.
+  // Een verborgen paneel (geminimaliseerd, zie volgendBeeld) raakt hem kwijt, en dan ging
+  // midden in het spel toch de beamer uit. Mislukt het, dan een halve minuut niet.
+  const venster = document.visibilityState === 'visible' ? window
+    : projOk() && app.proj.document.visibilityState === 'visible' ? app.proj : null;
+  const nav = venster && venster.navigator;
+  if (!nav || !nav.wakeLock || performance.now() < wakkerNiet) return;
+  wakkerBezig = true;
+  nav.wakeLock.request('screen').then((w) => {
+    wakker = w; wakkerVenster = venster;
+    w.addEventListener('release', () => { if (wakker === w) wakker = null; });
+  }, () => { wakkerNiet = performance.now() + 30000; }).then(() => { wakkerBezig = false; });
 }
 
 // ---------------------------------------------------------------- speelplek: muur, scherm of demo
@@ -2219,6 +2567,8 @@ function frame(now) {
 
 const svCanvas = $('svCanvas');
 const svCtx = svCanvas.getContext('2d');
+const svVideo = $('svVideo');   // de camera onder het speelveld, op een scherm (zie koppelSvVideo)
+let svVideoNiet = null;         // deze camerastroom wilde de <video> niet: dan niet elk beeldje opnieuw
 const demoLijst = [];           // de obstakels van de demo, elk beeldje opnieuw gevuld
 const svVak = { b: -1, h: -1, ar: -1 };   // waarvoor het speelscherm zijn maat het laatst kreeg
 
@@ -2254,9 +2604,14 @@ async function vraagCameraStand() {
 function camRedenTekst(r) {
   if (r === 'ingesloten') return t('In dit ingesloten venster mag het spel de camera niet gebruiken. De demo werkt hier wel.');
   if (r === 'onveilig') return t('Via dit adres geeft de browser de camera niet vrij (geen https). De demo werkt hier wel.');
-  if (r === 'geen-api') return t('Deze browser kan de camera niet gebruiken: probeer Chrome of Edge. De demo werkt hier wel.');
+  if (r === 'geen-api') {
+    // Op een iPhone of iPad is elke browser vanbinnen Safari: een andere kiezen helpt niet.
+    // Wel als de pagina in een app opende (een link in een chat): dan in Safari zelf.
+    return OP_IOS ? t('Deze browser kan de camera niet gebruiken: open deze pagina in Safari. De demo werkt hier wel.')
+      : t('Deze browser kan de camera niet gebruiken: probeer een recente Chrome, Edge, Firefox of Safari. De demo werkt hier wel.');
+  }
   if (r === 'popup') return t('Het beamervenster kan hier niet open: dit is een ingesloten venster.');
-  return t('De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon en kies Toestaan.');
+  return t('De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon, zet de camera op Toestaan (in Firefox: haal de blokkade weg met ×) en herlaad de pagina.');
 }
 
 /** De uitleg bij de camerakeuzes, met een link naar een eigen tabblad als dat helpt. */
@@ -2369,27 +2724,77 @@ function toonSchermKnop() {
 function toonStartStatus() {
   if (!app.plekGekozen) { status(t('Welkom! Kies hieronder hoe je wilt spelen')); return; }
   if (app.speelplek === 'demo') { status(t('Klik op "Speel de demo"')); return; }
-  if (!window.isSecureContext) status(t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij'), 'err');
-  else if (!chromium && app.speelplek === 'muur') status(t('Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen'), 'err');
-  else if (app.speelplek === 'scherm') status(t('Klik op "Start op dit scherm"'));
+  if (!window.isSecureContext) {
+    status(BESTURING === 'windows' ? t('Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij')
+      : t('Open sticky-clash.html, of speel online — zo geeft de browser geen camera vrij'), 'err');
+  } else if (app.speelplek === 'scherm') status(t('Klik op "Start op dit scherm"'));
+  else toonMuurStart();
+}
+
+/**
+ * Bij muur + beamer: wat je moet doen, en wat deze computer anders doet. Geen waarschuwing
+ * op de naam van de browser: Firefox en Safari spelen alles. Alleen weten ze niet waar de
+ * beamer hangt; dan sleep je het beamervenster er zelf heen. En een tablet of telefoon kan
+ * het beamervenster niet apart openen.
+ */
+function toonMuurStart() {
+  if (!APART_VENSTER) status(t('Muur + beamer kan alleen met een laptop of computer — speel hier op een scherm of de demo'), 'err');
+  else if (!SCHERMEN_HERKENNEN) status(t('Klik op "Alles automatisch instellen" — en sleep daarna het beamervenster naar de beamer'));
+  else status(t('Klik op "Alles automatisch instellen"'));
 }
 
 /**
  * De achtergrond op een scherm: het camerabeeld, iets donkerder, zodat de ballen en de
  * teksten erop opvallen. Precies op het speelveld; gespiegeld als dat aan staat.
+ *
+ * In het speelscherm staat de camera als <video> onder het doek (zie koppelSvVideo): dan
+ * tekent de browser dat beeld zelf, zonder rekenwerk voor het spel, en maken we het doek
+ * hier alleen leeg en iets donkerder. Elk beeldje het camerabeeld in het doek tekenen
+ * kostte op een trage computer een flink deel van de tijd.
  */
 function tekenCameraBeeld(ctx, cw, ch) {
+  const sc = ch / game.H, w = game.W * sc, x0 = (cw - w) / 2;
+  if (ctx === svCtx && svCanvas.classList.contains('op-video')) {
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = '#000';
+    if (x0 > 0) { ctx.fillRect(0, 0, x0, ch); ctx.fillRect(x0 + w, 0, cw - x0 - w, ch); }
+    ctx.fillStyle = 'rgba(6,8,12,.36)';
+    ctx.fillRect(x0, 0, w, ch);
+    return;
+  }
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, cw, ch);
   const v = vision.video;
   if (!vision.ready || v.readyState < 2) return;
-  const sc = ch / game.H, w = game.W * sc, x0 = (cw - w) / 2;
   ctx.save();
   if (app.schermSpiegel) { ctx.translate(x0 + w, 0); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0, w, ch); }
   else ctx.drawImage(v, x0, 0, w, ch);
   ctx.restore();
   ctx.fillStyle = 'rgba(6,8,12,.36)';
   ctx.fillRect(x0, 0, w, ch);
+}
+
+/**
+ * Op een scherm: de camera als <video> onder het speelveld. Pas als die echt beeld heeft,
+ * wordt het doek erboven doorzichtig; tot dan (of als het hier niet lukt) tekent
+ * tekenCameraBeeld het camerabeeld gewoon zelf.
+ */
+function koppelSvVideo() {
+  const s = app.svOpen && app.speelplek === 'scherm' && vision.ready ? vision.stream : null;
+  if (svVideo.srcObject !== s && s !== svVideoNiet) {
+    try {
+      svVideo.srcObject = s;
+      if (s) { const p = svVideo.play(); if (p && p.catch) p.catch(() => {}); }
+    } catch { svVideoNiet = s; /* dan tekent het spel het camerabeeld zelf */ }
+  }
+  // !paused: weigert de browser het afspelen (iOS in energiebesparing), dan tekent het spel
+  // het camerabeeld zelf, anders bleef er een stilstaand beeld onder het speelveld
+  const aan = !!s && svVideo.srcObject === s && svVideo.readyState >= 2 && svVideo.videoWidth > 0 && !svVideo.paused;
+  if (aan === svVideo.classList.contains('hidden')) {
+    svVideo.classList.toggle('hidden', !aan);
+    svCanvas.classList.toggle('op-video', aan);
+  }
+  svVideo.classList.toggle('spiegel', !!app.schermSpiegel);
 }
 
 /** Hoe breed het speelveld is (breedte gedeeld door hoogte). */
@@ -2399,7 +2804,10 @@ function veldVerhouding() {
   if (app.speelplek === 'scherm' && vision.ready && v.videoWidth) return v.videoWidth / v.videoHeight;
   if (app.svOpen) return svCanvas.width / svCanvas.height;
   if (projOk()) return app.projCtx.canvas.width / app.projCtx.canvas.height;
-  return world.width / world.height;
+  // Anders de vorm van het vak rechts, maar niet smaller dan 1,2 : 1 (zie fitWereld).
+  const r = world.getBoundingClientRect();
+  const w = Math.max(2, Math.round(r.width)), h = Math.max(2, Math.round(r.height));
+  return Math.max(1.2, w / h);
 }
 
 // ---- het speelscherm
@@ -2410,8 +2818,8 @@ function openSpeelvenster() {
   $('speelvenster').classList.remove('hidden');
   document.body.classList.add('sv-open');
   // Volledig scherm kan niet overal (een ingesloten venster zonder toestemming, een iPhone):
-  // dan geen knop die alleen maar "kan niet" zegt.
-  $('svVol').classList.toggle('hidden', !document.fullscreenEnabled);
+  // dan geen knop die alleen maar "kan niet" zegt. (Oudere Safari: alleen de webkit-naam.)
+  $('svVol').classList.toggle('hidden', !vsKan(document));
   // Haal je een plek op de ranglijst, dan typ je je naam hier: het paneel zit eronder.
   $('svNaam').appendChild($('naamInvoer'));
   svVak.b = -1;
@@ -2421,7 +2829,8 @@ function openSpeelvenster() {
 function sluitSpeelvenster() {
   if (!app.svOpen) return;
   app.svOpen = false;
-  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); }
+  if (vsElement(document)) vsUit(document);
+  koppelSvVideo();                               // de camera onder het speelveld los
   $('speelvenster').classList.add('hidden');
   document.body.classList.remove('sv-open');
   $('ranglijst').insertBefore($('naamInvoer'), $('scoreLijst'));
@@ -2439,21 +2848,20 @@ function svMaat() {
   if (bw === svVak.b && bh === svVak.h && ar === svVak.ar) return;
   svVak.b = bw; svVak.h = bh; svVak.ar = ar;
   const m = pasVeld(bw, bh, ar);
-  // scherp op een telefoon, maar niet meer dan dubbel: dat kost alleen maar rekenwerk
-  const k = Math.min(2, window.devicePixelRatio || 1);
-  svCanvas.width = Math.round(m.w * k); svCanvas.height = Math.round(m.h * k);
+  // Scherp op een telefoon, maar niet meer dan dubbel: dat kost alleen maar rekenwerk. Op
+  // een trage computer (zie js/kwaliteit.js) niet extra scherp, en vanaf stand 2 met 70% van
+  // de pixels: dat is wat zachter, maar het blijft vlot.
+  const k = (kw.niveau >= 1 ? 1 : Math.min(2, window.devicePixelRatio || 1)) * (kw.niveau >= 2 ? 0.7 : 1);
+  svCanvas.width = Math.max(2, Math.round(m.w * k)); svCanvas.height = Math.max(2, Math.round(m.h * k));
   svCanvas.style.width = m.w + 'px'; svCanvas.style.height = m.h + 'px';
+  // de camera eronder precies even groot (zie koppelSvVideo)
+  svVideo.style.width = m.w + 'px'; svVideo.style.height = m.h + 'px';
 }
 
 function volledigScherm() {
-  if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); return; }
-  const el = $('speelvenster');
+  if (vsElement(document)) { vsUit(document); return; }
   const niet = () => status(t('Volledig scherm kan hier niet — in een ingesloten venster mag dat soms niet'), 'err');
-  if (!el.requestFullscreen) { niet(); return; }
-  try {
-    const p = el.requestFullscreen();
-    if (p && p.catch) p.catch(niet);
-  } catch { niet(); }
+  vsAan($('speelvenster')).catch(niet);
 }
 
 // ---- de demo
@@ -2512,17 +2920,28 @@ function demoObstakels() {
   return demoLijst;
 }
 
+/**
+ * Canvaspixels per CSS-pixel op canvas cv. Met object-fit: contain kan het beeld kleiner zijn
+ * dan het vak (zie fitWereld): dan telt de kant die vol is.
+ */
+function doekSchaal(cv) {
+  const r = cv.getBoundingClientRect();
+  return Math.max(cv.width / Math.max(1, r.width), cv.height / Math.max(1, r.height));
+}
+
 /** Hoeveel CSS-pixels één wereldeenheid is op canvas cv. */
 function pixPerEenheid(cv) {
-  return Math.max(0.05, cv.getBoundingClientRect().height / game.H);
+  return Math.max(0.05, cv.height / doekSchaal(cv) / game.H);
 }
 
 /** Plek in het speelveld (wereldcoördinaten) onder de muis of vinger, op canvas cv. */
 function veldVan(e, cv) {
   const r = cv.getBoundingClientRect();
-  const k = cv.width / Math.max(1, r.width);          // canvaspixels per CSS-pixel
+  const k = doekSchaal(cv);                            // canvaspixels per CSS-pixel
+  // een rand boven en onder (of links en rechts) als het beeld niet het hele vak vult
+  const ox = (r.width * k - cv.width) / 2, oy = (r.height * k - cv.height) / 2;
   const sc = cv.height / game.H;
-  return [((e.clientX - r.left) * k - (cv.width - game.W * sc) / 2) / sc, (e.clientY - r.top) * k / sc];
+  return [((e.clientX - r.left) * k - ox - (cv.width - game.W * sc) / 2) / sc, ((e.clientY - r.top) * k - oy) / sc];
 }
 
 /** Het kruisje van een briefje, binnen het veld gehouden (zo tekent tekenKruisjes het ook). */
@@ -2621,7 +3040,8 @@ svCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
 /** In de demo: een klein kruisje rechtsboven elk briefje, om het weg te halen. */
 function tekenKruisjes(ctx, w, h) {
   const sc = h / game.H, ox = (w - game.W * sc) / 2;
-  const hoog = ctx.canvas.clientHeight || h;
+  // zo hoog als het beeld op het scherm staat (met object-fit: contain soms lager dan het vak)
+  const cv = ctx.canvas, hoog = cv.clientHeight ? Math.min(cv.clientHeight, cv.clientWidth * cv.height / cv.width) : h;
   const r = kruisStraal(hoog / game.H) * sc, d = r * 0.42;
   ctx.save();
   ctx.lineCap = 'round';
@@ -2698,7 +3118,7 @@ document.querySelectorAll('#welkom .plekknop').forEach(k => {
     if (plek === 'demo') { demoStart(); return; }
     zetSpeelplek(plek);
     if (plek === 'scherm') schermStart();
-    else status(t('Klik op "Alles automatisch instellen"'));
+    else toonMuurStart();
   };
 });
 document.querySelectorAll('#plekSeg button').forEach(k => {
@@ -2707,8 +3127,8 @@ document.querySelectorAll('#plekSeg button').forEach(k => {
     const plek = k.dataset.plek;
     if (app.busy || plek === app.speelplek) return;
     zetSpeelplek(plek);
-    status(plek === 'demo' ? t('Klik op "Speel de demo"') : plek === 'scherm' ? t('Klik op "Start op dit scherm"')
-      : t('Klik op "Alles automatisch instellen"'));
+    if (plek === 'muur') toonMuurStart();
+    else status(plek === 'demo' ? t('Klik op "Speel de demo"') : t('Klik op "Start op dit scherm"'));
   };
 });
 // Vanuit de demo meteen echt spelen: op een scherm blijft het speelscherm open.
@@ -2717,7 +3137,7 @@ document.querySelectorAll('.sv-cta button').forEach(k => {
     if (k.dataset.plek === 'scherm') { schermStart(); return; }
     sluitSpeelvenster();
     zetSpeelplek('muur');
-    status(t('Klik op "Alles automatisch instellen"'));
+    toonMuurStart();
   };
 });
 $('btnDemo').onclick = demoStart;
@@ -2744,7 +3164,7 @@ document.querySelectorAll('#svPalet button').forEach(k => {
   };
 });
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && app.svOpen && !document.fullscreenElement) sluitSpeelvenster();
+  if (e.key === 'Escape' && app.svOpen && !vsElement(document)) sluitSpeelvenster();
 });
 
 // ---------------------------------------------------------------- taal (NL | EN)
@@ -2761,7 +3181,18 @@ function toonTaalKnoppen() {
 /** Het losse bestand (file://) vraagt bij elke start om de camera: dat zegt de hint bovenaan. */
 function toonLosHint() {
   if (location.protocol !== 'file:') return;
-  $('wizHint').textContent = t('Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.');
+  // start.bat bestaat alleen op Windows; elders onthoudt de online versie het
+  $('wizHint').textContent = BESTURING === 'windows'
+    ? t('Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.')
+    : t('Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, speel dan online (noaquim.github.io/sticky-clash) of start via start.command of start.sh.');
+}
+
+/** Bij "Belichting vastzetten": kan deze camera dat niet, dan zeggen we dat (zie startCamera). */
+function toonVastzetHint() {
+  $('lockExp').disabled = !app.kanVastzetten;
+  $('lockExpHint').textContent = app.kanVastzetten
+    ? t('Op sommige camera\'s wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.')
+    : t('Deze camera of browser kan de belichting niet vastzetten.');
 }
 
 /**
@@ -2780,6 +3211,9 @@ function nieuweTaal() {
   toonCamReden();
   toonModeHint();
   toonLosHint();
+  toonSchermenHint();
+  toonVastzetHint();
+  toonFps();
   renderClasses();
   updateCal();
   updateTips();
@@ -2821,13 +3255,11 @@ applySpel();
 game.reset();
 game.time = +$('roundLen').value;
 fillDevices();
-// Chromium herkennen. userAgentData bestaat alleen daar, maar ook alleen in een
-// beveiligde omgeving — dus de gewone browserstring als reserve.
-const chromium = !!navigator.userAgentData || /Chrome\/|Edg\//.test(navigator.userAgent);
 toonStartStatus();
 bekijkCamera();
 vraagCameraStand();
 toonLosHint();
+toonSchermenHint();
 loadScreens(false);
 startApp();
 vision.insideFn = inProjection;
@@ -2842,8 +3274,16 @@ opTaal(nieuweTaal);
 // Na het kiezen de knop weer loslaten: anders drukt spatie daarna die knop in, in plaats
 // van de ronde te starten.
 document.querySelectorAll('#taalKeuze button').forEach(b => { b.onclick = () => { zetTaal(b.dataset.taal); b.blur(); }; });
-requestAnimationFrame(frame);
+pasKwaliteitToe(false);
+volgendBeeld();
 
-// handig bij het afstellen: in de console beschikbaar als window.sc
+// handig bij het afstellen: in de console beschikbaar als window.sc. sc.prestatie: hoe vlot
+// het loopt; sc.kwaliteit.vast(0) zet de wacht voor trage computers vast op alles.
 window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon,
-  zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster };
+  zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster,
+  kwaliteit: kw, prestatie };
+
+// Helemaal opgestart. Het kleine script bovenin index.html kijkt hiernaar: staat dit er na
+// het laden niet, dan kon deze browser het spel niet draaien, en zegt het dat (in plaats van
+// een pagina waarop niets werkt). Moet de allerlaatste regel blijven.
+window.scGestart = true;

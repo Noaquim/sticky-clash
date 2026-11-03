@@ -10,10 +10,11 @@ steer them into the bin with real objects.
 Runs entirely in the browser. Nothing to install, no libraries.
 
 **Play online right away: https://noaquim.github.io/sticky-clash/** — open the link in
-Chrome or Edge, allow the camera, done. Nothing to download or install. No projector, or
-not even a camera? That works too, see below. Rather play without internet? Download
-`sticky-clash.html` (the whole game in one file) or the whole folder via
-*Code → Download ZIP*.
+any recent browser (Chrome, Edge, Firefox or Safari), allow the camera, done. Nothing to
+download or install. No projector, or not even a camera? That works too, see below.
+Rather play without internet? Download `sticky-clash.html`, the whole game in one file
+(in the online game: *Download the game as a single file* at the bottom of the panel), or
+the whole folder via *Code → Download ZIP*.
 
 ![Balls bouncing off paper notes on a wall towards the bin](docs/demo.gif)
 
@@ -132,19 +133,20 @@ USB stick or email it; it works on its own.
 | computer | how to start |
 |---|---|
 | **Windows** | double-click `sticky-clash.html`, or the **Sticky Clash** shortcut on the desktop |
-| **Mac** | open `sticky-clash.html` with Chrome (right-click → Open With → Google Chrome) |
-| **Linux** | open `sticky-clash.html` with Chrome or Chromium, or run `./start.sh` |
-| **Chromebook** | open `sticky-clash.html` from the Files app |
+| **Mac** | double-click `sticky-clash.html` (or right-click → Open With → Chrome, Firefox or Safari) |
+| **Linux** | open `sticky-clash.html` in your browser, or in a terminal: `sh start.sh` |
+| **Chromebook** | open `sticky-clash.html` from the Files app, or play online and install it |
+| **iPad / tablet** | play online: *Screen* or *Demo* |
 
-Use **Chrome or Edge**. It hasn't been tested in Safari or Firefox; the game tells you
-if you're using a different browser.
+It works in **Chrome, Edge, Firefox and Safari**. See [Every computer](#every-computer)
+for the small differences, and for what to do when something blocks.
 
 **One difference**: when you start from the single file, the browser asks for the camera
 again *every* time — just click Allow. If you want it to remember, start through a small
 local server. On Windows that's what `start.bat` (and the shortcut) is for; it picks the
 best way by itself:
 
-1. **Node.js** installed → `node serve.mjs`
+1. **Node.js** 16 or newer installed → `node serve.mjs`
 2. otherwise **PowerShell** (on every Windows computer) → `serve.ps1`, no install and no
    admin rights needed
 3. if that isn't allowed either, as on some school computers → just the single file
@@ -154,8 +156,10 @@ address, and you'd lose your calibration and camera permission. If the game is a
 running, they just open the page; if another program is using 8123, they open the single
 file.
 
-On a Mac or Linux, `start.command` / `start.sh` does the same (using Node.js if it's
-there). After copying, make it executable first: `chmod +x start.command`.
+On a Mac or Linux, `start.command` / `start.sh` does the same (with Node.js 16 or newer;
+on Linux also with Python 3). If double-clicking doesn't start it, type `sh start.command`
+or `sh start.sh` in a terminal: that always works, even if the file isn't executable.
+(Node.js older than 16, as on Ubuntu 22.04? The scripts skip it and use the next way.)
 
 To recreate the desktop shortcut (for example after moving the folder, or on another
 Windows computer):
@@ -186,14 +190,35 @@ it next to or on top of the projector, pointed at the wall.
 
 ### Projector as a second screen
 
-Click **More settings → Projector → Detect projector screen** once and allow it. From
-then on, the projector window opens on the projector by itself — even if the projector is
-your main screen. After that, one click in that window for full screen; no website is
-allowed to go full screen without a click. Until you've done that, a small line at the
-bottom of the projected image says "Click once in this window for full screen" — but
-only when nobody is playing, and as part of the image itself, so the camera doesn't
-mistake it for an object. The game notices when the projected area has changed and then
-recalibrates itself.
+First set the projector to **extend** your desktop, not to duplicate it (otherwise the
+panel ends up on the wall). Windows: <kbd>Win</kbd>+<kbd>P</kbd> → *Extend*. Mac: *System
+Settings → Displays*, use it as an extended display. Chromebook: *Settings → Displays*,
+untick *Mirror built-in display*. Linux: *Settings → Displays → Join displays*.
+
+**Chrome and Edge** can put the projector window on the projector by themselves: click
+**More settings → Projector → Detect projector screen** once and allow it. From then on,
+the projector window opens on the projector by itself — even if the projector is your
+main screen.
+
+**Firefox and Safari** (and Chrome until you've allowed that) don't know where the
+projector is. Then *Set up everything automatically* opens the projector window on your
+laptop screen and waits; the window itself says *Drag this window to the projector*. Drag
+it there (Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>, Chromebook:
+<kbd>Search</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
+<kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>) and click in it, or press <kbd>F</kbd>,
+for full screen: the setup then carries on by itself. Already in the right place? Click
+**Continue** in the panel. (On Linux with Wayland, Ubuntu's default, no browser may place
+its own windows, so there you always drag it.)
+
+No website is allowed to go full screen without a click, so: one click in the projector
+window. Until you've done that, a small line at the bottom of the projected image says
+"Click once in this window for full screen" — but only when nobody is playing, and as
+part of the image itself, so the camera doesn't mistake it for an object. The game
+notices when the projected area has changed (full screen, dragged to another screen) and
+then recalibrates itself and relearns the wall.
+
+While the projector window or the play screen is open, the game asks the computer to keep
+the screen awake, so the laptop and the projector don't go dark in the middle of a round.
 
 ### Installing as an app
 
@@ -202,7 +227,9 @@ Sticky Clash as a program of its own, with its own window and an icon in the Sta
 
 - **Installing:** in Chrome or Edge, click the install icon at the right of the address
   bar, or the **Install as app** button at the top of the panel. That button only appears
-  when the browser says it can be done.
+  when the browser says it can be done. In **Safari**: on a Mac *File → Add to Dock*, on an
+  iPad or iPhone *Share → Add to Home Screen* (the panel says so too). **Firefox** can't
+  install web apps, but after one visit online the game starts there without internet too.
 - **Without internet:** after that, the game also starts offline — the browser keeps a
   copy of all the files. When you're online, it always fetches the newest version first:
   an update on GitHub, or your own change after F5, shows up right away. Installed through
@@ -267,6 +294,41 @@ Changing a text:
   in the console, in `js/app.js`.
 
 After that, as with any change: rebuild `sticky-clash.html`.
+
+## Every computer
+
+Sticky Clash is plain HTML and JavaScript without libraries, so it runs in every recent
+browser: Chrome, Edge, Brave, Opera and Vivaldi on Windows, Mac, Linux and Chromebook,
+Firefox (also the ESR versions schools use), and Safari on a Mac, iPad and iPhone. Older
+ones work too, roughly from Chrome 66, Firefox 78 and Safari 13. A browser that really is
+too old shows *This browser is too old* instead of a page where nothing works.
+
+| | easiest | if something blocks |
+|---|---|---|
+| **Windows** | unzip (right-click → *Extract All*), double-click `sticky-clash.html`; or `start.bat`, which remembers the camera | *Smart App Control blocked …* or *Windows protected your PC*: right-click the **zip** → *Properties* → tick *Unblock* → OK, and unzip again. Never start from inside the zip. |
+| **Mac** | double-click `sticky-clash.html`, or play online (Safari: *File → Add to Dock*) | `start.command` refused (*Apple could not verify …*): skip it, or *System Settings → Privacy & Security → Open Anyway*, or in Terminal: `sh start.command` |
+| **Linux** | open `sticky-clash.html` in your browser, or in a terminal: `sh start.sh` (Node.js 16+ or Python 3) | double-clicking opens the script in an editor: use `sh start.sh` |
+| **Chromebook** | play online and install it, or open `sticky-clash.html` from the Files app | a school Chromebook blocks files: play online |
+| **School or work PC** | double-click `sticky-clash.html`, or play online | scripts or PowerShell blocked: you don't need them. Camera blocked by the administrator: play the demo. |
+| **iPad / Android tablet** | play online: *Screen* or *Demo* | *Wall + projector* needs a laptop or computer: a tablet opens the projector window as a tab |
+
+**Firefox and Safari** play everything. The differences: they don't know where the
+projector is (drag the projector window there yourself, see
+[Projector as a second screen](#projector-as-a-second-screen)), Firefox has no *Install as
+app* button, and *Lock exposure* is greyed out where the browser or camera can't do it.
+
+**Camera blocked by the computer itself** (the game tells you): Windows: *Settings →
+Privacy & security → Camera*, allow desktop apps. Mac: *System Settings → Privacy &
+Security → Camera*, switch on your browser.
+
+**A slow or old computer?** The game notices by itself when drawing takes too long, and
+then draws a little simpler: no glow around the balls and fewer confetti (*lite 1*), a
+smaller play field (*lite 2*), and recognition at most 15 times a second (*lite 3*). A
+camera started after that starts smaller. The game itself doesn't change, nor does what
+counts as an object, and the round clock always runs at real speed, even at 7 frames a
+second. Top right shows the frames per second, how long recognition takes (*detection …
+ms*) and the *lite* level. On a normal computer nothing changes at all. Want to test with
+full quality? Add `?kwaliteit=vol` to the address.
 
 ## Dark room: the projector lights the wall
 
@@ -572,6 +634,8 @@ node test/telefoon.mjs      # phone control: messages, sending sparingly, QR cod
 node test/taal.mjs          # English version: everything translated, no Dutch outside t(), telefoon.html
 node test/gids.mjs          # CUSTOMIZE.txt and ZELF AANPASSEN.txt: every code snippet really is in that file
 node test/speelplek.mjs     # three ways to play: first-visit choice, demo layout (does it play?), notes, screen, embedded camera
+node test/kwaliteit.mjs     # slow computers: a normal one never changes, a slow one draws simpler and never runs in slow motion
+node test/apparaat.mjs      # every computer: full screen in old Safari, iPad and tablets, operating system, "browser too old"
 ```
 
 The tests talk Dutch: "alles goed" at the end means "all good". `bench.mjs` only

@@ -5,8 +5,10 @@
 # Gebruik: powershell -NoProfile -ExecutionPolicy Bypass -File serve.ps1
 # (start.bat doet dat vanzelf als Node.js ontbreekt)
 
-param([string]$Root = $PSScriptRoot, [int]$Port = 8123, [switch]$NoBrowser)
+param([string]$Root = '', [int]$Port = 8123, [switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
+# De map van dit script. ($PSScriptRoot kent PowerShell 2.0 op Windows 7 alleen in modules.)
+if (-not $Root) { $Root = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Root = [System.IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
 $url = "http://localhost:$Port/"
 $los = Join-Path $Root 'sticky-clash.html'
@@ -27,8 +29,11 @@ try { $l.Start() } catch {
   # kalibratie en cameratoestemming weg.
   # Beide adressen proberen: 'localhost' gaat in .NET eerst naar IPv6, terwijl de
   # Node-server alleen op IPv4 (127.0.0.1) luistert.
+  # (Invoke-WebRequest bestaat pas vanaf PowerShell 3.)
   $onsSpel = $false
+  $kanVragen = [bool](Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue)
   foreach ($probe in @("http://127.0.0.1:$Port/", $url)) {
+    if (-not $kanVragen) { break }
     try {
       $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 $probe
       if ($r.Content -match '<title>Sticky Clash') { $onsSpel = $true; break }
@@ -36,9 +41,11 @@ try { $l.Start() } catch {
   }
   if ($onsSpel) {
     Write-Host 'Sticky Clash draait al - ik open alleen de pagina.'
+    Write-Host 'Sticky Clash is already running - just opening the page.'
     if (-not $NoBrowser) { Start-Process $url }
   } else {
     Write-Host "Poort $Port is bezet door een ander programma - ik open de losse versie."
+    Write-Host "Port $Port is used by another program - opening the single-file version."
     if (-not $NoBrowser) { Start-Process $los }
   }
   exit 0
@@ -46,9 +53,10 @@ try { $l.Start() } catch {
 
 Write-Host ''
 Write-Host "  Sticky Clash draait op $url"
+Write-Host "  Sticky Clash is running at $url"
 Write-Host ''
-Write-Host '  Laat dit venster open zolang je speelt.'
-Write-Host '  Sluiten stopt de server.'
+Write-Host '  Laat dit venster open zolang je speelt. Sluiten stopt de server.'
+Write-Host '  Keep this window open while you play. Closing it stops the server.'
 Write-Host ''
 if (-not $NoBrowser) { Start-Process $url }
 

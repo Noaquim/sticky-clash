@@ -37,6 +37,8 @@ WHAT IS WHERE
   js/telefoon.js        your phone as a remote control; it opens telefoon.html
   js/qr.js              the QR code you scan with your phone
   js/app.js             installing as an app
+  js/apparaat.js        what this computer and browser can do (full screen, iPad, tips)
+  js/kwaliteit.js       slow computers: the game then draws a little simpler by itself
   js/taal.js            the NL | EN language choice
   js/taal-en.js         all English texts (see CHANGING TEXTS)
   css/style.css         how the panel looks

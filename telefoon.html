@@ -26,6 +26,7 @@ html,body{margin:0; background:var(--bg); color:var(--ink)}
 body{
   font:16px/1.4 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; -webkit-text-size-adjust:100%;
   display:flex; flex-direction:column; min-height:100vh; min-height:100dvh;
+  padding:0 16px;                     /* voor een browser die env() niet kent: die slaat de regel hieronder over */
   padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
 }
 header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0 6px}
@@ -34,7 +35,8 @@ h1 em{font-style:normal; color:var(--acc)}
 .pil{font-size:12px; padding:4px 10px; border-radius:99px; background:#1d2029; color:var(--dim); text-align:right}
 .pil.ok{background:#16301f; color:var(--ok)}
 .pil.fout{background:#3a1c1c; color:#ffab8f}
-main{flex:1; display:flex; flex-direction:column; gap:14px; width:100%; max-width:520px; margin:0 auto}
+/* grid en niet flex: gap in een flex-kolom kennen oudere telefoons (iOS 12 tot 14.4) niet */
+main{flex:1; display:grid; align-content:start; gap:14px; width:100%; max-width:520px; margin:0 auto}
 .fase{font-size:30px; font-weight:800; text-align:center; margin:14px 0 0}
 .sub{text-align:center; color:var(--dim); margin:-6px 0 0; min-height:1.4em}
 .cijfers{display:grid; grid-template-columns:1fr 1fr; gap:10px}
@@ -43,7 +45,7 @@ main{flex:1; display:flex; flex-direction:column; gap:14px; width:100%; max-widt
 .cijfer b{display:block; font-size:40px; line-height:1.2; font-weight:800; font-variant-numeric:tabular-nums}
 .cijfer b.klein{font-size:16px; line-height:3; font-weight:600; color:var(--dim)}
 .melding{min-height:1.4em; text-align:center; color:#ffd479; margin:0}
-.knoppen{display:flex; flex-direction:column; gap:12px}
+.knoppen{display:grid; gap:12px}
 button{
   font:inherit; font-size:20px; font-weight:700; padding:20px; border-radius:14px;
   border:1px solid var(--line); background:#1d2029; color:var(--ink); touch-action:manipulation;
@@ -51,7 +53,7 @@ button{
 button.hoofd{background:var(--acc); border-color:var(--acc); color:#1a1000}
 button:disabled{opacity:.4}
 .verborgen{display:none !important}
-form{display:flex; flex-direction:column; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
+form{display:grid; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
 form label{font-weight:600}
 input{font:inherit; font-size:20px; padding:14px; border-radius:10px; border:1px solid var(--line); background:#1d2029; color:var(--ink); width:100%}
 footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
@@ -165,6 +167,10 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
     '{n} punt — dat haalt de ranglijst! Hoe heet je?': "{n} point — that makes the leaderboard! What's your name?",
     '{n} punten — dat haalt de ranglijst! Hoe heet je?': "{n} points — that makes the leaderboard! What's your name?",
     'Level {n} — dat haalt de ranglijst! Hoe heet je?': "Level {n} — that makes the leaderboard! What's your name?",
+    // het noodscript onderaan (als dit script niet kan draaien); daar staan ze ook
+    'Deze browser is te oud': 'This browser is too old',
+    'Werk je telefoon of browser bij, of bedien het spel gewoon op de laptop.': 'Update your phone or browser, or just use the controls on the laptop.',
+    'Te oud': 'Too old',
   };
   const ENGELS = !/^nl/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
   const NAAR_EN = new Map(Object.entries(EN));
@@ -503,6 +509,8 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
   // Nieuwe code gescand terwijl deze pagina nog openstond: dan verandert alleen het stuk
   // na de #, en laadt de browser niets opnieuw. Dan doen we dat zelf.
   window.addEventListener('hashchange', () => location.reload());
+  // Tot hier is het gelukt: het noodscript onderaan hoeft niets te zeggen.
+  window.scTelGestart = true;
 
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(kamer)) {
     weg = true;                                      // nergens mee verbinden, ook niet later
@@ -514,6 +522,26 @@ footer{font-size:12px; color:var(--dim); text-align:center; padding:18px 0}
   toon();
   verbind();
   setInterval(tik, 250);
+})();
+</script>
+<script>
+/* Kon het script hierboven niet draaien (een te oude telefoon of browser)? Dan dat zeggen, in
+   plaats van eeuwig "Even verbinden…". Bewust ouderwets JavaScript (geen let, const of
+   pijlen): dit moet juist daar werken. Het script hierboven zet window.scTelGestart zodra het
+   opgestart is. Dezelfde teksten staan ook in zijn woordenboek EN. */
+(function () {
+  if (window.scTelGestart) return;
+  var engels = !/^nl/i.test((navigator.languages && navigator.languages[0]) || navigator.language || navigator.userLanguage || '');
+  var EN_NOOD = {
+    'Deze browser is te oud': 'This browser is too old',
+    'Werk je telefoon of browser bij, of bedien het spel gewoon op de laptop.': 'Update your phone or browser, or just use the controls on the laptop.',
+    'Te oud': 'Too old'
+  };
+  function t(nl) { return engels ? EN_NOOD[nl] || nl : nl; }
+  var d = document, f = d.getElementById('fase'), s = d.getElementById('sub'), v = d.getElementById('verbinding');
+  if (f) f.textContent = t('Deze browser is te oud');
+  if (s) s.textContent = t('Werk je telefoon of browser bij, of bedien het spel gewoon op de laptop.');
+  if (v) { v.textContent = t('Te oud'); v.className = 'pil fout'; }
 })();
 </script>
 </body>

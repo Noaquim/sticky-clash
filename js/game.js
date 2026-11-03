@@ -317,6 +317,16 @@ export class Game {
     // de kleur van de soort.
     this.onderlaag = null;
     this.papier = false;
+    // Zuinig tekenen op een trage computer (zie js/kwaliteit.js; main.js zet ze). gloed: de
+    // zachte gloed om ballen, bak en bron, en de sporen achter de ballen. maxDeeltjes: hoeveel
+    // confetti en vonken er tegelijk mogen zijn. Aan het spel zelf verandert niets.
+    this.gloed = true;
+    this.maxDeeltjes = FX_MAX_PARTS;
+  }
+
+  /** Gloed (shadowBlur) tekenen? Niet als het licht op de muur zuinig moet, en niet op een trage computer. */
+  metGloed() {
+    return this.gloed && !this.lowLight;
   }
 
   setAspect(ar) {
@@ -730,18 +740,15 @@ export class Game {
   }
 
   /**
-   * Een deeltje uit de voorraad; de aanroeper zet alle velden. Is de voorraad op, dan
+   * Een deeltje uit de voorraad; de aanroeper zet alle velden. Zijn er al maxDeeltjes, dan
    * wordt steeds een ander levend deeltje hergebruikt: nooit meer dan FX_MAX_PARTS.
    */
   part() {
-    let p = this.partPool.pop();
-    if (!p) {
-      if (this.parts.length >= FX_MAX_PARTS) {
-        this.partSteal = (this.partSteal + 1) % this.parts.length;
-        return this.parts[this.partSteal];
-      }
-      p = fxDeeltje();
+    if (this.parts.length >= this.maxDeeltjes) {
+      this.partSteal = (this.partSteal + 1) % this.parts.length;
+      return this.parts[this.partSteal];
     }
+    const p = this.partPool.pop() || fxDeeltje();
     this.parts.push(p);
     return p;
   }
@@ -810,7 +817,7 @@ export class Game {
     b.spark -= dt;
     if (b.spark > 0) return;
     b.spark = this.lowLight ? 0.09 : 0.04;
-    if (this.parts.length > FX_MAX_PARTS * 0.8) return;
+    if (this.parts.length > this.maxDeeltjes * 0.8) return;
     const p = this.part();
     p.x = b.x + (this.fx() - 0.5) * b.r; p.y = b.y + (this.fx() - 0.5) * b.r;
     p.vx = (this.fx() - 0.5) * 70 - b.vx * 0.06; p.vy = (this.fx() - 0.5) * 70 - b.vy * 0.06;
@@ -1277,7 +1284,7 @@ export class Game {
         ctx.lineWidth = 3;                 // geen gloed: die valt op het voorwerp zelf
       } else {
         ctx.lineWidth = 4;
-        ctx.shadowColor = col; ctx.shadowBlur = 22;
+        if (this.gloed) { ctx.shadowColor = col; ctx.shadowBlur = 22; }
       }
       // Een stukje naar buiten, zodat het licht naast het voorwerp valt en niet
       // erop. De vorm die de ballen raken blijft precies de gemeten vorm.
@@ -1369,7 +1376,7 @@ export class Game {
       const spot = this.labelSpot(boxes, i, text.length * 22 + 8, 34);
       if (!spot) continue;                 // nergens plek: liever geen label dan licht op een briefje
       ctx.fillStyle = sty.col;
-      if (!this.lowLight) { ctx.shadowColor = sty.col; ctx.shadowBlur = 12; }
+      if (this.metGloed()) { ctx.shadowColor = sty.col; ctx.shadowBlur = 12; }
       ctx.fillText(text, spot[0], spot[1]);
       ctx.shadowBlur = 0;
     }
@@ -1410,7 +1417,7 @@ export class Game {
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#ffd479';
     ctx.font = '800 36px ui-sans-serif, system-ui, sans-serif';
-    if (!this.lowLight) { ctx.shadowColor = '#ffd479'; ctx.shadowBlur = 14; }
+    if (this.metGloed()) { ctx.shadowColor = '#ffd479'; ctx.shadowBlur = 14; }
     ctx.fillText('+' + bn.pts, bn.x, bn.y - bn.r * 0.55 - 14);
     ctx.shadowBlur = 0;
     ctx.restore();
@@ -1432,7 +1439,7 @@ export class Game {
       ctx.beginPath(); ctx.arc(0, 0, g.r, 0, 7); ctx.fill();
     }
     ctx.strokeStyle = col;
-    if (!this.lowLight) { ctx.shadowColor = col; ctx.shadowBlur = 26; }
+    if (this.metGloed()) { ctx.shadowColor = col; ctx.shadowBlur = 26; }
     ctx.lineWidth = lw;
     // De kom: de onderste boog. Met "true" werd de bovenste boog getekend, een koepel.
     ctx.beginPath(); ctx.arc(0, 0, g.r * 0.62, Math.PI * 0.08, Math.PI * 0.92, false); ctx.stroke();
@@ -1477,7 +1484,7 @@ export class Game {
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.strokeStyle = '#ff4fa3';
-    if (!this.lowLight) { ctx.shadowColor = '#ff4fa3'; ctx.shadowBlur = 20; }
+    if (this.metGloed()) { ctx.shadowColor = '#ff4fa3'; ctx.shadowBlur = 20; }
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(-34, -14); ctx.lineTo(-16, 16); ctx.lineTo(16, 16); ctx.lineTo(34, -14);
@@ -1488,7 +1495,7 @@ export class Game {
 
   drawBalls(ctx) {
     for (const b of this.balls) {
-      if (b.trail.length > 3) {
+      if (this.gloed && b.trail.length > 3) {
         ctx.strokeStyle = b.gold ? 'rgba(255,212,121,.22)' : 'rgba(255,255,255,.16)';
         ctx.lineWidth = b.r * 1.1;
         ctx.lineCap = 'round';
@@ -1498,7 +1505,7 @@ export class Game {
         ctx.stroke();
       }
       ctx.fillStyle = b.gold ? '#ffd479' : '#fff';
-      if (!this.lowLight) { ctx.shadowColor = b.gold ? '#ffd479' : '#cfe6ff'; ctx.shadowBlur = b.gold ? 24 : 18; }
+      if (this.metGloed()) { ctx.shadowColor = b.gold ? '#ffd479' : '#cfe6ff'; ctx.shadowBlur = b.gold ? 24 : 18; }
       ctx.globalAlpha = b.fade == null ? 1 : Math.max(0, b.fade / 0.35);
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
       ctx.shadowBlur = 0;

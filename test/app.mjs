@@ -63,7 +63,9 @@ const swBron = lees('sw.js');
 /** Draait sw.js in een nagebootste browser: eigen netwerk, eigen opslag. */
 function maakSw(bestanden) {
   const BASIS = 'https://voorbeeld.nl/sticky-clash/';
-  const net = { offline: false, bestanden, gevraagd: [] };
+  // traag: een belofte waar het netwerk eerst op wacht (een trage verbinding); klokken: de
+  // wekkers van sw.js (setTimeout), die de test zelf laat aflopen met netKlok()
+  const net = { offline: false, bestanden, gevraagd: [], traag: null, klokken: [] };
   // een antwoord van de eigen site, met de caching van GitHub Pages
   class Antwoord extends Response {
     constructor(tekst, status = 200) { super(tekst, { status, headers: { 'Cache-Control': 'max-age=600' } }); }
@@ -74,6 +76,7 @@ function maakSw(bestanden) {
   }
   const fetch = async (req, init = {}) => {
     net.gevraagd.push({ url: req.url, cache: init.cache || req.cache });
+    if (net.traag) await net.traag;
     if (net.offline) throw new TypeError('Failed to fetch');
     const rel = req.url.slice(BASIS.length).split('?')[0] || './';
     return net.bestanden.has(rel) ? new Antwoord(net.bestanden.get(rel)) : new Antwoord('niet gevonden', 404);
@@ -105,14 +108,19 @@ function maakSw(bestanden) {
     skipWaiting: async () => { self.overgeslagen = true; },
     clients: { claim: async () => { self.geclaimd = true; } },
   };
-  const ctx = vm.createContext({ self, caches, fetch, Request: Verzoek, Response, Headers, URL, console });
+  const setTimeout = (fn, ms) => net.klokken.push({ fn, ms, weg: false });
+  const clearTimeout = (id) => { if (net.klokken[id - 1]) net.klokken[id - 1].weg = true; };
+  const ctx = vm.createContext({ self, caches, fetch, Request: Verzoek, Response, Headers, URL, console, setTimeout, clearTimeout });
   const vars = vm.runInContext(swBron + '\n;({ VERSIE, NODIG, MISSCHIEN })', ctx);
+  /** Laat alle wekkers van sw.js aflopen die nog lopen. */
+  const netKlok = () => { for (const k of net.klokken) if (!k.weg) { k.weg = true; k.fn(); } };
   /** Een gebeurtenis afvuren zoals de browser dat doet; wacht op alles wat hij belooft. */
-  async function vuur(type, extra = {}) {
+  async function vuur(type, extra = {}, tussendoor = null) {
     const wacht = [];
     let antwoord;
     const e = { ...extra, waitUntil: (p) => wacht.push(p), respondWith: (p) => { antwoord = p; } };
     luisteraars[type](e);
+    if (tussendoor) await tussendoor();             // bijvoorbeeld: de tijd laten verstrijken
     let res, fout = null;
     try { res = await antwoord; } catch (f) { fout = f; }
     try { await Promise.all(wacht); } catch (f) { fout = fout || f; }
@@ -120,7 +128,7 @@ function maakSw(bestanden) {
     return { beantwoord: antwoord !== undefined, res, tekst, fout };
   }
   const opvraag = (rel, o = {}) => ({ request: { url: new URL(rel, BASIS).href, method: 'GET', mode: 'cors', ...o } });
-  return { ...vars, net, caches, self, vuur, opvraag, BASIS };
+  return { ...vars, net, netKlok, caches, self, vuur, opvraag, BASIS };
 }
 
 // eerst de lijst zelf: alles wat het spel nodig heeft, en niets wat er niet is
@@ -132,6 +140,15 @@ const nodig = [...order, 'index.html', './', 'css/style.css', 'manifest.webmanif
 const mist = nodig.filter(f => !NODIG.includes(f));
 check('alle modules, css, pictogrammen en manifest in de lijst', mist.length === 0, mist.length ? mist.join(', ') + ' (zet in NODIG in sw.js)' : '');
 check('telefoon.html alleen als optioneel', MISSCHIEN.includes('telefoon.html') && !NODIG.includes('telefoon.html'));
+// index.html haalt alle modules tegelijk op (op een trage verbinding scheelt dat seconden),
+// maar het losse bestand heeft er niets aan: dat staat tussen los:weg
+{
+  const vooraf = [...index.matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map(m => m[1]);
+  const mistVooraf = order.filter(f => !vooraf.includes(f));
+  check('index.html haalt alle modules tegelijk op (modulepreload)', mistVooraf.length === 0 && vooraf.length === order.length,
+    mistVooraf.length ? mistVooraf.join(', ') + ' (zet een <link rel="modulepreload"> in index.html)' : vooraf.length + ' modules');
+  check('  niet in het losse bestand', !los.includes('modulepreload'));
+}
 
 // installeren, ook als een optioneel bestand ontbreekt
 const bestanden = new Map(NODIG.map(f => [f, 'versie 1 van ' + f]));
@@ -140,7 +157,7 @@ const inst = await sw.vuur('install');
 const c = await sw.caches.open(sw.VERSIE);
 check('installeren lukt zonder telefoon.html', !inst.fout && sw.self.overgeslagen === true);
 check('alles opgeslagen', NODIG.every(f => c.urls().includes(new URL(f, sw.BASIS).href)), c.urls().length + ' bestanden');
-check('rechtstreeks van de server (cache: reload)', sw.net.gevraagd.every(g => g.cache === 'reload'));
+check('bij de server nagevraagd (cache: no-cache), niet alles opnieuw', sw.net.gevraagd.every(g => g.cache === 'no-cache'));
 const opgeslagen = await c.match('js/game.js');
 check('opgeslagen met "altijd navragen"', opgeslagen && opgeslagen.headers.get('Cache-Control') === 'no-cache' &&
   (await opgeslagen.text()) === 'versie 1 van js/game.js');
@@ -194,6 +211,27 @@ r = await sw.vuur('fetch', sw.opvraag('index.html?x=1', { mode: 'navigate' }));
 check('  en andersom', r.tekst === 'versie 3 van index.html');
 sw.net.offline = false;
 
+// een heel trage verbinding (school-wifi, 3G): toch wachten op het netwerk. Eerst de kopie
+// pakken als één bestand traag was, gaf net na een nieuwe versie een mengsel van oude en
+// nieuwe bestanden (een nieuwe main.js bij een oude kwaliteit.js), en dan startte het spel niet.
+{
+  const tijd = (ms) => new Promise((klaar) => setTimeout(klaar, ms));
+  bestanden.set('js/game.js', 'versie 3');
+  let los;
+  sw.net.traag = new Promise((k) => { los = k; });
+  sw.net.klokken.length = 0;
+  r = await sw.vuur('fetch', sw.opvraag('js/game.js'), async () => {
+    await tijd(5);
+    sw.netKlok();                                  // de tijd laten verstrijken
+    await tijd(5);
+    sw.net.traag = null; los();
+  });
+  check('trage verbinding: toch de nieuwe versie, nooit oud en nieuw door elkaar', r.tekst === 'versie 3', r.tekst);
+  check('  geen wekker die naar de oude kopie grijpt', sw.net.klokken.length === 0);
+  const nu = await (await sw.caches.open(sw.VERSIE)).match('js/game.js');
+  check('  en de kopie is bijgewerkt', nu && (await nu.text()) === 'versie 3');
+}
+
 // andere sites (ntfy.sh) en versturen: daar blijft hij af
 sw.net.gevraagd.length = 0;
 r = await sw.vuur('fetch', { request: { url: 'https://ntfy.sh/iets', method: 'GET', mode: 'cors' } });
@@ -204,7 +242,7 @@ check('versturen (POST): niet aangeraakt', !r.beantwoord);
 // ---------------------------------------------------------------- js/app.js
 
 /** Draait de app.js-code in een nagebootste pagina op adres `adres`. */
-function pagina(code, adres, { standalone = false, geladen = true, sw = true } = {}) {
+function pagina(code, adres, { standalone = false, geladen = true, sw = true, manifest = true, opslag = true, ua = '', bip = false } = {}) {
   const aangemeld = [];
   const vak = { hidden: true };
   const klasse = (el) => ({
@@ -213,15 +251,27 @@ function pagina(code, adres, { standalone = false, geladen = true, sw = true } =
   });
   vak.classList = klasse(vak);
   const knop = { onclick: null };
+  const tip = { hidden: true };
+  tip.classList = klasse(tip);
   const win = new EventTarget();
+  if (bip) win.onbeforeinstallprompt = null;       // Chrome en Edge kennen die melding
   const nav = sw ? { serviceWorker: { register: (u) => { aangemeld.push(u); return Promise.resolve(); } } } : {};
+  nav.userAgent = ua;
+  if (!opslag) nav.cookieEnabled = false;
   const ctx = vm.createContext({
     window: win, navigator: nav, location: new URL(adres), console,
-    document: { readyState: geladen ? 'complete' : 'interactive', getElementById: (id) => ({ appInstall: vak, btnInstall: knop })[id] || null },
+    document: {
+      readyState: geladen ? 'complete' : 'interactive',
+      getElementById: (id) => ({ appInstall: vak, btnInstall: knop, appSafari: tip })[id] || null,
+      // het losse bestand heeft geen manifest
+      querySelector: (q) => (manifest && q === 'link[rel="manifest"]' ? {} : null),
+    },
     matchMedia: (q) => ({ matches: standalone && q.includes('standalone') }),
   });
-  const f = vm.runInContext(code + '\n;({ magOffline, startApp })', ctx);
-  return { ...f, aangemeld, vak, knop, win };
+  if (opslag) ctx.localStorage = { length: 0 };
+  else Object.defineProperty(ctx, 'localStorage', { get() { throw new Error('SecurityError: The operation is insecure.'); } });
+  const f = vm.runInContext(code + '\n;({ magOffline, startApp, safariAchtig })', ctx);
+  return { ...f, aangemeld, vak, knop, win, tip };
 }
 
 const appBron = lees('js/app.js');
@@ -246,6 +296,40 @@ for (const [naam, code] of [['bron', appBron.replace(/^export\s+/gm, '')], ['los
   const voor = h.aangemeld.length;
   h.win.dispatchEvent(new Event('load'));
   check(naam + ': localhost meldt sw.js aan, na het laden', voor === 0 && h.aangemeld.join() === 'sw.js');
+
+  const z = pagina(code, 'http://localhost:8123/sticky-clash.html', { manifest: false });
+  z.startApp();
+  check(naam + ': het losse bestand (geen manifest) meldt niets aan', z.aangemeld.length === 0);
+  const g = pagina(code, 'http://localhost:8123/', { opslag: false });
+  g.startApp();
+  check(naam + ': opslag geblokkeerd: niet eens proberen', g.aangemeld.length === 0);
+}
+
+// Safari: geen installeerknop, maar wel een tip (Deel → Zet op beginscherm, of Voeg toe aan Dock)
+{
+  const UA = {
+    mac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+    ipad: 'Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+    chrome: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    edge: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+    firefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0',
+  };
+  const code = appBron.replace(/^export\s+/gm, '');
+  const p = pagina(code, 'https://noaquim.github.io/sticky-clash/');
+  const sa = (ua) => p.safariAchtig({ userAgent: ua });
+  check('Safari herkend (Mac, iPad), Chrome, Edge en Firefox niet', sa(UA.mac) && sa(UA.ipad) && !sa(UA.chrome) && !sa(UA.edge) && !sa(UA.firefox));
+  const mac = pagina(code, 'https://noaquim.github.io/sticky-clash/', { ua: UA.mac });
+  mac.startApp();
+  check('  Safari: de tip hoe installeren daar gaat', mac.tip.hidden === false);
+  const chr = pagina(code, 'https://noaquim.github.io/sticky-clash/', { ua: UA.chrome, bip: true });
+  chr.startApp();
+  check('  Chrome: geen tip (die heeft de knop)', chr.tip.hidden === true);
+  const app = pagina(code, 'https://noaquim.github.io/sticky-clash/', { ua: UA.ipad, standalone: true });
+  app.startApp();
+  check('  al als app geopend: geen tip', app.tip.hidden === true);
+  const bestand = pagina(code, 'file:///C:/spel/sticky-clash.html', { ua: UA.mac, manifest: false });
+  bestand.startApp();
+  check('  het losse bestand: geen tip', bestand.tip.hidden === true);
 }
 
 // de installeerknop
@@ -271,7 +355,10 @@ check('als app geopend: geen knop', a.vak.hidden === true);
 
 // ---------------------------------------------------------------- het losse bestand
 
-check('los bestand: geen manifest', !/rel=["']manifest["']/.test(los) && !los.includes('manifest.webmanifest'));
+// (de code zelf mag er wel naar vragen: app.js kijkt zo of hij in het losse bestand zit)
+const losPagina = los.replace(/<script type="module">[\s\S]*?<\/script>/, '');
+check('los bestand: geen manifest', !/rel=["']manifest["']/.test(losPagina) && !los.includes('manifest.webmanifest'));
+check('los bestand: geen los pictogram voor het beginscherm', !/apple-touch-icon/.test(losPagina) && lees('index.html').includes('rel="apple-touch-icon"'));
 const aanmeldingen = los.match(/serviceWorker\.register\(/g) || [];
 check('los bestand: alleen de bewaakte aanmelding uit app.js', aanmeldingen.length === 1 && (deel || '').includes('serviceWorker.register('));
 check('los bestand is bijgewerkt', lees('sticky-clash.html') === los);

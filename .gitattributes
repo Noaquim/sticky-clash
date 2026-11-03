@@ -1,0 +1,10 @@
+# Regeleinden vastleggen. Git voor Windows zet bij het binnenhalen anders LF om in CRLF, en
+# dan werken start.sh en start.command niet meer op een Mac of Linux. De Windows-bestanden
+# (.bat, .ps1) blijven precies zoals ze zijn opgeslagen, met CRLF.
+start.sh text eol=lf
+start.command text eol=lf
+*.bat -text
+*.ps1 -text
+*.ico binary
+*.png binary
+*.gif binary

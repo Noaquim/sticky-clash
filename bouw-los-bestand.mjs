@@ -4,7 +4,8 @@
 // niet vanaf een dubbelgeklikt bestand (file://) — dat blokkeert hij uit veiligheid.
 // Een module die ín de pagina staat werkt wél, en de camera ook. Dus zetten we alle
 // code en de opmaak in één bestand. Dat kun je op een USB-stick zetten of mailen, en
-// het werkt op elke computer met Chrome of Edge, zonder iets te installeren.
+// het werkt op elke computer met een recente browser (Chrome, Edge, Firefox of Safari),
+// zonder iets te installeren.
 //
 // Draai na elke wijziging aan js/, css/ of index.html:   node bouw-los-bestand.mjs
 // test/losbestand.mjs controleert dat sticky-clash.html bij de broncode past.
@@ -56,6 +57,8 @@ export function bouw() {
   html = html.replace(/[ \t]*<link rel="icon" href="sticky-clash\.ico">\n?/, '');
   // installeren als app kan niet vanaf file://; de browser zou het manifest vergeefs zoeken
   html = html.replace(/[ \t]*<link rel="manifest" href="manifest\.webmanifest">\n?/, '');
+  // en geen los pictogram voor het beginscherm van een iPad: dat bestand reist niet mee
+  html = html.replace(/[ \t]*<link rel="apple-touch-icon" href="[^"]*">\n?/, '');
   const css = read('css/style.css').replace(/<\/style/gi, '<\\/style');
   const cssTag = /<link[^>]+href=["']css\/style\.css["'][^>]*>/;
   const jsTag = /<script\s+type=["']module["'][^>]*src=["']js\/main\.js["'][^>]*><\/script>/;

@@ -8,8 +8,11 @@
 // de opgeslagen kalibratie en de cameratoestemming weg. Is 8123 bezet, dan kijken we
 // wie daar zit: draait het spel er al, dan openen we alleen de pagina; is het iets
 // anders, dan openen we het losse bestand.
+//
+// Werkt vanaf Node.js 14.18 (start.bat, start.sh en start.command vragen 16 of nieuwer).
+// Elke melding staat er twee keer: in het Nederlands en in het Engels.
 
-import { createServer } from 'node:http';
+import { createServer, get } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -42,11 +45,30 @@ function openBrowser(target) {
     process.platform === 'win32' ? ['cmd', ['/c', 'start', '', target]] :
     process.platform === 'darwin' ? ['open', [target]] :
     ['xdg-open', [target]];
+  const zelf = () => console.log('  Open zelf / Open yourself: ' + target);
   try {
-    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
+    // Ontbreekt het programma (Linux zonder xdg-open), dan komt dat later als 'error'. Zonder
+    // luisteraar daarop viel de hele server om, net nadat hij gestart was.
+    const c = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+    c.on('error', zelf);
+    c.unref();
   } catch {
-    console.log('  Open zelf: ' + target);
+    zelf();
   }
+}
+
+/** De pagina op adres u, of '' als daar niets (op tijd) antwoordt. Zonder fetch: dat kent Node 16 niet. */
+function haalPagina(u) {
+  return new Promise((klaar) => {
+    const req = get(u, (res) => {
+      let tekst = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => { tekst += d; });
+      res.on('end', () => klaar(tekst));
+    });
+    req.setTimeout(1500, () => req.destroy());
+    req.on('error', () => klaar(''));
+  });
 }
 
 const server = createServer(async (req, res) => {
@@ -78,7 +100,7 @@ server.on('error', async (e) => {
   // EACCES krijg je op Windows als een andere server (bijvoorbeeld serve.ps1) de
   // poort via het systeem heeft gereserveerd: ook dat betekent "bezet".
   if (e.code !== 'EADDRINUSE' && e.code !== 'EACCES') {
-    console.error('Kon de server niet starten:', e.message);
+    console.error('Kon de server niet starten / Could not start the server:', e.message);
     openBrowser(pathToFileURL(join(ROOT, 'sticky-clash.html')).href);
     process.exit(1);
   }
@@ -86,16 +108,15 @@ server.on('error', async (e) => {
   // server alleen op IPv4 luistert, en serve.ps1 antwoordt juist alleen op "localhost".
   let onsSpel = false;
   for (const probe of ['http://127.0.0.1:' + PORT + '/', URL_HIER]) {
-    try {
-      const html = await (await fetch(probe, { signal: AbortSignal.timeout(1500) })).text();
-      if (/<title>Sticky Clash/.test(html)) { onsSpel = true; break; }
-    } catch { /* geen antwoord op dit adres */ }
+    if (/<title>Sticky Clash/.test(await haalPagina(probe))) { onsSpel = true; break; }
   }
   if (onsSpel) {
     console.log('Sticky Clash draait al — ik open alleen de pagina.');
+    console.log('Sticky Clash is already running — just opening the page.');
     openBrowser(URL_HIER);
   } else {
     console.log('Poort ' + PORT + ' is bezet door een ander programma — ik open de losse versie.');
+    console.log('Port ' + PORT + ' is used by another program — opening the single-file version.');
     openBrowser(pathToFileURL(join(ROOT, 'sticky-clash.html')).href);
   }
   setTimeout(() => process.exit(0), 800);
@@ -104,9 +125,10 @@ server.on('error', async (e) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log('');
   console.log('  Sticky Clash draait op ' + URL_HIER);
+  console.log('  Sticky Clash is running at ' + URL_HIER);
   console.log('');
-  console.log('  Laat dit venster open zolang je speelt.');
-  console.log('  Sluiten of Ctrl+C stopt de server.');
+  console.log('  Laat dit venster open zolang je speelt. Sluiten of Ctrl+C stopt de server.');
+  console.log('  Keep this window open while you play. Closing it or Ctrl+C stops the server.');
   console.log('');
   openBrowser(URL_HIER);
 });

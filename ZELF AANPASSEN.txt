@@ -37,6 +37,8 @@ WAT STAAT WAAR
   js/telefoon.js        je telefoon als afstandsbediening; die opent telefoon.html
   js/qr.js              de QR-code die je met je telefoon scant
   js/app.js             installeren als app
+  js/apparaat.js        wat deze computer en browser kunnen (volledig scherm, iPad, tips)
+  js/kwaliteit.js       trage computers: het spel tekent dan vanzelf wat eenvoudiger
   js/taal.js            de taalkeuze NL | EN
   js/taal-en.js         alle Engelse teksten (zie TEKSTEN VERANDEREN)
   css/style.css         hoe het paneel eruitziet

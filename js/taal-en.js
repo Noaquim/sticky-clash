@@ -23,7 +23,10 @@ export const TAAL_EN = {
   'Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.':
     'Sets up the projector, camera, calibration and wall in one go. Follow the instructions on the wall.',
   'Afbreken': 'Cancel',
+  'Verder': 'Continue',
   'Installeer als app': 'Install as app',
+  'Als app op je iPad of iPhone: Deel → Zet op beginscherm. Op een Mac in Safari: Archief → Voeg toe aan Dock. Daarna start het spel ook zonder internet.':
+    'As an app on your iPad or iPhone: Share → Add to Home Screen. On a Mac in Safari: File → Add to Dock. After that the game also starts without internet.',
   'Eigen venster en pictogram, en daarna start het spel ook zonder internet.': 'Its own window and icon, and after that the game also starts without internet.',
   'Speelmodus': 'Play mode',
   'Elk voorwerp': 'Any object',
@@ -85,6 +88,8 @@ export const TAAL_EN = {
   'Sluiten': 'Close',
   'Beamerscherm herkennen': 'Detect projector screen',
   'Eén keer toestaan, daarna opent het beamervenster voortaan vanzelf op de beamer.': 'Allow it once, and from then on the projector window opens on the projector by itself.',
+  'Zet de beamer als tweede scherm op uitbreiden, niet op dupliceren. Windows: Win+P → Uitbreiden. Mac: Systeeminstellingen → Beeldschermen. Chromebook: Instellingen → Beeldschermen, vink Spiegelen uit.':
+    "Set the projector as a second screen to extend, not duplicate. Windows: Win+P → Extend. Mac: System Settings → Displays. Chromebook: Settings → Displays, untick Mirror.",
   'Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.':
     'Not full screen by itself? Click once in that window. The game then recalibrates by itself.',
   'Automatisch': 'Automatic',
@@ -113,6 +118,8 @@ export const TAAL_EN = {
     'Off in object mode: light on an object makes it invisible to the camera. You always see the outlines on your laptop.',
   // de uitleg onderaan, in stukjes rond de toetsen
   'Doel en bron verplaatsen:': 'Moving the goal and source:',
+  'Download het spel als één bestand': 'Download the game as a single file',
+  '— speelt daarna ook zonder internet, op elke computer.': '— then it also plays without internet, on any computer.',
   'sleep ze met de muis in de rechter weergave. Het doel pak je door erin te klikken, de bron met':
     'drag them with the mouse in the right-hand view. Grab the goal by clicking inside it, the source with',
   '+klik. Of met de pijltjestoetsen en': '+click. Or use the arrow keys and',
@@ -121,7 +128,13 @@ export const TAAL_EN = {
   'Beeld': 'Image',
   'Wat het spel ziet': 'What the game sees',
   'Wat de beamer laat zien': 'What the projector shows',
-  'Kon het spel niet laden — open sticky-clash.html, of start via start.bat': "Couldn't load the game — open sticky-clash.html, or start it with start.bat",
+  // als het spel niet kan starten: het kleine script bovenin index.html (staat daar ook in het Engels)
+  'Deze browser is te oud voor Sticky Clash. Werk hem bij, of open het spel in een recente Chrome, Edge, Firefox of Safari.':
+    'This browser is too old for Sticky Clash. Update it, or open the game in a recent Chrome, Edge, Firefox or Safari.',
+  'Kon het spel niet laden — open sticky-clash.html, of speel online: noaquim.github.io/sticky-clash':
+    "Couldn't load the game — open sticky-clash.html, or play online: noaquim.github.io/sticky-clash",
+  'Het spel kon niet starten ({fout}). Herlaad de pagina; helpt dat niet, probeer een andere browser.':
+    "The game couldn't start ({fout}). Reload the page; if that doesn't help, try another browser.",
 
   // ---- de speelplek: muur + beamer, scherm, of de demo zonder camera (index.html)
   'Welkom! Hoe wil je spelen?': 'Welcome! How do you want to play?',
@@ -183,9 +196,13 @@ export const TAAL_EN = {
   'De camera is verschoven — klik op Opnieuw leren': 'The camera moved — click Learn again',
   'In dit ingesloten venster mag het spel de camera niet gebruiken. De demo werkt hier wel.': "In this embedded window the game isn't allowed to use the camera. The demo does work here.",
   'Via dit adres geeft de browser de camera niet vrij (geen https). De demo werkt hier wel.': "At this address the browser won't give out the camera (no https). The demo does work here.",
-  'Deze browser kan de camera niet gebruiken: probeer Chrome of Edge. De demo werkt hier wel.': "This browser can't use the camera: try Chrome or Edge. The demo does work here.",
+  'Deze browser kan de camera niet gebruiken: probeer een recente Chrome, Edge, Firefox of Safari. De demo werkt hier wel.':
+    "This browser can't use the camera: try a recent Chrome, Edge, Firefox or Safari. The demo does work here.",
+  'Deze browser kan de camera niet gebruiken: open deze pagina in Safari. De demo werkt hier wel.':
+    "This browser can't use the camera: open this page in Safari. The demo does work here.",
   'Het beamervenster kan hier niet open: dit is een ingesloten venster.': "The projector window can't open here: this is an embedded window.",
-  'De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon en kies Toestaan.': 'The camera is blocked for this page — click the camera icon in the address bar and choose Allow.',
+  'De camera is geblokkeerd voor deze pagina — klik in de adresbalk op het camera-icoon, zet de camera op Toestaan (in Firefox: haal de blokkade weg met ×) en herlaad de pagina.':
+    'The camera is blocked for this page — click the camera icon in the address bar, set the camera to Allow (in Firefox: remove the block with ×) and reload the page.',
   'Open het spel in een eigen tabblad': 'Open the game in its own tab',
   'Camera mislukt: in een ingesloten venster mag het spel de camera niet gebruiken — open het spel in een eigen tabblad':
     "Camera failed: in an embedded window the game isn't allowed to use the camera — open the game in its own tab",
@@ -194,8 +211,18 @@ export const TAAL_EN = {
   'Er ging iets mis: {fout}': 'Something went wrong: {fout}',
   'Camera {n}': 'Camera {n}',
   '{naam} (ingebouwd)': '{naam} (built-in)',
-  'Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon en kies Toestaan':
-    "Camera failed: the camera isn't allowed — click the camera icon in the address bar and choose Allow",
+  'Camera mislukt: de camera mag niet — klik in de adresbalk op het camera-icoon, zet de camera op Toestaan (in Firefox: haal de blokkade weg met ×) en probeer opnieuw':
+    "Camera failed: the camera isn't allowed — click the camera icon in the address bar, set the camera to Allow (in Firefox: remove the block with ×) and try again",
+  'Camera mislukt: de camera is bezet of staat uit — sluit Teams, Zoom, OBS of de Camera-app. Helpt dat niet: Instellingen > Privacy en beveiliging > Camera, en zet de toegang voor bureaublad-apps aan':
+    "Camera failed: the camera is in use or switched off — close Teams, Zoom, OBS or the Camera app. If that doesn't help: Settings > Privacy & security > Camera, and allow desktop apps to access the camera",
+  'Camera mislukt: de camera is bezet of staat uit — sluit Teams, Zoom, OBS of FaceTime. Helpt dat niet: Systeeminstellingen > Privacy en beveiliging > Camera, en zet je browser aan':
+    "Camera failed: the camera is in use or switched off — close Teams, Zoom, OBS or FaceTime. If that doesn't help: System Settings > Privacy & Security > Camera, and switch on your browser",
+  'Camera mislukt: je Mac houdt de camera tegen — Systeeminstellingen > Privacy en beveiliging > Camera, zet je browser aan en start de browser opnieuw':
+    'Camera failed: your Mac is blocking the camera — System Settings > Privacy & Security > Camera, switch on your browser and restart the browser',
+  'Camera mislukt: Windows houdt de camera tegen — Instellingen > Privacy en beveiliging > Camera, en zet de toegang voor apps en bureaublad-apps aan':
+    'Camera failed: Windows is blocking the camera — Settings > Privacy & security > Camera, and allow apps and desktop apps to access the camera',
+  'Camera mislukt: je computer houdt de camera tegen — kijk in de privacy-instellingen of de browser de camera mag gebruiken':
+    "Camera failed: your computer is blocking the camera — check the privacy settings to see if the browser may use the camera",
   'Camera mislukt: de camera is bezet — sluit Teams, Zoom, OBS of de Camera-app en probeer opnieuw':
     'Camera failed: the camera is in use — close Teams, Zoom, OBS or the Camera app and try again',
   'Camera mislukt: geen camera gevonden — sluit je webcam aan': 'Camera failed: no camera found — connect your webcam',
@@ -217,8 +244,24 @@ export const TAAL_EN = {
   'Pop-up geblokkeerd — sta pop-ups toe voor deze pagina en probeer opnieuw': 'Pop-up blocked — allow pop-ups for this page and try again',
   'Sticky Clash — beamer': 'Sticky Clash — projector',
   'Klik één keer in het beamervenster voor volledig scherm': 'Click once in the projector window for full screen',
-  'Deze browser kan geen schermen herkennen — sleep het beamervenster zelf naar de beamer': "This browser can't detect screens — drag the projector window to the projector yourself",
-  'Geen toestemming gekregen — sleep het beamervenster zelf naar de beamer': 'No permission given — drag the projector window to the projector yourself',
+  'Deze browser kan geen schermen herkennen — {tip}': "This browser can't detect screens — {tip}",
+  'Geen toestemming gekregen — {tip}': 'No permission given — {tip}',
+  'Deze browser zet het beamervenster niet zelf op de beamer: {tip}.': "This browser doesn't put the projector window on the projector by itself: {tip}.",
+  // {tip} hierboven: hoe je het beamervenster zelf naar de beamer krijgt, per besturingssysteem
+  'sleep het beamervenster naar de beamer (of Win+Shift+→) en klik erin of druk op F voor volledig scherm':
+    'drag the projector window to the projector (or Win+Shift+→) and click in it or press F for full screen',
+  'sleep het beamervenster naar de beamer (of Zoeken+Alt+M) en klik erin of druk op F voor volledig scherm':
+    'drag the projector window to the projector (or Search+Alt+M) and click in it or press F for full screen',
+  'sleep het beamervenster naar de beamer (of Super+Shift+→) en klik erin of druk op F voor volledig scherm':
+    'drag the projector window to the projector (or Super+Shift+→) and click in it or press F for full screen',
+  'sleep het beamervenster naar de beamer en klik erin of druk op F voor volledig scherm':
+    'drag the projector window to the projector and click in it or press F for full screen',
+  'Sleep het beamervenster naar de beamer en klik erin voor volledig scherm — of klik op Verder':
+    'Drag the projector window to the projector and click in it for full screen — or click Continue',
+  'Sleep dit venster naar de beamer': 'Drag this window to the projector',
+  'en klik erin voor volledig scherm': 'and click in it for full screen',
+  'Het beamervenster ging dicht — klik op "Alles automatisch instellen" om opnieuw te beginnen':
+    'The projector window was closed — click "Set up everything automatically" to start again',
   'Maar één scherm gevonden — sluit de beamer aan en probeer opnieuw': 'Only one screen found — connect the projector and try again',
   'Beamer gevonden ({b}×{h}) — het beamervenster opent daar voortaan vanzelf': 'Projector found ({b}×{h}) — the projector window will open there by itself from now on',
   'Start eerst de camera': 'Start the camera first',
@@ -267,6 +310,7 @@ export const TAAL_EN = {
   'Doel gezet': 'Goal set',
   '{kleur} geleerd: tint {tint}°': '{kleur} learned: hue {tint}°',
   'Kalibratie gelukt': 'Calibration done',
+  'Kalibratie gelukt — klik nu op "Muur opnieuw leren"': 'Calibration done — now click "Relearn wall"',
   'Kalibratie mislukt — klik de punten in de juiste volgorde': 'Calibration failed — click the points in the right order',
   'Muurverlichting veranderd — klik "Muur opnieuw leren" voor de beste herkenning': 'Wall light changed — click "Relearn wall" for the best detection',
   'Belichting wordt vastgezet bij het leren van de muur': 'Exposure will be locked when the wall is learned',
@@ -286,6 +330,8 @@ export const TAAL_EN = {
   '{n} punten — dat haalt de ranglijst! Hoe heet je?': "{n} points — that makes the leaderboard! What's your name?",
   'Anoniem': 'Anonymous',
   'Opgeslagen in de ranglijst: {naam}': 'Saved to the leaderboard: {naam}',
+  'Opgeslagen in de ranglijst: {naam} — alleen zolang deze pagina openstaat (deze browser bewaart niets)':
+    "Saved to the leaderboard: {naam} — only while this page is open (this browser doesn't keep anything)",
   'De ranglijst van deze spelvorm wissen?': 'Clear the leaderboard for this game type?',
   'De camera of beamer is verschoven — klik op "Alles automatisch instellen"': 'The camera or projector has moved — click "Set up everything automatically"',
   'De camera of beamer is verschoven — ik stel alles opnieuw in': 'The camera or projector has moved — setting everything up again',
@@ -306,8 +352,17 @@ export const TAAL_EN = {
   'Ronde afgelopen': 'Round over',
   'Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, start dan via start.bat.':
     'Single-file version: the browser asks for the camera every time you start — just click Allow. Want it to remember? Start with start.bat instead.',
+  'Losse versie: de browser vraagt bij elke start om de camera — klik dan op Toestaan. Wil je dat hij het onthoudt, speel dan online (noaquim.github.io/sticky-clash) of start via start.command of start.sh.':
+    'Single-file version: the browser asks for the camera every time you start — just click Allow. Want it to remember? Play online (noaquim.github.io/sticky-clash) or start with start.command or start.sh instead.',
   'Open sticky-clash.html of start.bat — zo geeft de browser geen camera vrij': "Open sticky-clash.html or start.bat — opened like this, the browser won't allow the camera",
-  'Werkt het best in Chrome of Edge — in deze browser kan het beamervenster haperen': 'Works best in Chrome or Edge — in this browser the projector window may stutter',
+  'Open sticky-clash.html, of speel online — zo geeft de browser geen camera vrij': "Open sticky-clash.html, or play online — opened like this, the browser won't allow the camera",
+  'Klik op "Alles automatisch instellen" — en sleep daarna het beamervenster naar de beamer': 'Click "Set up everything automatically" — then drag the projector window to the projector',
+  'Muur + beamer kan alleen met een laptop of computer — speel hier op een scherm of de demo': 'Wall + projector only works with a laptop or computer — play on a screen or the demo here',
+  'Deze camera of browser kan de belichting niet vastzetten.': "This camera or browser can't lock the exposure.",
+  'Deze computer heeft het zwaar — het spel tekent nu wat eenvoudiger, zodat het vlot blijft': 'This computer is struggling — the game now draws a little simpler, so it stays smooth',
+  // rechtsboven naast de fps
+  'herkenning {n} ms': 'detection {n} ms',
+  'zuinig {n}': 'lite {n}',
   'De camera wisselde van beeldformaat — leer de muur opnieuw': 'The camera changed its image format — relearn the wall',
   'De camera wisselde van beeldformaat — klik op Opnieuw leren': 'The camera changed its image format — click Learn again',
 
@@ -349,6 +404,8 @@ export const TAAL_EN = {
   '(uitsnede)': '(cropped)',
   'uitdaging': 'challenge',
   'Kalibratie: {kal}   Muur geleerd: {muur}   Modus: {modus}': 'Calibration: {kal}   Wall learned: {muur}   Mode: {modus}',
+  'Speelplek: scherm   Spiegelen: {spiegel}   Ondergrond geleerd: {muur}   Modus: {modus}': 'Play setup: screen   Mirror: {spiegel}   Surface learned: {muur}   Mode: {modus}',
+  'Gevoeligheid {sens}   Huid negeren {huid}   Mensen negeren {mensen}': 'Sensitivity {sens}   Ignore skin {huid}   Ignore people {mensen}',
   'Gevoeligheid {sens}   Muurverlichting {licht}%   Huid negeren {huid}   Mensen negeren {mensen}':
     'Sensitivity {sens}   Wall light {licht}%   Ignore skin {huid}   Ignore people {mensen}',
   'Camera ziet helderheid {l}/255   voorgrond {fg}%   lichtcorrectie {gain}   {fps}': 'Camera sees brightness {l}/255   foreground {fg}%   light correction {gain}   {fps}',

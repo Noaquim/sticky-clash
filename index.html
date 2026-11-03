@@ -8,6 +8,8 @@
 <link rel="icon" href="sticky-clash.ico">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#101217">
+<meta name="color-scheme" content="dark">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="description" content="Stick notes on the wall, the balls bounce off them. A free projection-mapping game in your browser; also plays on a screen, or try it without a camera.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Sticky Clash">
@@ -21,7 +23,67 @@
   // voor file://). Door naar de versie waar alles in één bestand zit.
   if (location.protocol === 'file:') location.replace('sticky-clash.html');
 </script>
+<!-- Alle modules meteen tegelijk ophalen, niet de een na de ander: op een trage verbinding
+     scheelt dat seconden. Browsers die dit niet kennen, slaan het over. -->
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/vision.js">
+<link rel="modulepreload" href="js/homography.js">
+<link rel="modulepreload" href="js/game.js">
+<link rel="modulepreload" href="js/audio.js">
+<link rel="modulepreload" href="js/muziek.js">
+<link rel="modulepreload" href="js/app.js">
+<link rel="modulepreload" href="js/apparaat.js">
+<link rel="modulepreload" href="js/kwaliteit.js">
+<link rel="modulepreload" href="js/telefoon.js">
+<link rel="modulepreload" href="js/qr.js">
+<link rel="modulepreload" href="js/taal.js">
+<link rel="modulepreload" href="js/taal-en.js">
+<link rel="modulepreload" href="js/speelplek.js">
 <!-- /los:weg -->
+<script>
+/* Een melding als deze browser het spel niet kan draaien, in plaats van een pagina waarop
+   niets werkt. Bewust ouderwets JavaScript (geen let, const of pijlen): dit moet juist in
+   heel oude browsers lopen. js/main.js zet window.scGestart als het spel helemaal
+   opgestart is. Een module die niet laadt, die deze browser niet kan lezen of die halverwege
+   vastloopt, zet dat niet. Bij 'load' zijn alle modules al uitgevoerd: dan weten we het
+   zeker. Ook in sticky-clash.html (daar staat de module in de pagina zelf). De teksten staan
+   ook in js/taal-en.js; test/taal.mjs controleert dat ze daar gelijk zijn. */
+(function () {
+  var w = window, d = document, fout = '', leesFout = false;
+  var T = {
+    oud: ['Deze browser is te oud voor Sticky Clash. Werk hem bij, of open het spel in een recente Chrome, Edge, Firefox of Safari.',
+      'This browser is too old for Sticky Clash. Update it, or open the game in a recent Chrome, Edge, Firefox or Safari.'],
+    net: ['Kon het spel niet laden — open sticky-clash.html, of speel online: noaquim.github.io/sticky-clash',
+      'Couldn\'t load the game — open sticky-clash.html, or play online: noaquim.github.io/sticky-clash'],
+    start: ['Het spel kon niet starten ({fout}). Herlaad de pagina; helpt dat niet, probeer een andere browser.',
+      'The game couldn\'t start ({fout}). Reload the page; if that doesn\'t help, try another browser.']
+  };
+  if (!w.addEventListener) return;
+  w.addEventListener('error', function (e) {
+    if (w.scGestart || fout || !e || !e.message) return;    // (een plaatje dat niet laadt heeft geen melding)
+    fout = String(e.message);
+    leesFout = /SyntaxError|Unexpected|Invalid|expected|unterminated|unrecognized|missing/i.test(fout);
+  }, true);
+  w.addEventListener('load', function () {
+    if (w.scGestart) return;
+    // index.html als bestand stuurt zichzelf door naar sticky-clash.html: dan niets zeggen
+    if (location.protocol === 'file:' && d.querySelector && d.querySelector('script[type="module"][src]')) return;
+    var k = '';
+    try { k = localStorage.getItem('stickyclash.taal') || ''; } catch (x) { k = ''; }
+    if (k !== 'nl' && k !== 'en') k = /^nl/i.test((navigator.languages && navigator.languages[0]) || navigator.language || navigator.userLanguage || '') ? 'nl' : 'en';
+    var i = k === 'nl' ? 0 : 1;
+    var teOud = !('noModule' in d.createElement('script')) || leesFout || !w.PointerEvent || !w.Promise || !w.Map || !w.fetch;
+    var tekst = teOud ? T.oud[i] : w.scNetFout ? T.net[i] : T.start[i].replace('{fout}', fout.slice(0, 120) || '?');
+    var st = d.getElementById('status');
+    if (st) { st.textContent = tekst; st.className = 'status err'; }
+    var vak = d.createElement('div');
+    vak.setAttribute('role', 'alert');
+    vak.style.cssText = 'margin:12px;padding:14px 16px;border-radius:10px;background:#3a1c1c;color:#ffd9cc;font:15px/1.45 sans-serif;border:1px solid #6b2a2a';
+    vak.appendChild(d.createTextNode(tekst));
+    d.body.insertBefore(vak, d.body.firstChild);
+  });
+})();
+</script>
 </head>
 <body class="plek-muur">
 <header>
@@ -83,11 +145,13 @@
       </ol>
       <button id="btnSchermLeer" class="alleen-scherm">Opnieuw leren</button>
       <p id="wizHint" class="hint alleen-muur">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
+      <button id="btnVerder" class="hidden">Verder</button>
       <button id="btnAbort" class="hidden">Afbreken</button>
       <div id="appInstall" class="installeer hidden">
         <button id="btnInstall" class="klein">Installeer als app</button>
         <p class="hint">Eigen venster en pictogram, en daarna start het spel ook zonder internet.</p>
       </div>
+      <p id="appSafari" class="hint hidden">Als app op je iPad of iPhone: Deel → Zet op beginscherm. Op een Mac in Safari: Archief → Voeg toe aan Dock. Daarna start het spel ook zonder internet.</p>
     </section>
 
     <section class="alleen-camera">
@@ -126,7 +190,7 @@
       <h2>Telefoon</h2>
       <button id="btnTelefoon">Telefoon koppelen</button>
       <div id="telefoonVak" class="hidden">
-        <canvas id="telefoonQr" width="180" height="180" style="flex:none; width:180px; height:180px; margin:4px auto 0; background:#fff; border:0; border-radius:6px; image-rendering:pixelated"></canvas>
+        <canvas id="telefoonQr" width="180" height="180" style="flex:none; width:180px; height:180px; margin:4px auto 0; background:#fff; border:0; border-radius:6px; image-rendering:crisp-edges; image-rendering:pixelated"></canvas>
         <p id="telefoonStatus" class="badge">—</p>
         <p class="hint">Scan de code met je telefoon. Zolang er niet gespeeld wordt staat hij ook op de muur. Geen scanner? Open op je telefoon: <a id="telefoonLink" target="_blank" rel="noopener noreferrer" style="color:inherit; word-break:break-all"></a></p>
         <label class="check"><input type="checkbox" id="telefoonMuur" checked> Code ook op de muur</label>
@@ -185,7 +249,7 @@
           <button id="btnFlip" class="alleen-muur">Spiegelen</button>
         </div>
         <label class="check alleen-muur"><input type="checkbox" id="lockExp"> Belichting vastzetten — alleen als het beeld flikkert</label>
-        <p class="hint alleen-muur">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
+        <p id="lockExpHint" class="hint alleen-muur">Op sommige camera's wordt het beeld dan donkerder. Het spel controleert dat en zet hem dan terug.</p>
       </section>
 
       <section class="alleen-muur">
@@ -195,7 +259,8 @@
           <button id="btnProjClose">Sluiten</button>
         </div>
         <button id="btnScreens">Beamerscherm herkennen</button>
-        <p class="hint">Eén keer toestaan, daarna opent het beamervenster voortaan vanzelf op de beamer.</p>
+        <p id="schermenHint" class="hint">Eén keer toestaan, daarna opent het beamervenster voortaan vanzelf op de beamer.</p>
+        <p class="hint">Zet de beamer als tweede scherm op uitbreiden, niet op dupliceren. Windows: Win+P → Uitbreiden. Mac: Systeeminstellingen → Beeldschermen. Chromebook: Instellingen → Beeldschermen, vink Spiegelen uit.</p>
         <p class="hint">Staat het niet vanzelf op volledig scherm, klik dan één keer in dat venster. Het spel kalibreert zich daarna vanzelf opnieuw.</p>
       </section>
 
@@ -238,6 +303,11 @@
       </section>
     </details>
 
+    <!-- los:weg -->
+    <section class="foot">
+      <p class="hint"><a href="sticky-clash.html" download="Sticky Clash.html" style="color:inherit">Download het spel als één bestand</a> — speelt daarna ook zonder internet, op elke computer.</p>
+    </section>
+    <!-- /los:weg -->
   </aside>
 
   <div class="stage">
@@ -270,7 +340,7 @@
     <button id="svVol" class="sv-icoon" title="Volledig scherm" aria-label="Volledig scherm">⛶</button>
     <button id="svSluit" class="sv-icoon" title="Sluiten" aria-label="Sluiten">×</button>
   </div>
-  <div id="svVeld" class="sv-veld"><canvas id="svCanvas" width="640" height="360"></canvas></div>
+  <div id="svVeld" class="sv-veld"><video id="svVideo" class="hidden" muted playsinline autoplay></video><canvas id="svCanvas" width="640" height="360"></canvas></div>
   <div class="sv-voet">
     <div id="svPalet" class="sv-palet alleen-demo" role="group" aria-label="Soort briefje">
       <button data-soort="los" class="on"><i style="background:#ffd84d"></i>Briefje</button>
@@ -287,6 +357,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js" onerror="var k='';try{k=localStorage.getItem('stickyclash.taal')}catch(e){}if(k!='nl'&&k!='en')k=/^nl/i.test((navigator.languages||[])[0]||navigator.language||'')?'nl':'en';document.getElementById('status').textContent=k=='nl'?'Kon het spel niet laden — open sticky-clash.html, of start via start.bat':'Couldn\'t load the game — open sticky-clash.html, or start it with start.bat'"></script>
+<script type="module" src="js/main.js" onerror="window.scNetFout=1"></script>
 </body>
 </html>

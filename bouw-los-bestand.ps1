@@ -67,6 +67,8 @@ $html = [Text.RegularExpressions.Regex]::Replace($html, '[ \t]*<!-- los:weg -->[
 $html = (New-Object Text.RegularExpressions.Regex('[ \t]*<link rel="icon" href="sticky-clash\.ico">\n?')).Replace($html, '', 1)
 # installeren als app kan niet vanaf file://; de browser zou het manifest vergeefs zoeken
 $html = (New-Object Text.RegularExpressions.Regex('[ \t]*<link rel="manifest" href="manifest\.webmanifest">\n?')).Replace($html, '', 1)
+# en geen los pictogram voor het beginscherm van een iPad: dat bestand reist niet mee
+$html = (New-Object Text.RegularExpressions.Regex('[ \t]*<link rel="apple-touch-icon" href="[^"]*">\n?')).Replace($html, '', 1)
 $css = [Text.RegularExpressions.Regex]::Replace((Lees 'css/style.css'), '</style', '<\/style', 'IgnoreCase')
 $cssTag = New-Object Text.RegularExpressions.Regex('<link[^>]+href=["'']css/style\.css["''][^>]*>')
 $jsTag = New-Object Text.RegularExpressions.Regex('<script\s+type=["'']module["''][^>]*src=["'']js/main\.js["''][^>]*></script>')
