@@ -299,6 +299,8 @@ export const TAAL_EN = {
   'Kalibratie mislukt.': 'Calibration failed.',
   'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt': 'Calibration done — check that the dashed line runs around the projected image',
   'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)': "Calibration done (rough measurement; the dots weren't clearly visible)",
+  'Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels': 'Calibration done — accurate to about {px} projector pixels',
+  'Kalibreren… stip {n} van {m}': 'Calibrating… dot {n} of {m}',
   'Klik punt {n} van 4 in het camerabeeld': 'Click point {n} of 4 in the camera view',
   'Gekalibreerd': 'Calibrated',
   'Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch': 'Locking made the camera image darker — exposure stays automatic',
