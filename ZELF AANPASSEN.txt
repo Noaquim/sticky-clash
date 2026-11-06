@@ -33,6 +33,7 @@ WAT STAAT WAAR
   js/stappen.js         klaarzetten, stap voor stap: het kaartje met de zeven stappen
   js/vision.js          de camera en het herkennen van voorwerpen (lastig, pas op)
   js/homography.js      het omrekenen van camerabeeld naar beamerbeeld (wiskunde)
+  js/kalibratie.js      nauwkeurige kalibratie: stippenraster en lensvertekening
   js/audio.js           de geluidjes
   js/muziek.js          de achtergrondmuziek: planner, pauze, sneller, stijl wisselen
   js/muziek-stijlen.js  de drie muziekstijlen: Rustig, Vrolijk en Arcade

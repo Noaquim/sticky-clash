@@ -250,6 +250,11 @@ export class Vision {
     this.jitterMax = 0.15;
     this.calmFor = 0.4;          // zo lang (s) achter elkaar onder jitterMax
     this.jitterWindow = 0.8;     // over zo'n stuk tijd (s) wordt de trilling gemeten
+    // "Alleen wat op de muur zit" (zie opDeMuur): zo lang (s) stil hangen, hooguit zoveel
+    // trillen (px), en hooguit zoveel huid erin, voordat iets meetelt.
+    this.muurStil = 1.0;
+    this.muurTril = 0.35;
+    this.muurHuid = 0.35;
     this.personGap = 8;
     this.insideFn = null;        // (x, y) => op het beamervlak? Gezet door main.js.
     // Zoveel metingen achter elkaar moet een nieuwe briefjessoort winnen voordat een
@@ -2059,6 +2064,70 @@ export class Vision {
     }
     // Aaneengesloten rustig: één toevallig kalm moment is niet genoeg.
     t.calmT = t.jitter <= this.jitterMax ? (t.calmT || 0) + dt : 0;
+  }
+
+  /**
+   * Zit dit echt op de muur? Voor de instelling "Alleen wat op de muur zit" (main.js,
+   * buildObstacles); de herkenning zelf verandert er niet door. Een flits van een
+   * podiumlamp of een vlek van de discobal is er binnen een seconde weer af of schuift
+   * door; iemand die langsloopt of iets vasthoudt beweegt, trilt of zit vast aan huid.
+   * Een briefje of boek dat écht hangt, staat een seconde stil en trilt niet.
+   * Eenmaal geteld blijft het tellen, ook als er ballen overheen vliegen (ons eigen licht
+   * verschuift de vlek dan even). Pas als het zonder ons licht erop echt verschoof (de
+   * stilstandklok begon opnieuw), moet het weer opnieuw stil hangen. Weggehaald is
+   * het spoor weg, en daarmee het obstakel.
+   * Geeft '' (telt), 'wacht' (staat al even stil, bijna) of 'los' (telt niet).
+   */
+  opDeMuur(t, nodig = this.muurStil, mensen = this.muurMensen(), nu = t.age / 30) {
+    // Eén meting per camerabeeld: het zachte midden (zie softCentre) en de grootte.
+    const h = t.muurH || (t.muurH = []);
+    if (t.muurAge !== t.age) {
+      t.muurAge = t.age;
+      const k = (t.hn - 1) % JITTER_N;
+      h.push({ nu, x: t.hn ? t.hx[k] : t.cx, y: t.hn ? t.hy[k] : t.cy, n: t.cells, licht: !!(t.lit || t.held) });
+      while (h.length && h[0].nu < nu - nodig - 1.5) h.shift();
+    }
+    const tol = 1.2 * this.cell;
+    if (t.opMuur) {
+      // Eenmaal geteld blijft het tellen. Alleen als het een halve seconde lang zonder
+      // ons licht erop duidelijk ergens anders staat, is het verplaatst.
+      const recent = h.filter(m => m.nu > nu - 0.5 && !m.licht);
+      const weg = recent.filter(m => Math.hypot(m.x - t.muurX, m.y - t.muurY) > 2 * tol).length;
+      if (!(recent.length >= 8 && weg >= recent.length * 0.8)) return '';
+      t.opMuur = false;
+    }
+    // Stil: in de laatste `nodig` seconden staat het in de meeste beelden op dezelfde plek
+    // met dezelfde grootte, en trilt het daar niet. Een flits of lichtvlek die er even
+    // overheen gaat, verandert een paar beelden, niet de meeste.
+    const venster = h.filter(m => m.nu >= nu - nodig - 1e-6);
+    const lang = h.length && nu - h[0].nu >= nodig - 0.04;
+    if (venster.length < 4) return 'los';
+    const med = (a) => { const s = a.slice().sort((p, q) => p - q); return s[s.length >> 1]; };
+    const mx = med(venster.map(m => m.x)), my = med(venster.map(m => m.y)), mn = med(venster.map(m => m.n));
+    const goed = venster.filter(m => Math.abs(m.x - mx) <= tol && Math.abs(m.y - my) <= tol && Math.abs(m.n - mn) <= mn * 0.25);
+    let sx = 0, sy = 0, sxx = 0, syy = 0;
+    for (const m of goed) { sx += m.x; sy += m.y; sxx += m.x * m.x; syy += m.y * m.y; }
+    const g = Math.max(1, goed.length);
+    const tril = Math.sqrt(Math.max(0, sxx / g - (sx / g) ** 2, syy / g - (sy / g) ** 2));
+    const rustig = goed.length >= venster.length * 0.6 && tril <= this.muurTril;
+    const vast = t.age >= 12 && t.rigid && (t.trusted || !(t.skinFrac > this.muurHuid));
+    if (lang && rustig && vast && !this.aanMens(t, mensen)) { t.opMuur = true; t.muurX = mx; t.muurY = my; return ''; }
+    return rustig && nu - h[0].nu >= Math.min(0.4, nodig * 0.4) ? 'wacht' : 'los';
+  }
+
+  /** Sporen die een mens of een hand kunnen zijn (voor opDeMuur; één keer per beeld). */
+  muurMensen() {
+    return this.tracks.filter(u => !u.held && (this.personLike(u) || (!u.trusted && this.disguise(u) === 'huid')));
+  }
+
+  /** Zit er een mens of hand vlak naast (iets wat je vasthoudt)? Zoals in earnTrust. */
+  aanMens(t, mensen) {
+    const gap = this.personGap * this.cell;
+    for (const u of mensen) {
+      if (u === t) continue;
+      for (const p of t.corners) for (const q of u.corners) if (Math.abs(p[0] - q[0]) < gap && Math.abs(p[1] - q[1]) < gap) return true;
+    }
+    return false;
   }
 
   measureTrack(t, best, dt) {

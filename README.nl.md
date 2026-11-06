@@ -57,10 +57,12 @@ openen.
 1. Dubbelklik **`sticky-clash.html`** (of op Windows de snelkoppeling / `start.bat`), of
    open de link hierboven
 2. Kies hoe je speelt. De demo begint meteen.
-3. Met een beamer: kies **Muur + beamer**. Dan begint het instellen meteen: het
-   beamervenster gaat open, je staat de camera toe, en je volgt de aanwijzingen op de muur
-   (het spel kalibreert, stelt het licht af, leert de lege muur en zoekt de bak). Kom je
-   later terug, dan staat er één grote knop: **Start: alles klaarzetten**. Op een scherm:
+3. Met een beamer: kies **Muur + beamer**. Het spel loopt dan **stap voor stap** met je
+   mee, één stap per keer met een groen vinkje als het gelukt is: beamer aansluiten,
+   beamervenster op de beamer, camera richten, kalibreren, muur leren, bak neerzetten.
+   Liever alles in één keer? Klik in dat kaartje op **Alles automatisch**. Kom je later
+   terug, dan staat er één grote knop: **Start: alles klaarzetten** (en **Stap voor stap
+   klaarzetten** voor de stappen opnieuw). Op een scherm:
    sta de camera toe en haal je handen even uit beeld terwijl het spel de lege tafel leert.
 4. **Start ronde**
 
@@ -540,6 +542,20 @@ Onder "Meer instellingen" staan twee knoppen om dit bij te stellen: **Mensenfilt
 (hoger = strenger op vormvastheid) en **Stilstaan** (op bijvoorbeeld 0,5 s tellen alleen
 neergezette voorwerpen mee).
 
+### Alleen wat op de muur zit
+
+Met muur en beamer staat **Alleen wat op de muur zit** standaard aan (onder "Speelmodus").
+Dan wordt iets pas een obstakel als het een seconde stil op de muur hangt (of zo lang als
+*Stilstaan* zegt, als dat langer is): in de meeste camerabeelden van die seconde staat het
+op dezelfde plek met dezelfde grootte, het trilt niet, en er zit geen hand of mens aan vast.
+Een flitsende podiumlamp of een vlek van een discobal is binnen een seconde weer weg of
+schuift door; iemand die langsloopt beweegt; een boek in je hand trilt en zit tegen je hand
+aan. Eenmaal geteld blijft het tellen terwijl er ballen overheen vliegen; haal je het van de
+muur, dan is het weg. Zet het uit als voorwerpen in je hand juist wél moeten tellen (zoals
+in de kop hierboven). Gemeten in `test/muur.mjs`: flitsen en discobalvlekken 0 obstakels
+(zonder de instelling 509 obstakel-beelden), een boek in een trillende hand 0 (zonder 78),
+briefjes tellen na ongeveer 1 s.
+
 ## Spelregels
 
 Onder **Spelregels** in het paneel:
@@ -661,6 +677,15 @@ dat het ook in een verlichte kamer werkt. Daarna verfijnt hij met vier losse sti
 alleen als die goed genoeg te zien zijn. Daarna projecteert hij twee seconden een groene
 rand: die moet precies om het beamerbeeld vallen.
 
+Bovenop de vier stippen komt een raster van twintig stippen, één voor één (plus vijf
+controlestippen), gemeten op de eigen resolutie van de camera. Elke stip wordt alleen binnen
+het witte vlak gezocht, als mediaan van vijf camerabeelden (een flitsende lamp of discobal
+verandert één beeld, niet de meeste), en telt pas als twee van die metingen hetzelfde zeggen.
+Daar gaat een homografie plus de kromming van de cameralens doorheen; een stip die er ver
+naast ligt, telt niet mee. Zo klopt het ook in de hoeken met een groothoekwebcam of een
+scheve beamer. Het raster wordt alleen gebruikt als het op de controlestippen minstens zo
+goed klopt als de vier stippen; anders blijven die staan.
+
 Lukt het niet, dan zegt hij erbij waaróm — te weinig contrast, of het beamervlak ligt niet
 volledig in het camerabeeld.
 
@@ -731,9 +756,12 @@ node test/telefoon.mjs      # bedienen met je telefoon: berichten, zuinig verstu
 node test/taal.mjs          # Engelse versie: alles vertaald, geen Nederlands buiten t(), telefoon.html
 node test/gids.mjs          # ZELF AANPASSEN.txt en CUSTOMIZE.txt: elk stukje code staat echt in dat bestand
 node test/speelplek.mjs     # drie speelplekken: welkomstkeuze, demo-opstelling (en speelt hij?), briefjes, scherm, camera ingesloten
+node test/stappen.mjs       # stap voor stap klaarzetten: camera richten (te klein, valt buiten beeld, goed) en de haakjes
 node test/kwaliteit.mjs     # trage computers: een gewone verandert nooit, een trage tekent eenvoudiger en loopt nooit in slow motion
 node test/apparaat.mjs      # elke computer: volledig scherm in oude Safari, iPad en tablets, besturingssysteem, "browser te oud"
 node test/omgeving.mjs      # elke minuut controleren: wanneer wel en niet bijstellen; kleuren in het donker, met hysterese
+node test/kalibratie.mjs    # kalibratie: lensvertekening heen en terug, passen met ruis en uitschieters, stipmidden met flitsen, oude opslag
+node test/muur.mjs          # "Alleen wat op de muur zit": flitsen, discobalvlekken, een boek in je hand tellen nooit; geplakte briefjes wel, ook onder ballen
 node test/muurwacht.mjs     # nagebouwde kamer: 10 min rustig = nooit opnieuw leren; licht, lamp, gordijn, schaduw = wel; briefjes blijven
 node test/uitleg.mjs        # de uitleg om op te zetten (uitleg.html, de pdf's): beide talen gelijk, links kloppen, knoppen heten zoals in het spel
 ```
@@ -758,6 +786,7 @@ afgewogen.
 | bestand | rol |
 |---|---|
 | [js/homography.js](js/homography.js) | 4-punts homografie camera → beamer |
+| [js/kalibratie.js](js/kalibratie.js) | nauwkeurige kalibratie: stippenraster, lensvertekening, anders vier stippen |
 | [js/vision.js](js/vision.js) | achtergrondsubtractie met schaduwonderdrukking, kleurherkenning, convexe omhullende per voorwerp |
 | [js/game.js](js/game.js) | physics: cirkel tegen convexe veelhoek, scoren, tekenen |
 | [js/audio.js](js/audio.js) | gesynthetiseerd geluid, geen audiobestanden |

@@ -658,7 +658,7 @@ export class StapVoorStap {
     this.elSluit.setAttribute('aria-label', t('Sluiten'));
     this.stippen.forEach((b, k) => {
       const id = KLAAR_STAPPEN[k];
-      const gedaan = k < this.i ? this.stand[id] !== 'fout' : this.stand[id] === 'goed';
+      const gedaan = k < this.i ? this.stand[id] !== 'fout' || !!this.handmatig[id] : this.stand[id] === 'goed';
       b.className = 'st-stip' + (k === this.i ? ' nu' : gedaan ? ' gedaan' : '');
       b.disabled = !this.magNaar(k) && k !== this.i;
       b.setAttribute('aria-label', t('Stap {n} van {m}', { n: k + 1, m: n }));
@@ -695,6 +695,8 @@ export class StapVoorStap {
     this.elHoofd.textContent = m.hoofd.tekst;
     this.elHoofd.disabled = !!m.hoofd.uit;
     this.elHoofd.classList.toggle('klaar', !m.hoofd.uit && c.soort === 'goed');
+    // bij de laatste stap valt er niets meer automatisch te doen
+    this.elAuto.parentNode.classList.toggle('hidden', KLAAR_STAPPEN[this.i] === 'klaar');
     this.elAuto.textContent = t('Alles automatisch');
     this.elAuto.disabled = this.bezig();
     this.elAutoHint.textContent = t('Doet alle stappen in één keer; volg dan de aanwijzingen op de muur.');

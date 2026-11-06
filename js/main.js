@@ -1,5 +1,6 @@
 import { Vision, DEFAULT_CLASSES, inConvex } from './vision.js';
 import { computeHomography, applyH, invertH } from './homography.js';
+import { kalNaarBeamer, kalNaarCamera, kalZetLens, kalLensVan, kalRaster } from './kalibratie.js';
 import { Game, normalizePoly } from './game.js';
 import { Sfx } from './audio.js';
 import { startApp } from './app.js';
@@ -49,6 +50,9 @@ const app = {
   abort: false,
   goalTrack: null,
   noPeople: true,
+  // Alleen wat echt op de muur zit telt (zie vision.opDeMuur): geen flitsen, lichtvlekken,
+  // langslopende mensen of iets in je hand. Alleen met muur en beamer.
+  alleenMuur: true,
   special: true,          // rood/groen/blauw briefje = trampoline/turbo/breekbaar
   gold: true,             // gouden ballen
   bonus: true,            // kleine bonusbak
@@ -133,12 +137,14 @@ function save() {
     localStorage.setItem(STORE, JSON.stringify({
       // op een scherm is app.H het camerabeeld zelf; de kalibratie van de beamer is muurH
       H: app.speelplek === 'scherm' ? app.muurH : app.H,
+      lens: kalLensVan(app.speelplek === 'scherm' ? app.muurH : app.H),
       speelplek: bewaarSpeelplek(app.speelplek, app.plekGekozen),
       schermSpiegel: app.schermSpiegel,
       classes: vision.classes,
       mirror: vision.mirror,
       mode: vision.mode,
       noPeople: app.noPeople,
+      alleenMuur: app.alleenMuur,
       special: app.special, gold: app.gold, bonus: app.bonus, levels: app.levels,
       autoRecal: app.autoRecal, elkeMinuut: app.elkeMinuut, lastName: app.lastName,
       resident: app.resident,
@@ -185,7 +191,7 @@ function load() {
       if (old) s = { classes: old.classes, mirror: old.mirror, mode: old.mode, best: old.best };
     }
     if (!s) return;
-    if (s.H) { app.H = s.H; app.Hinv = invertH(s.H); app.steps.cal = 1; }
+    if (s.H) { app.H = s.H; kalZetLens(app.H, s.lens); app.Hinv = invertH(s.H); app.steps.cal = 1; }
     if (s.classes) {
       vision.classes = DEFAULT_CLASSES.map(d => {
         const f = s.classes.find(c => c.id === d.id);
@@ -198,6 +204,7 @@ function load() {
       if (s[k] != null) $(k).value = s[k];
     }
     if (s.noPeople != null) { app.noPeople = s.noPeople; $('noPeople').checked = s.noPeople; }
+    if (s.alleenMuur != null) { app.alleenMuur = s.alleenMuur; $('alleenMuur').checked = s.alleenMuur; }
     if (s.skin != null) { vision.skinFilter = s.skin; $('skin').checked = s.skin; }
     if (s.resident != null) { app.resident = s.resident; $('resident').checked = s.resident; }
     for (const k of ['special', 'gold', 'bonus', 'autoRecal', 'elkeMinuut']) {
@@ -318,12 +325,12 @@ function syncStepsFromState() {
  */
 function toProj(x, y) {
   const c = vision.camNorm(x, y);
-  return applyH(app.H, c[0], c[1]);
+  return kalNaarBeamer(app.H, c[0], c[1]);
 }
 
 /** En terug: plek op het beamervlak naar camerapixel in het werkbeeld. */
 function fromProj(u, v) {
-  const c = applyH(app.Hinv, u, v);
+  const c = kalNaarCamera(app.H, app.Hinv, u, v);
   return vision.camPx(c[0], c[1]);
 }
 
@@ -901,7 +908,9 @@ async function diffAgainst(pattern, ref, settle, stil) {
  * Stap 1 is een volledig wit beeld. Dat is veruit het sterkste signaal en werkt
  * ook in een verlichte kamer; de vier hoekpunten van het heldere vlak geven al
  * een bruikbare homografie. Stap 2 verfijnt die met vier losse stippen, maar
- * alleen als die goed genoeg te zien zijn.
+ * alleen als die goed genoeg te zien zijn. Stap 3 legt daar een raster van stippen
+ * met de kromming van de lens overheen (js/kalibratie.js), maar alleen als dat op
+ * controlestippen minstens zo goed klopt.
  */
 async function autoCalibrate(silent) {
   if (!vision.ready) { if (!silent) status(t('Start eerst de camera'), 'err'); return false; }
@@ -1000,6 +1009,34 @@ async function autoCalibrate(silent) {
     if (H2) { H = H2; refined = true; }
   }
 
+  // ---- stap 3: raster van stippen met lensvertekening (js/kalibratie.js) ----
+  // Bovenop de vier stippen, nooit in plaats ervan: alleen binnen het witte vlak, met
+  // dezelfde mediaan en hetzelfde wachten. Klopt het raster op losse controlestippen
+  // niet minstens zo goed als de vier stippen, dan blijven die gewoon staan.
+  let rasterFout = null;
+  if (!app.abort && projOk()) {
+    const inVlak = new Uint8Array(white.d.length);
+    for (const k of vlak) inVlak[k] = 1;
+    const binnenVlak = (u, v) => {
+      const p = vision.camPx(u, v), cx = Math.floor(p[0] / vision.cell), cy = Math.floor(p[1] / vision.cell);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (x >= 0 && y >= 0 && x < cols && y < vision.rows && inVlak[y * cols + x]) return true;
+      }
+      return false;
+    };
+    const pc = app.projCtx.canvas, vid = vision.video;
+    const res = await kalRaster({
+      vision, sleep, H4: H, binnenVlak, wachtTotStil,
+      ar: (vid.videoWidth / vid.videoHeight) || 4 / 3, bw: pc.width, bh: pc.height,
+      toon: (p) => { app.calPattern = p; },
+      voortgang: (i, m) => { if (!silent) status(t('Kalibreren… stip {n} van {m}', { n: i, m })); },
+      afbreken: () => app.abort || !projOk(),
+    });
+    app.calDiag.raster = res.fout || res;
+    if (res.H) { H = res.H; kalZetLens(H, res.lens); rasterFout = res.fout; refined = true; }
+  }
+
   app.calPattern = null;
   app.wiz = wasWiz;
   if (vastCal.length && !app.lockExposure) await vision.unlockCamera();
@@ -1019,7 +1056,9 @@ async function autoCalibrate(silent) {
   app.calPattern = null;
 
   if (!silent) {
-    status(refined
+    status(rasterFout
+      ? t('Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels', { px: Math.max(1, Math.round(rasterFout.max)) })
+      : refined
       ? t('Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt')
       : t('Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)'), 'ok');
   }
@@ -1626,6 +1665,7 @@ bindSlider('bounce', v => (v / 100).toFixed(2), v => { game.rest = v / 100; });
 bindSlider('rate', v => (v / 10).toFixed(1) + '/s', v => { game.rate = v / 10; });
 
 $('noPeople').onchange = e => { app.noPeople = e.target.checked; save(); };
+$('alleenMuur').onchange = e => { app.alleenMuur = e.target.checked; save(); };
 $('fill').oninput = () => {
   app.fill = +$('fill').value / 100;
   $('fillOut').textContent = $('fill').value + '%';
@@ -2295,7 +2335,7 @@ function applyRoi() {
   if (!app.Hinv || !vision.ready || !app.useRoi) return false;
   let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity;
   for (const corner of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
-    const c = applyH(app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
+    const c = kalNaarCamera(app.H, app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
     u0 = Math.min(u0, c[0]); u1 = Math.max(u1, c[0]);
     v0 = Math.min(v0, c[1]); v1 = Math.max(v1, c[1]);
   }
@@ -2404,6 +2444,8 @@ function buildObstacles(tracks) {
   if (binTrack) app.reasonById.set(binTrack.id, 'bak');
 
   let bestGoal = null, bestSrc = null;
+  const alleenMuur = objectMode && app.alleenMuur && app.speelplek === 'muur';
+  const mensen = alleenMuur ? vision.muurMensen() : null;
   for (const t of tracks) {
     if (t === binTrack) continue;
     counts[t.cls] = (counts[t.cls] || 0) + 1;
@@ -2450,6 +2492,14 @@ function buildObstacles(tracks) {
       if (t.age < 12) pending = true;                 // nog onbekend is geen obstakel
       else if (!t.rigid) { drop('mens'); continue; }
       if (t.stable < app.stableNeed) pending = true;
+    }
+    // Alleen wat echt op de muur zit: eerst een seconde stil hangen (of zo lang als
+    // Stilstaan zegt), niet trillen en niet vastzitten aan een hand. Een flits, een
+    // lichtvlek of iets wat je vasthoudt wordt zo nooit een obstakel.
+    if (alleenMuur) {
+      const m = vision.opDeMuur(t, Math.max(vision.muurStil, app.stableNeed / 30), mensen, performance.now() / 1000);
+      if (m === 'wacht') pending = true;
+      else if (m) { drop(m); continue; }
     }
     out.push(obstacleFrom(t, t.corners, pending));
   }
@@ -2582,6 +2632,11 @@ function drawPattern(ctx, w, h) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(t[0] * w, t[1] * h, Math.min(w, h) * 0.075, 0, 7);
+    ctx.fill();
+  } else if (k === 'stip') {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(app.calPattern.u * w, app.calPattern.v * h, Math.min(w, h) * app.calPattern.r, 0, 7);
     ctx.fill();
   } else if (k === 'verify') {
     const m = Math.min(w, h) * 0.02;
@@ -2841,7 +2896,8 @@ function fitWereld(ar) {
 const REDENEN = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
                   hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
                   schaduw: 'donker of schaduw (telt als het stil hangt)',
-                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
+                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak',
+                  los: 'hangt niet stil op de muur' };
 
 let last = performance.now();
 let visionAcc = 0;

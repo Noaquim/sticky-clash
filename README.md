@@ -57,10 +57,12 @@ tab.
 1. Double-click **`sticky-clash.html`** (or on Windows, the shortcut / `start.bat`), or
    open the link above
 2. Choose how you play. The demo starts right away.
-3. With a projector: choose **Wall + projector**. Setup starts right away: the projector
-   window opens, you allow the camera, and you follow the instructions on the wall (the
-   game calibrates, adjusts the light, learns the empty wall and finds the bin). When you
-   come back later, there's one big button: **Start: set everything up**. On a screen: allow
+3. With a projector: choose **Wall + projector**. The game walks you through setup **step by
+   step**, one step per screen with a green tick when it worked: connect the projector, put
+   the projector window on the projector, aim the camera, calibrate, learn the wall, place the
+   bin. Rather have it all done at once? Click **All automatic** on that card. When you come
+   back later, there's one big button: **Start: set everything up** (and **Set up step by
+   step** for the step-by-step again). On a screen: allow
    the camera and keep your hands out of view for a moment while the game learns the empty
    table.
 4. **Start round**
@@ -541,6 +543,20 @@ Under "More settings" there are two controls to fine-tune this: **People filter*
 = stricter about keeping shape) and **Hold still** (at 0.5 s, for example, only objects
 that have been put down count).
 
+### Only what's on the wall
+
+With a wall and projector, **Only what's on the wall** is on by default (under "Play mode").
+Then something only becomes an obstacle once it has hung still on the wall for a second (or
+as long as *Hold still* says, if that is longer): in most camera frames of that second it is
+in the same place at the same size, it doesn't tremble, and no hand or person is attached
+to it. A flashing stage light or a spot from a disco ball is gone again within a second or
+keeps sliding; someone walking past moves; a book in your hand trembles and sits against
+your hand. Once counted, it keeps counting while balls fly over it; take it off the wall
+and it's gone. Turn it off if you *want* objects in your hand to count (as in the heading
+above). Measured in `test/muur.mjs`: flashes and disco spots 0 obstacles (509 obstacle
+frames without the setting), a book in a trembling hand 0 (78 without), notes count after
+about 1 s.
+
 ## Game rules
 
 Under **Game rules** in the panel:
@@ -663,6 +679,15 @@ it works in a lit room too. Then it refines with four separate dots, but only if
 clearly visible enough. Finally it projects a green border for two seconds: it should sit
 exactly around the projected image.
 
+On top of the four dots comes a grid of twenty dots, shown one at a time (plus five check
+dots), measured on the camera's own resolution. Each dot is only searched inside the white
+area, as the median of five camera frames (a flashing stage light or disco ball changes one
+frame, not most), and only counts once two of those measurements agree. A homography plus the
+curve of the camera lens is fitted through all of them; a dot that lands far off is left out.
+That keeps it accurate into the corners with a wide-angle webcam or a projector at an angle.
+The grid is only used when it fits the check dots at least as well as the four dots;
+otherwise the four dots stay.
+
 If it fails, it tells you *why* — too little contrast, or the projected area isn't
 completely in the camera image.
 
@@ -735,9 +760,12 @@ node test/telefoon.mjs      # phone control: messages, sending sparingly, QR cod
 node test/taal.mjs          # English version: everything translated, no Dutch outside t(), telefoon.html
 node test/gids.mjs          # CUSTOMIZE.txt and ZELF AANPASSEN.txt: every code snippet really is in that file
 node test/speelplek.mjs     # three ways to play: first-visit choice, demo layout (does it play?), notes, screen, embedded camera
+node test/stappen.mjs       # set up step by step: aiming the camera (too small, cut off, all good) and the hooks
 node test/kwaliteit.mjs     # slow computers: a normal one never changes, a slow one draws simpler and never runs in slow motion
 node test/apparaat.mjs      # every computer: full screen in old Safari, iPad and tablets, operating system, "browser too old"
 node test/omgeving.mjs      # checking every minute: when to adjust and when not; colours in the dark, with hysteresis
+node test/kalibratie.mjs    # calibration: lens distortion there and back, fitting with noise and outliers, dot centre with flashes, old saved data
+node test/muur.mjs          # "Only what's on the wall": flashes, disco spots, a book held in a hand never count; stuck notes do, also under balls
 node test/muurwacht.mjs     # simulated room: 10 quiet minutes = never relearn; light, lamp, curtain, shadow = do; notes stay
 node test/uitleg.mjs        # the setup guide (uitleg.html, the PDFs): both languages match, links work, buttons named as in the game
 ```
@@ -764,6 +792,7 @@ to 34 px. That's the yardstick every change to the detection has been measured a
 | file | role |
 |---|---|
 | [js/homography.js](js/homography.js) | 4-point homography camera → projector |
+| [js/kalibratie.js](js/kalibratie.js) | precise calibration: grid of dots, lens distortion, falls back to four dots |
 | [js/vision.js](js/vision.js) | background subtraction with shadow suppression, color detection, convex hull per object |
 | [js/game.js](js/game.js) | physics: circle vs. convex polygon, scoring, drawing |
 | [js/audio.js](js/audio.js) | synthesized sound, no audio files |

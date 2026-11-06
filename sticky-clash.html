@@ -480,6 +480,8 @@ button.stappenknop{width:100%; margin-top:8px}
       <label class="check alleen-muur"><input type="checkbox" id="fillAuto" checked> Automatisch afstellen bij instellen</label>
       <p class="hint alleen-muur">De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.</p>
       <label class="check"><input type="checkbox" id="noPeople" checked> Mensen negeren</label>
+      <label class="check alleen-muur"><input type="checkbox" id="alleenMuur" checked> Alleen wat op de muur zit</label>
+      <p class="hint alleen-muur">Iets telt pas als het een seconde stil op de muur hangt. Flitsende lampen, lichtvlekken van een discobal, mensen die langslopen en iets wat je in je hand houdt tellen niet.</p>
       <label class="check"><input type="checkbox" id="skin" checked> Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft</label>
       <label class="check"><input type="checkbox" id="resident" checked> Wat al aan de muur hangt telt ook mee</label>
       <div class="row">
@@ -951,6 +953,11 @@ class Vision {
     this.jitterMax = 0.15;
     this.calmFor = 0.4;          // zo lang (s) achter elkaar onder jitterMax
     this.jitterWindow = 0.8;     // over zo'n stuk tijd (s) wordt de trilling gemeten
+    // "Alleen wat op de muur zit" (zie opDeMuur): zo lang (s) stil hangen, hooguit zoveel
+    // trillen (px), en hooguit zoveel huid erin, voordat iets meetelt.
+    this.muurStil = 1.0;
+    this.muurTril = 0.35;
+    this.muurHuid = 0.35;
     this.personGap = 8;
     this.insideFn = null;        // (x, y) => op het beamervlak? Gezet door main.js.
     // Zoveel metingen achter elkaar moet een nieuwe briefjessoort winnen voordat een
@@ -2762,6 +2769,70 @@ class Vision {
     t.calmT = t.jitter <= this.jitterMax ? (t.calmT || 0) + dt : 0;
   }
 
+  /**
+   * Zit dit echt op de muur? Voor de instelling "Alleen wat op de muur zit" (main.js,
+   * buildObstacles); de herkenning zelf verandert er niet door. Een flits van een
+   * podiumlamp of een vlek van de discobal is er binnen een seconde weer af of schuift
+   * door; iemand die langsloopt of iets vasthoudt beweegt, trilt of zit vast aan huid.
+   * Een briefje of boek dat écht hangt, staat een seconde stil en trilt niet.
+   * Eenmaal geteld blijft het tellen, ook als er ballen overheen vliegen (ons eigen licht
+   * verschuift de vlek dan even). Pas als het zonder ons licht erop echt verschoof (de
+   * stilstandklok begon opnieuw), moet het weer opnieuw stil hangen. Weggehaald is
+   * het spoor weg, en daarmee het obstakel.
+   * Geeft '' (telt), 'wacht' (staat al even stil, bijna) of 'los' (telt niet).
+   */
+  opDeMuur(t, nodig = this.muurStil, mensen = this.muurMensen(), nu = t.age / 30) {
+    // Eén meting per camerabeeld: het zachte midden (zie softCentre) en de grootte.
+    const h = t.muurH || (t.muurH = []);
+    if (t.muurAge !== t.age) {
+      t.muurAge = t.age;
+      const k = (t.hn - 1) % JITTER_N;
+      h.push({ nu, x: t.hn ? t.hx[k] : t.cx, y: t.hn ? t.hy[k] : t.cy, n: t.cells, licht: !!(t.lit || t.held) });
+      while (h.length && h[0].nu < nu - nodig - 1.5) h.shift();
+    }
+    const tol = 1.2 * this.cell;
+    if (t.opMuur) {
+      // Eenmaal geteld blijft het tellen. Alleen als het een halve seconde lang zonder
+      // ons licht erop duidelijk ergens anders staat, is het verplaatst.
+      const recent = h.filter(m => m.nu > nu - 0.5 && !m.licht);
+      const weg = recent.filter(m => Math.hypot(m.x - t.muurX, m.y - t.muurY) > 2 * tol).length;
+      if (!(recent.length >= 8 && weg >= recent.length * 0.8)) return '';
+      t.opMuur = false;
+    }
+    // Stil: in de laatste `nodig` seconden staat het in de meeste beelden op dezelfde plek
+    // met dezelfde grootte, en trilt het daar niet. Een flits of lichtvlek die er even
+    // overheen gaat, verandert een paar beelden, niet de meeste.
+    const venster = h.filter(m => m.nu >= nu - nodig - 1e-6);
+    const lang = h.length && nu - h[0].nu >= nodig - 0.04;
+    if (venster.length < 4) return 'los';
+    const med = (a) => { const s = a.slice().sort((p, q) => p - q); return s[s.length >> 1]; };
+    const mx = med(venster.map(m => m.x)), my = med(venster.map(m => m.y)), mn = med(venster.map(m => m.n));
+    const goed = venster.filter(m => Math.abs(m.x - mx) <= tol && Math.abs(m.y - my) <= tol && Math.abs(m.n - mn) <= mn * 0.25);
+    let sx = 0, sy = 0, sxx = 0, syy = 0;
+    for (const m of goed) { sx += m.x; sy += m.y; sxx += m.x * m.x; syy += m.y * m.y; }
+    const g = Math.max(1, goed.length);
+    const tril = Math.sqrt(Math.max(0, sxx / g - (sx / g) ** 2, syy / g - (sy / g) ** 2));
+    const rustig = goed.length >= venster.length * 0.6 && tril <= this.muurTril;
+    const vast = t.age >= 12 && t.rigid && (t.trusted || !(t.skinFrac > this.muurHuid));
+    if (lang && rustig && vast && !this.aanMens(t, mensen)) { t.opMuur = true; t.muurX = mx; t.muurY = my; return ''; }
+    return rustig && nu - h[0].nu >= Math.min(0.4, nodig * 0.4) ? 'wacht' : 'los';
+  }
+
+  /** Sporen die een mens of een hand kunnen zijn (voor opDeMuur; één keer per beeld). */
+  muurMensen() {
+    return this.tracks.filter(u => !u.held && (this.personLike(u) || (!u.trusted && this.disguise(u) === 'huid')));
+  }
+
+  /** Zit er een mens of hand vlak naast (iets wat je vasthoudt)? Zoals in earnTrust. */
+  aanMens(t, mensen) {
+    const gap = this.personGap * this.cell;
+    for (const u of mensen) {
+      if (u === t) continue;
+      for (const p of t.corners) for (const q of u.corners) if (Math.abs(p[0] - q[0]) < gap && Math.abs(p[1] - q[1]) < gap) return true;
+    }
+    return false;
+  }
+
   measureTrack(t, best, dt) {
     // Komt er ineens huid of schaduw bij (een hand die eroverheen gaat), dan is het
     // niet meer hetzelfde ding: stilstand en vertrouwen opnieuw verdienen.
@@ -3437,6 +3508,475 @@ function invertH(H) {
   return inv;
 }
 
+// ---- js/kalibratie.js
+// Nauwkeurige kalibratie: een raster van stippen, één voor één geprojecteerd, en daar
+// een lensvertekening (k1 en k2, rond het midden van het camerabeeld) plus homografie
+// doorheen gepast. Een groothoekwebcam buigt rechte lijnen krom; met alleen vier
+// punten zat het beamervlak daardoor aan de randen en in de hoeken ernaast.
+//
+// Dit draait bovenop de meting met vier stippen uit main.js (autoCalibrate), en nooit
+// in plaats ervan. Elke stip wordt gemeten zoals daar: alleen binnen het witte vlak,
+// met de mediaan van een paar camerabeelden (een flitsende lamp of discobal verandert
+// één beeld, niet de meeste), en pas als twee metingen na elkaar hetzelfde zeggen (een
+// camera die zelf bijregelt is dan uitgeregeld). Klopt het raster niet duidelijk beter
+// op stippen die niet meededen, dan blijft de meting met vier stippen staan.
+
+// De lens hoort bij een homografie: wie app.H verwisselt (muur/scherm), neemt de
+// lens vanzelf mee. Oude opgeslagen kalibraties hebben geen lens en blijven werken.
+const KAL_LENZEN = new WeakMap();
+
+function kalZetLens(H, lens) {
+  if (!H) return;
+  const k1 = lens && Number.isFinite(lens.k1) ? lens.k1 : 0, k2 = lens && Number.isFinite(lens.k2) ? lens.k2 : 0;
+  if (k1 || k2) KAL_LENZEN.set(H, { k1, k2, ar: (lens && lens.ar) || 4 / 3 });
+  else KAL_LENZEN.delete(H);
+}
+
+function kalLensVan(H) {
+  return (H && KAL_LENZEN.get(H)) || null;
+}
+
+/** Camerabeeld (0..1, met lensvertekening) naar het rechte, onvertekende beeld. */
+function kalOntvorm(L, x, y) {
+  if (!L || !(L.k1 || L.k2)) return [x, y];
+  const ar = L.ar || 4 / 3, k2 = L.k2 || 0;
+  const dx = (x - 0.5) * ar, dy = y - 0.5, r2 = dx * dx + dy * dy;
+  const f = 1 + L.k1 * r2 + k2 * r2 * r2;
+  return [0.5 + dx * f / ar, 0.5 + dy * f];
+}
+
+/** En terug: de straal r zo zoeken dat r(1 + k1·r² + k2·r⁴) de gewenste straal geeft. */
+function kalVervorm(L, x, y) {
+  if (!L || !(L.k1 || L.k2)) return [x, y];
+  const ar = L.ar || 4 / 3, k2 = L.k2 || 0;
+  const ux = (x - 0.5) * ar, uy = y - 0.5;
+  const ru = Math.hypot(ux, uy);
+  if (ru < 1e-9) return [x, y];
+  let r = ru;
+  for (let i = 0; i < 12; i++) {
+    const r2 = r * r;
+    const f = r * (1 + L.k1 * r2 + k2 * r2 * r2) - ru, df = 1 + 3 * L.k1 * r2 + 5 * k2 * r2 * r2;
+    if (Math.abs(df) < 1e-6) break;
+    const nr = r - f / df;
+    if (!(nr > 0)) break;
+    if (Math.abs(nr - r) < 1e-10) { r = nr; break; }
+    r = nr;
+  }
+  const s = r / ru;
+  return [0.5 + ux * s / ar, 0.5 + uy * s];
+}
+
+/** De ene afbeelding camera -> beamervlak (beide 0..1), mét lens als die er is. */
+function kalNaarBeamer(H, x, y) {
+  const p = kalOntvorm(kalLensVan(H), x, y);
+  return applyH(H, p[0], p[1]);
+}
+
+/** En beamervlak -> camera. Hinv is invertH(H). */
+function kalNaarCamera(H, Hinv, u, v) {
+  const p = applyH(Hinv, u, v);
+  return kalVervorm(kalLensVan(H), p[0], p[1]);
+}
+
+// ---------------------------------------------------------------- passen
+
+function kalLos(A, b) {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-14) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    const piv = M[c][c];
+    for (let k = c; k <= n; k++) M[c][k] /= piv;
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const f = M[r][c];
+      if (!f) continue;
+      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+    }
+  }
+  return M.map(r => r[n]);
+}
+
+/**
+ * Homografie door N >= 4 punten, kleinste kwadraten. Twee keer herwogen met de noemer,
+ * zodat de fout in beamerpixels telt en niet een algebraïsche bijfout.
+ */
+function kalHomografieLS(src, dst) {
+  if (src.length < 4) return null;
+  let H = null;
+  for (let it = 0; it < 3; it++) {
+    const AtA = Array.from({ length: 8 }, () => new Array(8).fill(0)), Atb = new Array(8).fill(0);
+    for (let i = 0; i < src.length; i++) {
+      const [x, y] = src[i], [u, v] = dst[i];
+      let w = 1;
+      if (H) { const d = H[6] * x + H[7] * y + 1; w = Math.abs(d) > 1e-6 ? 1 / d : 1; }
+      const rows = [[x, y, 1, 0, 0, 0, -u * x, -u * y, u], [0, 0, 0, x, y, 1, -v * x, -v * y, v]];
+      for (const r of rows) {
+        for (let a = 0; a < 8; a++) {
+          const ra = r[a] * w;
+          if (!ra) continue;
+          Atb[a] += ra * r[8] * w;
+          for (let b = 0; b < 8; b++) AtA[a][b] += ra * r[b] * w;
+        }
+      }
+    }
+    const h = kalLos(AtA, Atb);
+    if (!h) return H;
+    H = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+  }
+  return H;
+}
+
+/** Fout per punt in beamerpixels (bw × bh), van camera (0..1) via lens en H naar het vlak. */
+function kalFouten(H, L, cam, proj, bw, bh) {
+  return cam.map((c, i) => {
+    const p = kalOntvorm(L, c[0], c[1]);
+    const q = applyH(H, p[0], p[1]);
+    return Math.hypot((q[0] - proj[i][0]) * bw, (q[1] - proj[i][1]) * bh);
+  });
+}
+
+/** Kleinste waarde van kost(x) tussen lo en hi: eerst grof, dan gulden snede. */
+function kalMinimum(kost, lo, hi, stap, rondes) {
+  let best = null;
+  for (let x = lo; x <= hi + 1e-9; x += stap) { const r = kost(x); if (!best || r.e < best.e) best = r; }
+  let a = best.x - stap, b = best.x + stap;
+  const g = (Math.sqrt(5) - 1) / 2;
+  let c = b - g * (b - a), d = a + g * (b - a), fc = kost(c), fd = kost(d);
+  for (let i = 0; i < rondes; i++) {
+    if (fc.e < fd.e) { b = d; d = c; fd = fc; c = b - g * (b - a); fc = kost(c); }
+    else { a = c; c = d; fc = fd; d = a + g * (b - a); fd = kost(d); }
+  }
+  for (const r of [fc, fd]) if (r.e < best.e) best = r;
+  return best;
+}
+
+function kalPasK(cam, proj, ar, metK2, bw, bh) {
+  const kost = (k1, k2) => {
+    const L = { k1, k2, ar };
+    const H = kalHomografieLS(cam.map(c => kalOntvorm(L, c[0], c[1])), proj);
+    if (!H) return { e: Infinity, H: null, k1, k2 };
+    const f = kalFouten(H, L, cam, proj, bw, bh);
+    return { e: f.reduce((s, v) => s + v * v, 0), H, k1, k2 };
+  };
+  const binnen = (k2) => { const r = kalMinimum(x => ({ ...kost(x, k2), x }), -0.6, 0.6, 0.1, 22); r.x = k2; return r; };
+  // k2 alleen met genoeg stippen: anders past hij ruis in plaats van de lens
+  return metK2 ? kalMinimum(binnen, -0.4, 0.4, 0.1, 16) : binnen(0);
+}
+
+/**
+ * Robuust passen: lens (k1) + homografie door alle gemeten stippen. Een stip die er ver
+ * naast ligt (iemand liep erdoor, een flits precies op dat moment) gaat eruit, één voor
+ * één, de slechtste eerst. cam in 0..1 camerabeeld, proj in 0..1 beamervlak, ar =
+ * breedte/hoogte van het camerabeeld, bw × bh het beamerbeeld in pixels.
+ * Geeft { H, lens, fouten (beamerpixels), gebruikt } of null.
+ */
+function kalPas(cam, proj, ar, opts = {}) {
+  const minPunten = opts.minPunten || 8;
+  const bw = opts.bw || 1280, bh = opts.bh || 720;
+  const grens = opts.grens || 4;               // beamerpixels
+  let idx = cam.map((_, i) => i);
+  for (;;) {
+    if (idx.length < minPunten) return null;
+    const c = idx.map(i => cam[i]), p = idx.map(i => proj[i]);
+    const r = kalPasK(c, p, ar, idx.length >= 12, bw, bh);
+    if (!r.H) return null;
+    const L = { k1: r.k1, k2: r.k2, ar };
+    const f = kalFouten(r.H, L, c, p, bw, bh);
+    const med = [...f].sort((x, y) => x - y)[f.length >> 1];
+    let slechtst = 0;
+    for (let i = 1; i < f.length; i++) if (f[i] > f[slechtst]) slechtst = i;
+    if (f[slechtst] > Math.max(grens, med * 4) && idx.length > minPunten) { idx.splice(slechtst, 1); continue; }
+    return { H: r.H, lens: Math.abs(r.k1) > 1e-4 || Math.abs(r.k2) > 1e-4 ? L : null, fouten: f, gebruikt: idx };
+  }
+}
+
+// ---------------------------------------------------------------- meten
+
+/** Waar de stippen komen: 5×4 over het hele vlak, tot vlak bij de randen. */
+const KAL_RASTER = (() => {
+  const us = [0.04, 0.27, 0.5, 0.73, 0.96], vs = [0.06, 0.35, 0.65, 0.94], out = [];
+  for (const v of vs) for (const u of us) out.push([u, v]);
+  return out;
+})();
+/** Controlestippen die niet meedoen met passen: vlak bij de hoeken en in het midden. */
+const KAL_CONTROLE = [[0.12, 0.13], [0.88, 0.13], [0.88, 0.87], [0.12, 0.87], [0.5, 0.5]];
+
+/**
+ * Het camerabeeld op zijn eigen resolutie (niet het kleine werkbeeld van de herkenning):
+ * een stip is daar een paar keer zo groot, en dan is het zwaartepunt een stuk preciezer.
+ * Spiegelen en uitsnede spelen hier geen rol; alles in videopixels.
+ */
+function kalBeeld(o) {
+  const v = o.vision.video, W = v.videoWidth, H = v.videoHeight;
+  if (!W || !H || v.readyState < 2) return null;
+  if (!o.cv) {
+    o.cv = document.createElement('canvas');
+    o.cx = o.cv.getContext('2d', { willReadFrequently: true });
+  }
+  if (o.cv.width !== W || o.cv.height !== H) { o.cv.width = W; o.cv.height = H; }
+  o.cx.drawImage(v, 0, 0, W, H);
+  return { W, H };
+}
+
+/** Helderheid van één venster uit het laatst getekende camerabeeld. */
+function kalVensterLuma(o, w) {
+  const d = o.cx.getImageData(w.x0, w.y0, w.w, w.h).data, n = w.w * w.h, out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  return out;
+}
+
+/** De mediaan per pixel van een paar camerabeelden, voor een paar vensters tegelijk. */
+async function kalMediaan(o, vensters, aantal) {
+  const lagen = vensters.map(() => []);
+  for (let i = 0; i < aantal; i++) {
+    if (i) await o.sleep(60);
+    if (!kalBeeld(o)) return null;
+    vensters.forEach((w, j) => lagen[j].push(kalVensterLuma(o, w)));
+  }
+  const rij = new Float32Array(aantal);
+  return lagen.map(l => {
+    const n = l[0].length, uit = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      for (let i = 0; i < aantal; i++) rij[i] = l[i][k];
+      rij.sort();
+      uit[k] = rij[aantal >> 1];
+    }
+    return uit;
+  });
+}
+
+/** De mediaan per pixel van het hele camerabeeld (de zwarte referentie). */
+async function kalMediaanHeel(o, aantal) {
+  const lagen = [];
+  let W = 0, H = 0;
+  for (let i = 0; i < aantal; i++) {
+    if (i) await o.sleep(60);
+    const b = kalBeeld(o);
+    if (!b) return null;
+    W = b.W; H = b.H;
+    const d = o.cx.getImageData(0, 0, W, H).data, n = W * H, l = new Uint8Array(n);
+    for (let k = 0; k < n; k++) l[k] = 0.299 * d[k * 4] + 0.587 * d[k * 4 + 1] + 0.114 * d[k * 4 + 2];
+    lagen.push(l);
+  }
+  const n = W * H, uit = new Float32Array(n), rij = new Float32Array(aantal);
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < aantal; i++) rij[i] = lagen[i][k];
+    rij.sort();
+    uit[k] = rij[aantal >> 1];
+  }
+  return { W, H, l: uit };
+}
+
+/** Een venster uit de zwarte referentie. */
+function kalRefVenster(ref, w) {
+  const out = new Float32Array(w.w * w.h);
+  for (let y = 0; y < w.h; y++) for (let x = 0; x < w.w; x++) out[y * w.w + x] = ref.l[(w.y0 + y) * ref.W + w.x0 + x];
+  return out;
+}
+
+function kalMediaanVan(a) {
+  const s = Float32Array.from(a).sort();
+  return s.length ? s[s.length >> 1] : 0;
+}
+
+/**
+ * Zwaartepunt van de stip in een venster: verschil met de zwarte referentie, min wat de
+ * rand van het venster gemiddeld (mediaan) feller werd (een camera die bijregelt, licht
+ * dat terugkaatst). Van alle heldere vlekjes in het venster telt het vlekje met het meeste
+ * licht dicht bij de verwachte plek (het midden van het venster): een los fel puntje van
+ * een discobal of lamp aan de rand is nooit de stip.
+ */
+function kalZwaartepunt(lum, ref, w) {
+  const n = w.w * w.h, d = new Float32Array(n), randW = [];
+  for (let k = 0; k < n; k++) {
+    d[k] = lum[k] - ref[k];
+    const x = k % w.w, y = (k - x) / w.w;
+    if (x === 0 || y === 0 || x === w.w - 1 || y === w.h - 1) randW.push(d[k]);
+  }
+  const basis = kalMediaanVan(randW);
+  const afw = kalMediaanVan(randW.map(v => Math.abs(v - basis))) * 1.48;
+  let max = 0;
+  for (let k = 0; k < n; k++) { d[k] -= basis; if (d[k] > max) max = d[k]; }
+  if (!(max > 0)) return null;
+  // 1. vlekjes boven een lage drempel; het beste: veel licht, dicht bij het midden
+  const laag = Math.max(afw * 4, max * 0.2);
+  const label = new Int32Array(n), stapel = [];
+  const mx = (w.cx != null ? w.cx - w.x0 : w.w / 2), my = (w.cy != null ? w.cy - w.y0 : w.h / 2);
+  const schaal = Math.max(3, Math.min(w.w, w.h) * 0.25);
+  let nr = 0, beste = null;
+  for (let s = 0; s < n; s++) {
+    if (label[s] || d[s] <= laag) continue;
+    nr++;
+    label[s] = nr; stapel.push(s);
+    let massa = 0, sx = 0, sy = 0, piek = 0, pk = s;
+    while (stapel.length) {
+      const k = stapel.pop(), x = k % w.w, y = (k - x) / w.w;
+      massa += d[k]; sx += x * d[k]; sy += y * d[k];
+      if (d[k] > piek) { piek = d[k]; pk = k; }
+      if (x > 0 && !label[k - 1] && d[k - 1] > laag) { label[k - 1] = nr; stapel.push(k - 1); }
+      if (x < w.w - 1 && !label[k + 1] && d[k + 1] > laag) { label[k + 1] = nr; stapel.push(k + 1); }
+      if (y > 0 && !label[k - w.w] && d[k - w.w] > laag) { label[k - w.w] = nr; stapel.push(k - w.w); }
+      if (y < w.h - 1 && !label[k + w.w] && d[k + w.w] > laag) { label[k + w.w] = nr; stapel.push(k + w.w); }
+    }
+    const afst = Math.hypot(sx / massa - mx, sy / massa - my) / schaal;
+    const score = massa / (1 + afst * afst);
+    if (!beste || score > beste.score) beste = { score, piek, pk };
+  }
+  if (!beste) return null;
+  // 2. binnen dat vlekje: zwaartepunt boven de helft van zijn eigen piek
+  const thr = beste.piek * 0.5;
+  const mee = new Uint8Array(n);
+  mee[beste.pk] = 1; stapel.push(beste.pk);
+  let sx = 0, sy = 0, sw = 0, rand = 0, aantal = 0;
+  while (stapel.length) {
+    const k = stapel.pop();
+    const x = k % w.w, y = (k - x) / w.w, g = d[k] - thr;
+    sx += x * g; sy += y * g; sw += g; aantal++;
+    if (x === 0 || y === 0 || x === w.w - 1 || y === w.h - 1) rand += g;
+    if (x > 0 && !mee[k - 1] && d[k - 1] > thr) { mee[k - 1] = 1; stapel.push(k - 1); }
+    if (x < w.w - 1 && !mee[k + 1] && d[k + 1] > thr) { mee[k + 1] = 1; stapel.push(k + 1); }
+    if (y > 0 && !mee[k - w.w] && d[k - w.w] > thr) { mee[k - w.w] = 1; stapel.push(k - w.w); }
+    if (y < w.h - 1 && !mee[k + w.w] && d[k + w.w] > thr) { mee[k + w.w] = 1; stapel.push(k + w.w); }
+  }
+  if (!sw) return null;
+  return { x: w.x0 + sx / sw + 0.5, y: w.y0 + sy / sw + 0.5, max: beste.piek, ruis: afw, n: aantal, rand: rand / sw };
+}
+
+function kalMaakVenster(cx, cy, half, W, H) {
+  const x0 = Math.max(0, Math.floor(cx - half)), x1 = Math.min(W - 1, Math.ceil(cx + half));
+  const y0 = Math.max(0, Math.floor(cy - half)), y1 = Math.min(H - 1, Math.ceil(cy + half));
+  if (x1 - x0 < 6 || y1 - y0 < 6) return null;
+  return { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1, cx, cy };
+}
+
+/**
+ * Meet één stip. Steeds de mediaan van vijf camerabeelden; pas als twee van die metingen
+ * na elkaar op dezelfde plek uitkomen, telt hij. Zo wacht het vanzelf tot de camera de
+ * stip echt laat zien (vertraging van 50–300 ms is normaal) en tot een camera die zijn
+ * helderheid zelf regelt weer stil staat.
+ */
+async function kalMeetStip(o, w, refHeel, settle) {
+  const eind = Date.now() + settle;
+  const tol = 0.35 * Math.max(1, o.W / 320);       // ongeveer 1/3 werkpixel
+  let vorige = null, verschoven = 0;
+  let ref = kalRefVenster(refHeel, w);
+  await o.sleep(o.eerst || 200);
+  while (Date.now() < eind) {
+    if (o.afbreken && o.afbreken()) return null;
+    const m = await kalMediaan(o, [w], 5);
+    if (!m) { await o.sleep(30); continue; }
+    const z = kalZwaartepunt(m[0], ref, w);
+    if (z && z.rand > 0.08 && z.max >= o.minContrast && verschoven < 2) {
+      // stip ligt tegen de rand van het venster: het venster op de stip zetten
+      const nw = kalMaakVenster(z.x, z.y, o.half, refHeel.W, refHeel.H);
+      if (nw && Math.hypot(z.x - w.cx, z.y - w.cy) < o.half * 1.2) { w = nw; ref = kalRefVenster(refHeel, w); verschoven++; vorige = null; continue; }
+    }
+    if (!z || z.max < Math.max(o.minContrast, z.ruis * 6) || z.rand > 0.08) { vorige = null; continue; }
+    if (vorige && Math.hypot(z.x - vorige.x, z.y - vorige.y) < tol && Math.abs(z.max - vorige.max) < vorige.max * 0.15) {
+      return { x: (z.x + vorige.x) / 2, y: (z.y + vorige.y) / 2, max: z.max };
+    }
+    vorige = z;
+  }
+  return null;
+}
+
+/** Gemiddelde en grootste fout (beamerpixels) van een afbeelding op losse stippen. */
+function kalControleFout(naar, cam, proj, bw, bh) {
+  const f = cam.map((c, i) => { const q = naar(c[0], c[1]); return Math.hypot((q[0] - proj[i][0]) * bw, (q[1] - proj[i][1]) * bh); });
+  return { gem: f.reduce((s, x) => s + x, 0) / Math.max(1, f.length), max: f.length ? Math.max(...f) : Infinity };
+}
+
+/**
+ * Het hele raster meten en passen. o: { vision, sleep, toon(patroon), H4 (de meting met
+ * vier stippen, camera 0..1 -> beamer 0..1), binnenVlak(u, v) (camera 0..1: ligt dit in
+ * het witte vlak?), wachtTotStil(ms), ar, bw, bh, voortgang(n, m), afbreken() }.
+ * Geeft { H, lens, fout } als het raster duidelijk klopt en minstens zo goed is als de
+ * vier stippen, en anders { mislukt: reden, ... }: dan blijft H4 staan.
+ */
+async function kalRaster(o) {
+  const vid = o.vision.video, W = vid.videoWidth, Hh = vid.videoHeight;
+  if (!W || !Hh) return { mislukt: 'camera' };
+  o.W = W;
+  const Hinv = invertH(o.H4);
+  if (!Hinv) return { mislukt: 'homografie' };
+  const bw = o.bw || 1280, bh = o.bh || 720;
+  const alle = [...KAL_RASTER, ...KAL_CONTROLE];
+  const naarPx = (u, v) => { const c = applyH(Hinv, u, v); return [c[0] * W, c[1] * Hh]; };
+  // Venster = ruim 40% van de kleinste afstand tussen twee rasterstippen in het
+  // camerabeeld. De stippen komen één voor één, dus vensters mogen elkaar overlappen.
+  let minAfst = Infinity;
+  for (let i = 0; i < KAL_RASTER.length; i++) for (let j = i + 1; j < KAL_RASTER.length; j++) {
+    const a = naarPx(...KAL_RASTER[i]), b = naarPx(...KAL_RASTER[j]);
+    minAfst = Math.min(minAfst, Math.hypot(a[0] - b[0], a[1] - b[1]));
+  }
+  const half = Math.min(90, Math.max(6, minAfst * 0.42));
+  o.half = half;
+  // stip: zo groot dat hij in de camera minstens een paar pixels beslaat
+  const pxPerBeamer = minAfst / Math.min(bw * 0.23, bh * 0.29);
+  const r = Math.min(0.05, Math.max(0.028, 2.5 / Math.max(1e-6, pxPerBeamer) / Math.min(bw, bh)));
+  const vensters = alle.map(([u, v]) => {
+    const p = naarPx(u, v);
+    // alleen binnen het witte vlak zoeken
+    if (o.binnenVlak && !o.binnenVlak(p[0] / W, p[1] / Hh)) return null;
+    return kalMaakVenster(p[0], p[1], half, W, Hh);
+  });
+  const bruikbaar = vensters.filter(Boolean);
+  if (bruikbaar.length < 12) return { mislukt: 'te weinig stippen in beeld', gezien: bruikbaar.length };
+
+  // zwarte referentie per venster, pas als het beeld stil staat
+  o.toon({ kind: 'black' });
+  await o.sleep(300);
+  if (o.wachtTotStil) await o.wachtTotStil(1500);
+  const refHeel = await kalMediaanHeel(o, 5);
+  if (!refHeel || refHeel.W !== W || refHeel.H !== Hh) return { mislukt: 'camera' };
+
+  const cam = [], proj = [], ctrlCam = [], ctrlProj = [];
+  const t0 = Date.now();
+  let geprobeerd = 0;
+  for (let i = 0; i < alle.length; i++) {
+    if (o.afbreken && o.afbreken()) return { mislukt: 'afgebroken' };
+    // Zijn de stippen niet te zien (te donker, te veel licht), dan niet een minuut lang
+    // blijven proberen: na acht stippen, of na 50 s, terug naar de vier stippen.
+    if ((geprobeerd >= 8 && cam.length < geprobeerd / 2) || Date.now() - t0 > 50000) {
+      o.toon({ kind: 'black' });
+      return { mislukt: 'stippen niet goed te zien', stippen: cam.length, geprobeerd };
+    }
+    o.voortgang && o.voortgang(i + 1, alle.length);
+    const w = vensters[i];
+    if (!w) continue;
+    const [u, v] = alle[i];
+    o.toon({ kind: 'stip', u, v, r });
+    geprobeerd++;
+    const z = await kalMeetStip({ ...o, minContrast: o.minContrast || 10 }, w, refHeel, o.settle || 2600);
+    if (!z) continue;
+    const c = [z.x / W, z.y / Hh];
+    if (o.binnenVlak && !o.binnenVlak(c[0], c[1])) continue;
+    if (i < KAL_RASTER.length) { cam.push(c); proj.push([u, v]); }
+    else { ctrlCam.push(c); ctrlProj.push([u, v]); }
+  }
+  o.toon({ kind: 'black' });
+  const pas = kalPas(cam, proj, o.ar, { bw, bh });
+  const fit = pas ? pas.gebruikt.map((_, j) => pas.fouten[j]) : [];
+  const rms = fit.length ? Math.sqrt(fit.reduce((s, x) => s + x * x, 0) / fit.length) : Infinity;
+  const diag = { stippen: cam.length, gebruikt: pas ? pas.gebruikt.length : 0, rms: +rms.toFixed(2), controle: ctrlCam.length };
+  // ---- zelfcontrole ----
+  if (!pas || pas.gebruikt.length < 12) return { mislukt: 'te weinig stippen', ...diag };
+  if (rms > Math.max(2.5, bw * 0.002)) return { mislukt: 'past niet', ...diag };
+  if (ctrlCam.length < 3) return { mislukt: 'controle', ...diag };
+  const L = pas.lens;
+  const raster = kalControleFout((x, y) => { const p = kalOntvorm(L, x, y); return applyH(pas.H, p[0], p[1]); }, ctrlCam, ctrlProj, bw, bh);
+  const vier = kalControleFout((x, y) => applyH(o.H4, x, y), ctrlCam, ctrlProj, bw, bh);
+  diag.gem = +raster.gem.toFixed(2); diag.max = +raster.max.toFixed(2);
+  diag.vier = { gem: +vier.gem.toFixed(2), max: +vier.max.toFixed(2) };
+  // Nooit slechter dan de vier stippen: anders blijven die staan.
+  if (raster.gem > vier.gem + 0.25 || raster.max > vier.max + 1) return { mislukt: 'niet beter', ...diag };
+  return { H: pas.H, lens: L, fout: diag };
+}
+
 // ---- js/taal-en.js
 // Het Engels van Sticky Clash. Links de Nederlandse tekst precies zoals hij in de code of
 // in index.html staat, rechts het Engels. Zie js/taal.js voor hoe het werkt.
@@ -3497,6 +4037,8 @@ const TAAL_EN = {
   'De beamer verlicht de muur zachtjes, zodat de camera je voorwerpen ook in een donkere kamer ziet.':
     'The projector gently lights the wall, so the camera can see your objects even in a dark room.',
   'Mensen negeren': 'Ignore people',
+  'Alleen wat op de muur zit': "Only what's on the wall",
+  'Iets telt pas als het een seconde stil op de muur hangt. Flitsende lampen, lichtvlekken van een discobal, mensen die langslopen en iets wat je in je hand houdt tellen niet.': "Something only counts once it has hung still on the wall for a second. Flashing lights, light spots from a disco ball, people walking past and anything you hold in your hand don't count.",
   'Huid negeren — je arm verdwijnt, het voorwerp in je hand blijft': 'Ignore skin — your arm disappears, the object in your hand stays',
   'Wat al aan de muur hangt telt ook mee': 'Things already on the wall count too',
   'Leer opnieuw hoe de lege muur eruitziet': 'Relearn what the empty wall looks like',
@@ -3739,6 +4281,8 @@ const TAAL_EN = {
   'Kalibratie mislukt.': 'Calibration failed.',
   'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt': 'Calibration done — check that the dashed line runs around the projected image',
   'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)': "Calibration done (rough measurement; the dots weren't clearly visible)",
+  'Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels': 'Calibration done — accurate to about {px} projector pixels',
+  'Kalibreren… stip {n} van {m}': 'Calibrating… dot {n} of {m}',
   'Klik punt {n} van 4 in het camerabeeld': 'Click point {n} of 4 in the camera view',
   'Gekalibreerd': 'Calibrated',
   'Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch': 'Locking made the camera image darker — exposure stays automatic',
@@ -3883,6 +4427,7 @@ const TAAL_EN = {
   '{n} voorwerpen actief': '{n} objects active',
   'genegeerd: {lijst}': 'ignored: {lijst}',
   'loopt beeld uit': 'leaves the frame',
+  'hangt niet stil op de muur': "isn't hanging still on the wall",
   'te groot': 'too big',
   'buiten beamervlak': 'outside projection',
   'te hoog': 'too high',
@@ -10801,7 +11346,7 @@ class StapVoorStap {
     this.elSluit.setAttribute('aria-label', t('Sluiten'));
     this.stippen.forEach((b, k) => {
       const id = KLAAR_STAPPEN[k];
-      const gedaan = k < this.i ? this.stand[id] !== 'fout' : this.stand[id] === 'goed';
+      const gedaan = k < this.i ? this.stand[id] !== 'fout' || !!this.handmatig[id] : this.stand[id] === 'goed';
       b.className = 'st-stip' + (k === this.i ? ' nu' : gedaan ? ' gedaan' : '');
       b.disabled = !this.magNaar(k) && k !== this.i;
       b.setAttribute('aria-label', t('Stap {n} van {m}', { n: k + 1, m: n }));
@@ -10838,6 +11383,8 @@ class StapVoorStap {
     this.elHoofd.textContent = m.hoofd.tekst;
     this.elHoofd.disabled = !!m.hoofd.uit;
     this.elHoofd.classList.toggle('klaar', !m.hoofd.uit && c.soort === 'goed');
+    // bij de laatste stap valt er niets meer automatisch te doen
+    this.elAuto.parentNode.classList.toggle('hidden', KLAAR_STAPPEN[this.i] === 'klaar');
     this.elAuto.textContent = t('Alles automatisch');
     this.elAuto.disabled = this.bezig();
     this.elAutoHint.textContent = t('Doet alle stappen in één keer; volg dan de aanwijzingen op de muur.');
@@ -10845,6 +11392,7 @@ class StapVoorStap {
 }
 
 // ---- js/main.js
+
 
 
 
@@ -10894,6 +11442,9 @@ const app = {
   abort: false,
   goalTrack: null,
   noPeople: true,
+  // Alleen wat echt op de muur zit telt (zie vision.opDeMuur): geen flitsen, lichtvlekken,
+  // langslopende mensen of iets in je hand. Alleen met muur en beamer.
+  alleenMuur: true,
   special: true,          // rood/groen/blauw briefje = trampoline/turbo/breekbaar
   gold: true,             // gouden ballen
   bonus: true,            // kleine bonusbak
@@ -10978,12 +11529,14 @@ function save() {
     localStorage.setItem(STORE, JSON.stringify({
       // op een scherm is app.H het camerabeeld zelf; de kalibratie van de beamer is muurH
       H: app.speelplek === 'scherm' ? app.muurH : app.H,
+      lens: kalLensVan(app.speelplek === 'scherm' ? app.muurH : app.H),
       speelplek: bewaarSpeelplek(app.speelplek, app.plekGekozen),
       schermSpiegel: app.schermSpiegel,
       classes: vision.classes,
       mirror: vision.mirror,
       mode: vision.mode,
       noPeople: app.noPeople,
+      alleenMuur: app.alleenMuur,
       special: app.special, gold: app.gold, bonus: app.bonus, levels: app.levels,
       autoRecal: app.autoRecal, elkeMinuut: app.elkeMinuut, lastName: app.lastName,
       resident: app.resident,
@@ -11030,7 +11583,7 @@ function load() {
       if (old) s = { classes: old.classes, mirror: old.mirror, mode: old.mode, best: old.best };
     }
     if (!s) return;
-    if (s.H) { app.H = s.H; app.Hinv = invertH(s.H); app.steps.cal = 1; }
+    if (s.H) { app.H = s.H; kalZetLens(app.H, s.lens); app.Hinv = invertH(s.H); app.steps.cal = 1; }
     if (s.classes) {
       vision.classes = DEFAULT_CLASSES.map(d => {
         const f = s.classes.find(c => c.id === d.id);
@@ -11043,6 +11596,7 @@ function load() {
       if (s[k] != null) $(k).value = s[k];
     }
     if (s.noPeople != null) { app.noPeople = s.noPeople; $('noPeople').checked = s.noPeople; }
+    if (s.alleenMuur != null) { app.alleenMuur = s.alleenMuur; $('alleenMuur').checked = s.alleenMuur; }
     if (s.skin != null) { vision.skinFilter = s.skin; $('skin').checked = s.skin; }
     if (s.resident != null) { app.resident = s.resident; $('resident').checked = s.resident; }
     for (const k of ['special', 'gold', 'bonus', 'autoRecal', 'elkeMinuut']) {
@@ -11163,12 +11717,12 @@ function syncStepsFromState() {
  */
 function toProj(x, y) {
   const c = vision.camNorm(x, y);
-  return applyH(app.H, c[0], c[1]);
+  return kalNaarBeamer(app.H, c[0], c[1]);
 }
 
 /** En terug: plek op het beamervlak naar camerapixel in het werkbeeld. */
 function fromProj(u, v) {
-  const c = applyH(app.Hinv, u, v);
+  const c = kalNaarCamera(app.H, app.Hinv, u, v);
   return vision.camPx(c[0], c[1]);
 }
 
@@ -11746,7 +12300,9 @@ async function diffAgainst(pattern, ref, settle, stil) {
  * Stap 1 is een volledig wit beeld. Dat is veruit het sterkste signaal en werkt
  * ook in een verlichte kamer; de vier hoekpunten van het heldere vlak geven al
  * een bruikbare homografie. Stap 2 verfijnt die met vier losse stippen, maar
- * alleen als die goed genoeg te zien zijn.
+ * alleen als die goed genoeg te zien zijn. Stap 3 legt daar een raster van stippen
+ * met de kromming van de lens overheen (js/kalibratie.js), maar alleen als dat op
+ * controlestippen minstens zo goed klopt.
  */
 async function autoCalibrate(silent) {
   if (!vision.ready) { if (!silent) status(t('Start eerst de camera'), 'err'); return false; }
@@ -11845,6 +12401,34 @@ async function autoCalibrate(silent) {
     if (H2) { H = H2; refined = true; }
   }
 
+  // ---- stap 3: raster van stippen met lensvertekening (js/kalibratie.js) ----
+  // Bovenop de vier stippen, nooit in plaats ervan: alleen binnen het witte vlak, met
+  // dezelfde mediaan en hetzelfde wachten. Klopt het raster op losse controlestippen
+  // niet minstens zo goed als de vier stippen, dan blijven die gewoon staan.
+  let rasterFout = null;
+  if (!app.abort && projOk()) {
+    const inVlak = new Uint8Array(white.d.length);
+    for (const k of vlak) inVlak[k] = 1;
+    const binnenVlak = (u, v) => {
+      const p = vision.camPx(u, v), cx = Math.floor(p[0] / vision.cell), cy = Math.floor(p[1] / vision.cell);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (x >= 0 && y >= 0 && x < cols && y < vision.rows && inVlak[y * cols + x]) return true;
+      }
+      return false;
+    };
+    const pc = app.projCtx.canvas, vid = vision.video;
+    const res = await kalRaster({
+      vision, sleep, H4: H, binnenVlak, wachtTotStil,
+      ar: (vid.videoWidth / vid.videoHeight) || 4 / 3, bw: pc.width, bh: pc.height,
+      toon: (p) => { app.calPattern = p; },
+      voortgang: (i, m) => { if (!silent) status(t('Kalibreren… stip {n} van {m}', { n: i, m })); },
+      afbreken: () => app.abort || !projOk(),
+    });
+    app.calDiag.raster = res.fout || res;
+    if (res.H) { H = res.H; kalZetLens(H, res.lens); rasterFout = res.fout; refined = true; }
+  }
+
   app.calPattern = null;
   app.wiz = wasWiz;
   if (vastCal.length && !app.lockExposure) await vision.unlockCamera();
@@ -11864,7 +12448,9 @@ async function autoCalibrate(silent) {
   app.calPattern = null;
 
   if (!silent) {
-    status(refined
+    status(rasterFout
+      ? t('Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels', { px: Math.max(1, Math.round(rasterFout.max)) })
+      : refined
       ? t('Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt')
       : t('Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)'), 'ok');
   }
@@ -12471,6 +13057,7 @@ bindSlider('bounce', v => (v / 100).toFixed(2), v => { game.rest = v / 100; });
 bindSlider('rate', v => (v / 10).toFixed(1) + '/s', v => { game.rate = v / 10; });
 
 $('noPeople').onchange = e => { app.noPeople = e.target.checked; save(); };
+$('alleenMuur').onchange = e => { app.alleenMuur = e.target.checked; save(); };
 $('fill').oninput = () => {
   app.fill = +$('fill').value / 100;
   $('fillOut').textContent = $('fill').value + '%';
@@ -13140,7 +13727,7 @@ function applyRoi() {
   if (!app.Hinv || !vision.ready || !app.useRoi) return false;
   let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity;
   for (const corner of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
-    const c = applyH(app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
+    const c = kalNaarCamera(app.H, app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
     u0 = Math.min(u0, c[0]); u1 = Math.max(u1, c[0]);
     v0 = Math.min(v0, c[1]); v1 = Math.max(v1, c[1]);
   }
@@ -13249,6 +13836,8 @@ function buildObstacles(tracks) {
   if (binTrack) app.reasonById.set(binTrack.id, 'bak');
 
   let bestGoal = null, bestSrc = null;
+  const alleenMuur = objectMode && app.alleenMuur && app.speelplek === 'muur';
+  const mensen = alleenMuur ? vision.muurMensen() : null;
   for (const t of tracks) {
     if (t === binTrack) continue;
     counts[t.cls] = (counts[t.cls] || 0) + 1;
@@ -13295,6 +13884,14 @@ function buildObstacles(tracks) {
       if (t.age < 12) pending = true;                 // nog onbekend is geen obstakel
       else if (!t.rigid) { drop('mens'); continue; }
       if (t.stable < app.stableNeed) pending = true;
+    }
+    // Alleen wat echt op de muur zit: eerst een seconde stil hangen (of zo lang als
+    // Stilstaan zegt), niet trillen en niet vastzitten aan een hand. Een flits, een
+    // lichtvlek of iets wat je vasthoudt wordt zo nooit een obstakel.
+    if (alleenMuur) {
+      const m = vision.opDeMuur(t, Math.max(vision.muurStil, app.stableNeed / 30), mensen, performance.now() / 1000);
+      if (m === 'wacht') pending = true;
+      else if (m) { drop(m); continue; }
     }
     out.push(obstacleFrom(t, t.corners, pending));
   }
@@ -13427,6 +14024,11 @@ function drawPattern(ctx, w, h) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(t[0] * w, t[1] * h, Math.min(w, h) * 0.075, 0, 7);
+    ctx.fill();
+  } else if (k === 'stip') {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(app.calPattern.u * w, app.calPattern.v * h, Math.min(w, h) * app.calPattern.r, 0, 7);
     ctx.fill();
   } else if (k === 'verify') {
     const m = Math.min(w, h) * 0.02;
@@ -13686,7 +14288,8 @@ function fitWereld(ar) {
 const REDENEN = { rand: 'loopt beeld uit', groot: 'te groot', buiten: 'buiten beamervlak',
                   hoog: 'te hoog', mens: 'mens', vorm: 'geen voorwerpvorm',
                   schaduw: 'donker of schaduw (telt als het stil hangt)',
-                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak' };
+                  huid: 'huidkleur (telt als het stil hangt)', bak: 'schaduw van de bak',
+                  los: 'hangt niet stil op de muur' };
 
 let last = performance.now();
 let visionAcc = 0;
