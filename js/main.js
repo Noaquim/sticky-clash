@@ -9,6 +9,7 @@ import { SPEELPLEKKEN, DEMO_KLEUREN, DEMO_SPECIAAL, DEMO_MAX, SPEL_ADRES, bepaal
   briefjeUitSleep, briefjeOp, kruisjeVan, schuifBriefje, briefjesMee, demoMee, dubbeltik, cameraReden, eigenTabblad } from './speelplek.js';
 import { vsElement, vsKan, vsAan, vsUit, isIOS, apartVensterKan, besturing } from './apparaat.js';
 import { Kwaliteit, kwaliteitBijStart, inStapjes } from './kwaliteit.js';
+import { OMGEVING, Omgevingswacht, versnelOmgeving, mensachtig, telAlsVoorwerp, nieuweKleurstand, kleurStap, kleurOordeel, samenOmtrekken } from './omgeving.js';
 
 const $ = (id) => document.getElementById(id);
 // Wat deze computer kan (zie js/apparaat.js). Niet de naam van de browser: Firefox en Safari
@@ -103,6 +104,12 @@ const app = {
   wachtBeamer: false,     // de wizard wacht tot het beamervenster op de beamer staat
   verder: false,          // daarop geklikt: niet langer wachten
   kanVastzetten: true,    // kan deze camera (en browser) de belichting vastzetten?
+  elkeMinuut: true,       // elke minuut controleren of het licht of de muur veranderd is
+  kleurFill: 0,           // zoveel muurverlichting hadden de kleuren nodig (zie kleurLicht)
+  kleurOpgegeven: false,  // feller ging niet, en de kleuren bleven onbetrouwbaar
+  autoPauze: false,       // de ronde ging vanzelf op pauze om bij te stellen
+  melding: null,          // korte melding op de muur: { nl, vars, tot } (zie muurMelding)
+  onderhoud: [],          // wat er vanzelf bijgesteld werd: { reden, ok, t } (voor de tests)
 };
 
 const debug = $('debug');
@@ -132,7 +139,7 @@ function save() {
       mode: vision.mode,
       noPeople: app.noPeople,
       special: app.special, gold: app.gold, bonus: app.bonus, levels: app.levels,
-      autoRecal: app.autoRecal, lastName: app.lastName,
+      autoRecal: app.autoRecal, elkeMinuut: app.elkeMinuut, lastName: app.lastName,
       resident: app.resident,
       skin: vision.skinFilter,
       maxSize: +$('maxSize').value,
@@ -151,6 +158,7 @@ function save() {
       wind: +$('wind').value,
       outline: $('outline').checked,
       sound: $('sound').checked, muziek: $('muziek').checked, effecten: $('effecten').checked,
+      muziekStijl: $('muziekStijl').value,
       strict: +$('strict').value,
       camId: app.camId || '',
       camChosen: app.camChosen,
@@ -191,7 +199,7 @@ function load() {
     if (s.noPeople != null) { app.noPeople = s.noPeople; $('noPeople').checked = s.noPeople; }
     if (s.skin != null) { vision.skinFilter = s.skin; $('skin').checked = s.skin; }
     if (s.resident != null) { app.resident = s.resident; $('resident').checked = s.resident; }
-    for (const k of ['special', 'gold', 'bonus', 'autoRecal']) {
+    for (const k of ['special', 'gold', 'bonus', 'autoRecal', 'elkeMinuut']) {
       if (s[k] != null) { app[k] = !!s[k]; $(k).checked = app[k]; }
     }
     if (s.levels != null) { app.levels = !!s.levels; $('spelvorm').value = app.levels ? 'levels' : 'vrij'; }
@@ -201,6 +209,7 @@ function load() {
     if (s.moveGoal != null) $('moveGoal').checked = s.moveGoal;
     if (s.outline != null) $('outline').checked = s.outline;
     for (const k of ['sound', 'muziek', 'effecten']) if (s[k] != null) $(k).checked = !!s[k];
+    if ([...$('muziekStijl').options].some(o => o.value === s.muziekStijl)) $('muziekStijl').value = s.muziekStijl;
     if (s.best) app.best = { object: s.best.object | 0, color: s.best.color | 0, demo: s.best.demo | 0 };
     if (typeof s.schermSpiegel === 'boolean') app.schermSpiegel = s.schermSpiegel;
     if (s.camId) app.camId = s.camId;
@@ -558,6 +567,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
 function vergeetMuur() {
   if (vision.mask) vision.clearBackground();
   step('bg', 0);
+  omgWacht.nieuw(null);
 }
 
 $('btnCam').onclick = () => runExclusive(startCamera);
@@ -734,7 +744,12 @@ function toonSchermenHint() {
   $('schermenHint').textContent = t('Deze browser zet het beamervenster niet zelf op de beamer: {tip}.', { tip: sleepTip });
 }
 
-$('btnScreens').onclick = async () => {
+/**
+ * De browser laten zoeken waar de beamer hangt (Chrome en Edge, na toestemming), en het
+ * beamervenster daarheen zetten. Uit "Meer instellingen → Beamer", en uit het kader dat
+ * wacht tot het beamervenster op de beamer staat (zie wachtOpBeamer).
+ */
+async function zoekBeamer() {
   if (!SCHERMEN_HERKENNEN) {
     status(t('Deze browser kan geen schermen herkennen — {tip}', { tip: sleepTip }), 'err');
     return;
@@ -747,8 +762,11 @@ $('btnScreens').onclick = async () => {
   if (projOk()) {
     app.proj.moveTo(scr.availLeft, scr.availTop);
     app.proj.resizeTo(scr.availWidth, scr.availHeight);
+    // Wachtte het instellen tot het venster op de beamer stond? Dan kan het nu verder.
+    if (app.wachtBeamer) app.verder = true;
   }
-};
+}
+$('btnScreens').onclick = zoekBeamer;
 $('btnProjClose').onclick = () => {
   if (projOk()) app.proj.close();
   app.proj = null; app.projCtx = null; step('proj', 0);
@@ -937,7 +955,14 @@ function updateCal() {
 
 // ---------------------------------------------------------------- muur leren
 
-async function learnWall(withCountdown) {
+/**
+ * De lege muur leren. opt (bij het vanzelf bijstellen, zie onderhoud):
+ *   houd   omtrekken (werkpixels) van wat als voorwerp telde: dat blijft meetellen, met zijn
+ *          eigen kleur, ook als het licht intussen veranderde (zie vision.houdVast)
+ *   stil   beweegt er iets terwijl de beelden binnenkomen (iemand loopt erdoor), dan niet
+ *          leren: de oude muur blijft, en het wordt later opnieuw geprobeerd
+ */
+async function learnWall(withCountdown, opt = {}) {
   if (!vision.ready) return false;
   // Op een scherm is er geen beamer: geen wit beeld, geen muurverlichting, niets vast te
   // zetten. Het spel leert gewoon hoe de lege tafel (of muur, of bord) eruitziet.
@@ -984,21 +1009,44 @@ async function learnWall(withCountdown) {
       status(t('Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch'), 'err');
     }
   }
+  // De oude muur, om wat als voorwerp telde straks terug te zetten (zie vision.houdVast).
+  const oud = opt.houd && opt.houd.length && vision.bg ? Float32Array.from(vision.bg) : null;
   // Een seconde aan beelden: met maar acht werd de ruis naast scherpe randen
   // onderschat, en dat gaf valse vlekken.
   vision.beginBackground();
+  if (opt.stil) { vision.grab(); vision.bewegingSindsVorig(true); }
+  let onrust = 0;
   for (let i = 0; i < 30; i++) {
     if (app.abort) { app.calPattern = null; return false; }
     vision.grab();
+    // Loopt er iemand door het beeld? Dan niet leren: die zou in de muur terechtkomen. De
+    // oude muur blijft gewoon staan (endBackground komt er niet). Drie keer achter elkaar,
+    // of één keer heel duidelijk: een uitschieter in de korrel van een donkere camera is
+    // nog geen voorbijganger.
+    const bew = opt.stil ? vision.bewegingSindsVorig() : 0;
+    onrust = bew > OMG.beweging * 2 ? onrust + 1 : 0;
+    if (onrust >= 3 || bew > OMG.beweging * 8) {
+      vision.bgAcc = null; vision.bgSq = null;
+      app.calPattern = null; app.wiz = null;
+      step('bg', vision.hasBackground ? 1 : 0);
+      app.leerOnrustig = true;
+      return false;
+    }
     vision.addBackgroundFrame();
     await sleep(33);
   }
   vision.endBackground();
   // Hing er al iets? Dat zit nu in de geleerde muur en zou onzichtbaar blijven.
   const al = app.resident ? vision.findResident(inProjection) : 0;
+  // Wat net nog als voorwerp telde, blijft meetellen (vanzelf bijstellen).
+  const gehouden = oud ? vision.houdVast(opt.houd, oud) : 0;
+  // (wat vastgehouden werd, telde al als voorwerp; findResident vindt die meestal ook)
+  app.laatstGehouden = gehouden || al;
   app.calPattern = null;
   app.wiz = null;
   step('bg', 1);
+  // De controle van elke minuut begint opnieuw, met deze muur als maatstaf.
+  omgWacht.nieuw(vision.omgevingBasis(app.H));
   // vision.lockCamera noemt wat hij vastzette: 'belichting', 'witbalans'
   const wat = () => vast.map(w => t(w)).join(', ');
   if (scherm) {
@@ -1099,6 +1147,9 @@ $('btnGoal').onclick = () => {
 
 function autoSetup() {
   sfx.resume();
+  // Wie terugkomt met een bewaarde kalibratie: eerst kijken of die nog klopt (zie
+  // kalibratieKlopt). Na het instellen is het "Opnieuw instellen": dan alles opnieuw.
+  const snel = !app.ingesteld && !!app.H && app.speelplek === 'muur';
   // Kan de camera hier helemaal niet (ingesloten venster, geen https)? Dan zeggen we dat
   // meteen, zonder eerst een beamervenster te openen dat toch niets kan.
   if (app.camReden && app.camReden !== 'geweigerd') { status(camRedenTekst(app.camReden), 'err'); return false; }
@@ -1125,7 +1176,8 @@ function autoSetup() {
     if (!vision.ready && !(await startCamera())) return;
     if (app.abort) return;
     await sleep(600);
-    return instellenNaCamera();
+    app.kleurOpgegeven = false;
+    return instellenNaCamera(snel);
   });
 }
 
@@ -1135,9 +1187,12 @@ function autoSetup() {
  * gaat het vanzelf verder zodra het beamervenster verplaatst of volledig scherm wordt (zie
  * openProjector).
  */
-async function instellenNaCamera() {
+async function instellenNaCamera(snel = false) {
   app.halfIngesteld = true;
-  if (!(await autoCalibrate(false))) return false;
+  const klopt = snel && await kalibratieKlopt();
+  if (app.abort) return false;
+  if (klopt) status(t('De kalibratie van de vorige keer klopt nog — die hoeft niet opnieuw'), 'ok');
+  else if (!(await autoCalibrate(false))) return false;
   if (app.abort) return false;
 
   if (app.fillAuto) {
@@ -1165,15 +1220,70 @@ async function instellenNaCamera() {
 }
 
 /**
+ * Klopt de bewaarde kalibratie nog? Wie terugkomt heeft de beamer en de camera meestal nog
+ * precies zo staan. Vier stippen projecteren en kijken of ze vallen waar de kalibratie zegt,
+ * op hooguit anderhalve cel na. Dat gaat sneller dan opnieuw kalibreren (geen wit beeld en geen
+ * controlerand), en een goede kalibratie blijft goed. Een andere camera: altijd opnieuw.
+ */
+async function kalibratieKlopt() {
+  if (!app.H || !vision.ready || !projOk()) return false;
+  if (app.calCam && app.camId && app.calCam !== app.camId) return false;
+  step('cal', 2);
+  const wasWiz = app.wiz;
+  app.wiz = { title: 'Kalibratie controleren', sub: 'even niet voor de beamer gaan staan' };
+  // Op het volledige beeld, zoals bij het kalibreren zelf (zie autoCalibrate).
+  if (vision.roi) setRoi(null);
+  await vision.unlockCamera();
+  await sleep(500);
+  app.calPattern = { kind: 'black' };
+  await sleep(900);
+  vision.grab();
+  const ref = vision.lumaSnapshot();
+  const cols = vision.cols;
+  let ok = true, slechtst = 0;
+  for (let i = 0; i < 4 && ok; i++) {
+    if (app.abort) { ok = false; break; }
+    const m = await diffAgainst({ kind: 'marker', i }, ref, 520);
+    if (m.max < 8) { ok = false; break; }
+    const mt = m.max * 0.6;
+    let sx = 0, sy = 0, sw = 0;
+    for (let k = 0; k < m.d.length; k++) {
+      if (m.d[k] < mt) continue;
+      const cx = k % cols, cy = (k - cx) / cols;
+      sx += cx * m.d[k]; sy += cy * m.d[k]; sw += m.d[k];
+    }
+    if (!sw) { ok = false; break; }
+    const waar = fromProj(CAL_TARGETS[i][0], CAL_TARGETS[i][1]);
+    const d = Math.hypot((sx / sw + 0.5) * vision.cell - waar[0], (sy / sw + 0.5) * vision.cell - waar[1]) / vision.cell;
+    slechtst = Math.max(slechtst, d);
+    if (!(d <= 1.5)) ok = false;
+  }
+  app.calPattern = null;
+  app.wiz = wasWiz;
+  app.calControle = { klopt: ok, afwijking: +slechtst.toFixed(2) };   // (voor de diagnose en de tests)
+  step('cal', 1);
+  if (!ok) return false;
+  app.calCam = app.camId || '';
+  app.calVoor = projOk() ? { w: app.projCtx.canvas.width, h: app.projCtx.canvas.height } : null;
+  updateCal();
+  save();
+  applyRoi();
+  return true;
+}
+
+/**
  * Het nieuwe beamervenster staat nog op het scherm van het paneel: wachten tot het op de
  * beamer staat. Verder zodra het volledig scherm is (de klik erin), of als je op Verder
- * klikt. Op de muur staat intussen in het venster zelf wat je moet doen. (Niet raden aan
- * de plek van het venster: Firefox verbergt de maten van de schermen tegen vingerafdrukken.)
- * Geeft false bij Afbreken of als het venster dicht ging.
+ * klikt. Op de muur staat intussen in het venster zelf wat je moet doen, en in het paneel
+ * stap voor stap (#beamerHulp). In Chrome en Edge kan de browser de beamer ook zelf zoeken.
+ * (Niet raden aan de plek van het venster: Firefox verbergt de maten van de schermen tegen
+ * vingerafdrukken.) Geeft false bij Afbreken of als het venster dicht ging.
  */
 async function wachtOpBeamer() {
   app.wiz = { title: 'Sleep dit venster naar de beamer', sub: 'en klik erin voor volledig scherm' };
   app.wachtBeamer = true; app.verder = false;
+  toonBeamerHulp();
+  $('beamerHulp').classList.remove('hidden');
   $('btnVerder').classList.remove('hidden');
   status(t('Sleep het beamervenster naar de beamer en klik erin voor volledig scherm — of klik op Verder'));
   try {
@@ -1181,9 +1291,19 @@ async function wachtOpBeamer() {
   } finally {
     app.wachtBeamer = false;
     $('btnVerder').classList.add('hidden');
+    $('beamerHulp').classList.add('hidden');
     app.wiz = null;
   }
   return !app.abort && projOk();
+}
+
+/** De stappen in #beamerHulp, met de sneltoets van dit besturingssysteem (opnieuw na het wisselen van taal). */
+function toonBeamerHulp() {
+  $('beamerSleep').textContent = BESTURING === 'windows' ? t('Sleep het beamervenster naar de beamer (of druk op Win+Shift+→).')
+    : BESTURING === 'chromeos' ? t('Sleep het beamervenster naar de beamer (of druk op Zoeken+Alt+M).')
+      : BESTURING === 'linux' ? t('Sleep het beamervenster naar de beamer (of druk op Super+Shift+→).')
+        : t('Sleep het beamervenster naar de beamer.');
+  $('btnZoekBeamer').classList.toggle('hidden', !SCHERMEN_HERKENNEN);
 }
 
 /**
@@ -1199,12 +1319,24 @@ async function stelOpnieuwIn() {
   return true;
 }
 
-/** De grote knop bovenaan: na de eerste keer instellen heet hij "Opnieuw instellen". */
+/**
+ * De grote knop bovenaan. Nog nooit gekalibreerd: "Alles automatisch instellen". Wie terugkomt
+ * met een bewaarde kalibratie: "Start: alles klaarzetten" (de browser laat het beamervenster
+ * alleen na een klik open, dus één klik is nodig; zie kalibratieKlopt). Na het instellen:
+ * "Opnieuw instellen", dan gaat alles opnieuw.
+ */
 function toonAutoKnop() {
-  $('btnAuto').textContent = app.ingesteld ? t('Opnieuw instellen') : t('Alles automatisch instellen');
+  const terug = !app.ingesteld && !!app.H;
+  $('btnAuto').textContent = app.ingesteld ? t('Opnieuw instellen') : terug ? t('Start: alles klaarzetten') : t('Alles automatisch instellen');
+  $('btnAuto').classList.toggle('klaarzetten', terug);
+  // (het losse bestand zegt hier iets anders, zie toonLosHint)
+  if (location.protocol !== 'file:') $('wizHint').textContent = terug ? t('Opent de beamer en de camera, kijkt of de kalibratie nog klopt en leert de muur — in één keer.')
+    : t('Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.');
 }
 
 $('btnAuto').onclick = autoSetup;
+// (niet via btnScreens: die staat uit zolang het instellen bezig is)
+$('btnZoekBeamer').onclick = zoekBeamer;
 $('btnAbort').onclick = () => { app.abort = true; app.halfIngesteld = false; status(t('Afgebroken')); };
 $('btnVerder').onclick = () => { app.verder = true; };
 
@@ -1409,6 +1541,7 @@ $('resident').onchange = e => {
 };
 $('sound').onchange = e => { sfx.on = e.target.checked; if (e.target.checked) sfx.resume(); save(); };
 $('muziek').onchange = e => { sfx.muziek.aan = e.target.checked; save(); };
+$('muziekStijl').onchange = e => { sfx.muziek.kies(e.target.value); save(); };
 $('effecten').onchange = e => { game.effects = e.target.checked; save(); };
 $('outline').onchange = () => { pasSpeelplekToe(); save(); };
 $('testMode').onchange = () => {
@@ -1443,7 +1576,10 @@ function applySpel() {
   toonRang();
 }
 for (const k of ['special', 'gold', 'bonus']) {
-  $(k).onchange = e => { app[k] = e.target.checked; applySpel(); save(); };
+  $(k).onchange = e => {
+    app[k] = e.target.checked; applySpel(); save();
+    if (k === 'special' && app.special && !kleurStand.ok) status(t('Te donker voor kleuren: speciale briefjes tellen nu als gewone briefjes — meer licht helpt'), 'err');
+  };
 }
 $('spelvorm').onchange = e => {
   app.levels = e.target.value === 'levels';
@@ -1453,6 +1589,12 @@ $('spelvorm').onchange = e => {
   applySpel(); save();
 };
 $('autoRecal').onchange = e => { app.autoRecal = e.target.checked; save(); };
+$('elkeMinuut').onchange = e => {
+  app.elkeMinuut = e.target.checked;
+  omgWacht.nieuw(vision.hasBackground ? vision.omgevingBasis(app.H) : null);
+  save();
+  status(app.elkeMinuut ? t('Het spel kijkt elke minuut of het licht of de muur veranderd is') : t('Niet meer elke minuut controleren'), 'ok');
+};
 
 // Ranglijst: per spelvorm de beste tien, alleen op deze computer.
 const RANG = 'stickyclash.ranglijst';
@@ -1555,7 +1697,7 @@ const telefoon = new Telefoon(game, {
   status,
   gebaar: () => sfx.resume(),
   // de waarschuwingsbalk onderin de muur (zie drawScene), als deel van de hoogte
-  onderbalk: () => { const s = onderbalkSoort(); return s === 'kalibratie' ? 0.13 : s === 'leren' ? 0.11 : 0; },
+  onderbalk: () => { const s = onderbalkSoort(); return s === 'kalibratie' ? 0.13 : s === 'leren' ? 0.11 : meldingOnderin() ? 0.08 : 0; },
 });
 telefoon.koppelPaneel(document);
 
@@ -1669,6 +1811,246 @@ async function herstelNaVerschuiving() {
     status(speelde ? t('Opnieuw ingesteld — klik op "Pauze opheffen" om verder te spelen') : t('Opnieuw ingesteld'), 'ok');
     return true;
   });
+}
+
+// ---------------------------------------------------------------- elke minuut controleren
+//
+// Het licht en de muur veranderen terwijl het spel openstaat: iemand doet een lamp aan, de zon
+// komt door het gordijn, er komt iets nieuws aan de muur. Eens per halve seconde meten (zie
+// vision.omgevingMeting: een steekproef, dat kost bijna niets), en js/omgeving.js beslist. Dan
+// stelt het spel zelf bij: buiten een ronde zodra er niemand voor de muur staat, tijdens een
+// ronde pas na afloop. Alleen als de herkenning echt stuk is (bijna alles voorgrond, of een
+// overbelicht beeld) gaat de ronde even op pauze. Verschuiven van de camera of de beamer
+// controleert checkVerschuiving al elke seconde.
+//
+// Voor de tests in een echte browser kan het sneller: ?snel=6 in het adres maakt van de minuut
+// tien seconden (zie versnelOmgeving). Niet in het paneel.
+
+const OMG = (() => {
+  let n = 1;
+  try { n = +new URLSearchParams(location.search).get('snel') || 1; } catch { /* geen adres */ }
+  return versnelOmgeving(OMGEVING, Math.min(60, n));
+})();
+const omgWacht = new Omgevingswacht(OMG);
+const kleurStand = nieuweKleurstand();
+let omgAcc = 0;
+// Wat het laatst als voorwerp telde, toen het beeld nog klopte: bij een stuk beeld zegt wat er
+// nú telt niets meer (zie onderhoud).
+let goedeOmtrekken = { H: null, lijst: [] };
+// ... en van de laatste vier seconden (midden in het spel kan net een bal over een briefje gaan).
+let recenteOmtrekken = [];
+
+/**
+ * Telt dit spoor als voorwerp op de muur (een briefje, de bak)? Wat over het doel heen ligt
+ * heet de bak (zie buildObstacles); een enorme vlek daar (een schaduw en iemand die ervoor
+ * staat) is dat niet.
+ */
+function isVoorwerp(sp) {
+  const r = app.reasonById.get(sp.id);
+  if (r === 'bak' && (sp.cells > projCells() * app.maxFrac || (app.goalTrack && sp.cells > app.goalTrack.cells * 3))) return false;
+  return telAlsVoorwerp(r);
+}
+
+/** Omtrekken (werkpixels) van wat nu als voorwerp telt: de briefjes en de bak, geen lichtvlek. */
+function houdOmtrekken() {
+  const uit = [];
+  for (const sp of tracks) {
+    if (!isVoorwerp(sp) || vision.egaalAnders(sp)) continue;
+    const k = (!sp.trusted && sp.fallback) ? sp.fallback : sp.corners;
+    uit.push(k.map(c => [c[0], c[1]]));
+  }
+  return uit;
+}
+
+function controleerOmgeving(dt) {
+  // De spelers gingen zelf verder na een automatische pauze: dan niet opnieuw pauzeren.
+  if (app.autoPauze && game.state === 'play') { app.autoPauze = false; app.melding = null; omgWacht.nietDringend(); }
+  if (!vision.ready || app.speelplek === 'demo' || app.testMode || app.busy) { omgAcc = 0; return; }
+  // Op de muur alleen met het beamervenster open en een kalibratie: anders valt er niets bij te stellen.
+  if (app.speelplek === 'muur' && (!projOk() || !app.H)) { omgAcc = 0; return; }
+  omgAcc += dt;
+  if (omgAcc < OMG.monster) return;
+  const stap = Math.min(2, omgAcc);
+  omgAcc = 0;
+  const m = vision.omgevingMeting(stap, isVoorwerp, app.H, OMG.tau, OMG.blijvend);
+  app.omgMeting = m;
+  // De kleuren: altijd, ook in het duel en zonder "Elke minuut controleren".
+  kleurStap(kleurStand, m.kleur, stap);
+  if (kleurStand.wissel) { kleurStand.wissel = false; kleurenGewisseld(); }
+  if (!app.elkeMinuut || !vision.hasBackground || vision.mode !== 'object') return;
+
+  let mensen = false, nieuw = false;
+  for (const sp of tracks) {
+    const r = app.reasonById.get(sp.id);
+    if (r === 'wacht') nieuw = true;
+    if (mensachtig(sp, r)) mensen = true;
+  }
+  if (m.bedekt < OMG.kapotDeel / 2 && !nieuw) {
+    goedeOmtrekken = { H: app.H, lijst: houdOmtrekken() };
+    recenteOmtrekken = recenteOmtrekken.filter(r => r.H === app.H).slice(-7);
+    recenteOmtrekken.push(goedeOmtrekken);
+  }
+  const lang = game.state === 'play' && ((game.endless && !game.ownSettings) || game.time > OMG.langeRonde);
+  const u = omgWacht.stap({ ...m, mensen }, {
+    ronde: game.state === 'play' || game.state === 'count',
+    lang, rustig: lang && !balBijBak(),
+    magLicht: app.fillAuto && app.speelplek === 'muur',
+    fill: app.fill, fillMax: 0.55,
+    kleur: !kleurStand.ok && kleurTelt() && app.fillAuto && app.speelplek === 'muur' && app.fill < 0.54 && !app.kleurOpgegeven,
+  }, stap);
+  app.omgActie = u.actie;
+  if (u.actie === 'herstel') { onderhoud(u.open); return; }
+  if (u.actie === 'speelpauze' && game.state === 'play') {
+    // Een rustig moment in een lange ronde: even pauzeren, bijstellen en vanzelf verder (zie
+    // onderhoud). Score en tijd blijven staan; de klok telt de pauze niet mee.
+    game.togglePause(); toonPlayKnop();
+    app.autoPauze = 'even';
+    muurMelding(t('Even bijstellen…'), 0);
+    onderhoud(u.open);
+    return;
+  }
+  if (u.actie === 'pauze' && game.state === 'play') {
+    game.togglePause(); toonPlayKnop();
+    app.autoPauze = true;
+    status(t('De herkenning werkt even niet (het licht is veranderd) — de ronde staat op pauze tot het bijgesteld is'), 'err');
+    muurMelding(t('Even pauze: het licht is veranderd. Ga even opzij, dan stel ik het bij'), 0);
+    return;
+  }
+  // Eén keer zeggen wat er gaat gebeuren, niet elke halve seconde.
+  const sleutel = u.open ? u.actie + ':' + u.open.reden : u.actie === 'opgegeven' ? u.actie : '';
+  if (sleutel === app.omgGemeld) return;
+  app.omgGemeld = sleutel;
+  if (u.actie === 'na-ronde' && lang) status(t('Het licht of de muur is veranderd — ik stel het zo even bij, op een rustig moment'));
+  else if (u.actie === 'na-ronde') status(t('Het licht of de muur is veranderd — na deze ronde stel ik het vanzelf bij'));
+  else if (u.actie === 'wacht' && !app.autoPauze) status(t('Het licht of de muur is veranderd — ik stel het bij zodra er niemand voor de muur staat'));
+  else if (u.actie === 'opgegeven') status(t('Het licht of de muur is veranderd, maar vanzelf bijstellen lukte niet — klik op "Opnieuw instellen"'), 'err');
+}
+
+/** Gaat er net een bal in de bak? Dan niet midden in het spel pauzeren (zie controleerOmgeving). */
+function balBijBak() {
+  const g = game.goal;
+  if (!g) return false;
+  for (const b of game.balls) if (Math.hypot(b.x - g.x, b.y - g.y) < g.r * 3) return true;
+  return false;
+}
+
+/**
+ * Vanzelf bijstellen (zie controleerOmgeving): eventueel de muurverlichting, en dan de muur
+ * opnieuw leren. Alles wat als voorwerp telde, blijft meetellen (vision.houdVast). Beweegt er
+ * iets tijdens het leren, dan blijft de oude muur en probeert de wacht het later opnieuw.
+ */
+async function onderhoud(open) {
+  const muur = app.speelplek === 'muur';
+  const houd = open.reden === 'kapot' ? (goedeOmtrekken.H === app.H ? goedeOmtrekken.lijst : [])
+    : app.autoPauze === 'even' ? samenOmtrekken([houdOmtrekken(), ...recenteOmtrekken.filter(r => r.H === app.H).map(r => r.lijst)])
+      : houdOmtrekken();
+  let gelukt = false;
+  app.leerOnrustig = false;
+  await runExclusive(async () => {
+    // Even zeggen wat er gebeurt; de woorden staan zo in de code, zodat test/taal.mjs ze vindt.
+    if (open.reden === 'kleur') app.wiz = { title: 'Even bijstellen', sub: 'meer licht, zodat de camera de kleuren ziet' };
+    else if (open.reden === 'muur') app.wiz = { title: 'Even bijstellen', sub: 'de muur is veranderd — even niet voor de muur' };
+    else app.wiz = { title: 'Even bijstellen', sub: 'het licht is veranderd — even niet voor de muur' };
+    await sleep(1200);
+    if (app.abort) return false;
+    if (muur && open.licht && app.fillAuto) {
+      app.kleurOpgegeven = false;
+      await autoLight(kleurTelt() ? app.kleurFill : 0);
+      if (app.abort) return false;
+    }
+    if (muur && open.kleur) {
+      await kleurLicht();
+      if (app.abort) return false;
+    }
+    gelukt = await learnWall(false, { houd, stil: true });
+    return gelukt;
+  });
+  app.wiz = null;
+  omgWacht.klaar(gelukt);
+  app.onderhoud.push({ reden: open.reden, ok: gelukt, t: Math.round(performance.now()) });
+  app.omgGemeld = '';
+  const n = app.laatstGehouden || 0;
+  if (gelukt) {
+    const tekst = open.reden === 'kleur' ? t('Muurverlichting hoger gezet, zodat de camera de kleuren ziet')
+      : n ? tAantal(n, 'Vanzelf bijgesteld — {n} voorwerp telt nog mee', 'Vanzelf bijgesteld — {n} voorwerpen tellen nog mee')
+        : t('Vanzelf bijgesteld');
+    status(tekst, 'ok');
+  } else if (app.leerOnrustig) status(t('Er bewoog iets voor de muur — ik probeer het zo nog eens'));
+  else if (!app.abort) status(t('Vanzelf bijstellen lukte niet — ik probeer het zo nog eens'), 'err');
+  if (app.autoPauze === 'even') {
+    // Even bijgesteld midden in het spel: altijd vanzelf verder, ook als het niet lukte (dan
+    // probeert de wacht het later nog eens, zie Omgevingswacht.klaar).
+    app.autoPauze = false;
+    app.melding = null;
+    if (game.state === 'paused') { game.togglePause(); toonPlayKnop(); game.toonBanner(t('GO'), 0.9); }
+    if (gelukt) status(t('Bijgesteld — het spel gaat verder'), 'ok');
+  } else if (app.autoPauze) {
+    if (gelukt && game.state === 'paused') {
+      app.autoPauze = false;
+      app.melding = null;
+      game.togglePause(); toonPlayKnop();
+      game.toonBanner(t('GO'), 0.9);
+      status(t('Bijgesteld — de ronde gaat verder'), 'ok');
+    } else if (!gelukt) muurMelding(t('Even pauze: het licht is veranderd. Ga even opzij, dan stel ik het bij'), 0);
+  } else if (gelukt) muurMelding(open.reden === 'kleur' ? t('Meer licht: de camera ziet de kleuren weer') : t('Licht en muur bijgesteld'), 3);
+}
+
+/** De kleuren werden net (on)betrouwbaar (zie kleurStap): de briefjes en de melding. */
+function kleurenGewisseld() {
+  vision.zetKleurOk(kleurStand.ok);
+  if (kleurStand.ok) app.kleurOpgegeven = false;
+  if (!kleurTelt()) return;
+  if (!kleurStand.ok) {
+    const tekst = vision.mode === 'color' ? t('Te donker voor de kleuren van het duel — de kleuren kunnen verkeerd gelezen worden. Meer licht helpt')
+      : t('Te donker voor kleuren: speciale briefjes tellen nu als gewone briefjes — meer licht helpt');
+    status(tekst, 'err');
+    muurMelding(vision.mode === 'color' ? t('Te donker voor de kleuren — meer licht helpt') : t('Te donker voor kleuren: speciale briefjes zijn nu gewoon'), 8);
+  } else {
+    status(t('Weer genoeg licht: de kleuren tellen weer'), 'ok');
+    muurMelding(t('Weer genoeg licht: de kleuren tellen weer'), 4);
+  }
+}
+
+/**
+ * Een korte melding op de muur, sec seconden lang (0 = tot hij weggehaald wordt). tekst komt
+ * uit t(): bij het tekenen wordt hij opnieuw vertaald, zodat hij meewisselt met de taal.
+ */
+function muurMelding(tekst, sec) {
+  const h = tHerkomst(tekst);
+  app.melding = { nl: h ? h.nl : tekst, vars: h ? h.vars : null, tot: sec ? performance.now() + sec * 1000 : Infinity };
+}
+
+/** Staat er nu een melding onderin de muur (buiten een ronde)? Dan houdt de QR-code er afstand van. */
+function meldingOnderin() {
+  const m = app.melding;
+  return !!m && performance.now() < m.tot && game.state !== 'play' && game.state !== 'count';
+}
+
+/**
+ * De melding tekenen: buiten een ronde als balk onderin, tijdens een ronde klein bovenin onder
+ * de score (onderin staat dan meestal de bak). Hier getekend, zodat hij ook in de
+ * lichtvoorspelling zit en de camera hem niet voor een voorwerp aanziet. In het duel staat de
+ * waarschuwing voor de kleuren buiten een ronde vast in beeld.
+ */
+function tekenMuurMelding(ctx, w, h) {
+  let m = app.melding;
+  if (m && performance.now() >= m.tot) { app.melding = m = null; }
+  const spelen = game.state === 'play' || game.state === 'count';
+  let tekst = m ? t(m.nl, m.vars) : null;
+  if (!tekst && vision.mode === 'color' && !kleurStand.ok && !spelen && app.speelplek !== 'demo') tekst = t('Te donker voor de kleuren — meer licht helpt');
+  if (!tekst) return;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const bh = h * 0.08, y = spelen ? h * 0.17 : h - bh;
+  let px = Math.round(bh * 0.36);
+  ctx.font = '700 ' + px + 'px ui-sans-serif, system-ui, sans-serif';
+  const b = ctx.measureText ? ctx.measureText(tekst).width : 0;
+  if (b > w * 0.9) { px = Math.max(8, Math.floor(px * w * 0.9 / b)); ctx.font = '700 ' + px + 'px ui-sans-serif, system-ui, sans-serif'; }
+  if (!spelen) { ctx.fillStyle = 'rgba(20,24,32,.88)'; ctx.fillRect(0, y, w, bh); }
+  ctx.fillStyle = spelen ? '#ffd479' : '#fff';
+  ctx.fillText(tekst, w / 2, y + bh / 2);
+  ctx.restore();
 }
 
 /** Tekst van de startknop, bij de stand van het spel. */
@@ -1991,12 +2373,15 @@ function inProjection(x, y) {
  * De muurverlichting afstellen: van zacht naar helderder, tot de camera het
  * beamervlak goed genoeg ziet. In een lichte kamer blijft het bij een zweem grijs;
  * in een donkere kamer is dit het enige licht waarmee de camera je voorwerpen ziet.
+ * Tellen de kleuren mee (speciale briefjes, het duel), dan ook zo hoog dat de camera
+ * de kleuren kan zien (zie kleurenGoed). vanaf: niet zachter dan dit.
  */
-async function autoLight() {
+async function autoLight(vanaf = 0) {
   // Eerst zonder verlichting: in een gewone, verlichte kamer ziet de camera de muur
   // prima en is een grijze waas op het spelbeeld alleen maar minder mooi.
-  const niveaus = [0, 0.12, 0.25, 0.4, 0.55];
-  let gekozen = niveaus[niveaus.length - 1], gemeten = 0;
+  const niveaus = [0, 0.12, 0.25, 0.4, 0.55].filter((lv, i, a) => lv >= vanaf - 0.01 || i === a.length - 1);
+  const hoogste = niveaus[niveaus.length - 1];
+  let gekozen = hoogste, gemeten = 0;
   app.wiz = { title: 'Licht afstellen', sub: 'even niet voor de beamer gaan staan' };
   await sleep(700);
   app.wiz = null;
@@ -2007,18 +2392,67 @@ async function autoLight() {
     await sleep(800);                                   // camera laten wennen
     vision.grab();
     gemeten = vision.meanLuma(inProjection);
-    if (gemeten >= 80) { gekozen = lv; break; }
+    if (gemeten >= 80 && (lv >= hoogste || !kleurTelt() || await kleurenGoed())) { gekozen = lv; break; }
   }
   app.calPattern = null;
-  app.fill = gekozen; game.fill = gekozen;
-  $('fill').value = Math.round(gekozen * 100);
-  $('fillOut').textContent = Math.round(gekozen * 100) + '%';
+  zetFill(gekozen);
   app.camLuma = gemeten;
-  save();
   if (gemeten < 45) {
     status(t('Het is erg donker — de camera ziet weinig, ook met de muurverlichting. Doe een lamp aan'), 'err');
   }
   return true;
+}
+
+/** De muurverlichting op lv (0..1), met de regelaar erbij, en bewaren. */
+function zetFill(lv) {
+  app.fill = lv; game.fill = lv;
+  $('fill').value = Math.round(lv * 100);
+  $('fillOut').textContent = Math.round(lv * 100) + '%';
+  save();
+}
+
+/** Tellen de kleuren mee: de speciale briefjes, of het duel van de post-its? */
+function kleurTelt() {
+  return vision.mode === 'color' || (vision.mode === 'object' && app.special);
+}
+
+/**
+ * Kan de camera nu de kleuren zien? Zes beelden, een vijfde seconde uit elkaar: de
+ * kleurkorrel is het verschil tussen twee beelden (zie vision.omgevingMeting). Tijdens het
+ * instellen, terwijl de beamer de muurverlichting projecteert.
+ */
+async function kleurenGoed() {
+  vision.grab();
+  vision.omgevingMeting(0, null, app.H);
+  let goed = 0;
+  for (let i = 0; i < 5; i++) {
+    await sleep(200);
+    vision.grab();
+    if (kleurOordeel(vision.omgevingMeting(0, null, app.H).kleur) !== false) goed++;
+  }
+  return goed >= 4;
+}
+
+/**
+ * De kleuren waren in het donker niet te vertrouwen: de muurverlichting stap voor stap hoger
+ * (hooguit 55%), tot de camera ze wel ziet. Lukt dat niet, dan blijft het zo, en tellen de
+ * speciale briefjes als gewone briefjes (zie kleurenGewisseld). Daarna moet de muur opnieuw
+ * geleerd worden: de verlichting hoort bij de lege muur.
+ */
+async function kleurLicht() {
+  const niveaus = [0.25, 0.4, 0.55].filter(lv => lv > app.fill + 0.01);
+  app.wiz = null;
+  for (const lv of niveaus) {
+    if (app.abort) return false;
+    app.fill = lv; game.fill = lv;
+    app.calPattern = { kind: 'fill' };
+    await sleep(1000);
+    if (await kleurenGoed()) { app.calPattern = null; app.kleurFill = lv; zetFill(lv); return true; }
+  }
+  app.calPattern = null;
+  if (niveaus.length) zetFill(niveaus[niveaus.length - 1]);
+  app.kleurOpgegeven = true;
+  return false;
 }
 
 function drawPattern(ctx, w, h) {
@@ -2170,6 +2604,9 @@ function drawScene(ctx, w, h) {
     ctx.fillText(app.speelplek === 'scherm' ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd'), w / 2, h - bh * 0.5);
     ctx.textBaseline = 'top';
   }
+
+  // Een korte melding (vanzelf bijgesteld, te donker voor kleuren), alleen zonder balk.
+  if (!balk) tekenMuurMelding(ctx, w, h);
 
   // De QR-code voor de telefoon, alleen buiten een ronde. Hier getekend, zodat hij ook in
   // de lichtvoorspelling zit en de camera hem niet voor een voorwerp aanziet.
@@ -2401,6 +2838,7 @@ function frame() {
     if (app.videoStill < 0.5 && app.stillWarned) { app.stillWarned = false; status(t('Camerabeeld is terug'), 'ok'); }
   }
   checkVerschuiving(dt);
+  controleerOmgeving(dt);
   if (app.syncTip) app.syncTip();
   app.projHint = projOk() && !app.projFull && !app.busy && game.state !== 'play' && game.state !== 'count';
   game.fill = app.speelplek === 'muur' ? app.fill : 0;
@@ -2461,8 +2899,9 @@ function frame() {
     if (app.testMode) el.textContent = tAantal(game.obstacles.length, '{n} obstakel (testmodus)', '{n} obstakels (testmodus)');
     else if (!app.H) el.textContent = t('Niet gekalibreerd — voorwerpen raken de ballen niet');
     else if (vision.mode === 'object' && !vision.hasBackground) el.textContent = scherm ? t('Nog niet geleerd — klik op Opnieuw leren') : t('Muur nog niet geleerd');
-    else if (staleBg > 2) el.textContent = scherm ? t('Bijna alles wordt als voorwerp gezien — licht veranderd? Klik op Opnieuw leren')
-      : t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
+    else if (staleBg > 2) el.textContent = app.elkeMinuut ? t('Bijna alles wordt als voorwerp gezien — het licht is veranderd. Ik stel het zo vanzelf bij')
+      : scherm ? t('Bijna alles wordt als voorwerp gezien — licht veranderd? Klik op Opnieuw leren')
+        : t('Bijna alles wordt als voorwerp gezien — licht veranderd? Leer de muur opnieuw');
     else if (vision.floodGuard && vision.mode === 'object') el.textContent = scherm ? t('Het licht is flink veranderd — herkenning werkt beperkt. Klik op Opnieuw leren')
       : t('Het licht is flink veranderd — herkenning werkt beperkt. Leer de muur opnieuw');
     else if (app.camLuma >= 0 && app.camLuma < 40) el.textContent = scherm ? t('De camera ziet te weinig licht ({n}/255) — doe een lamp aan', { n: Math.round(app.camLuma) })
@@ -2471,7 +2910,8 @@ function frame() {
       const uitleg = Object.keys(app.reasons || {})
         .map(k => app.reasons[k] + '× ' + (REDENEN[k] ? t(REDENEN[k]) : k)).join(', ');
       let txt = tAantal(app.active, '{n} voorwerp actief', '{n} voorwerpen actief')
-        + (app.rejected ? ' · ' + t('genegeerd: {lijst}', { lijst: uitleg }) : '');
+        + (app.rejected ? ' · ' + t('genegeerd: {lijst}', { lijst: uitleg }) : '')
+        + (!kleurStand.ok && kleurTelt() ? ' · ' + t('te donker voor kleuren') : '');
       // Het lastigste geval om zelf te zien: er wordt wél iets opgemerkt, maar het
       // valt onder de minimale grootte. Dan zwijgt de teller normaal helemaal.
       if (!app.active && vision.tooSmall > 0) {
@@ -2483,6 +2923,7 @@ function frame() {
     }
     if (vision.ready && vision.data) app.camLuma = vision.meanLuma(inProjection);
     el.className = 'live' + ((!app.active && vision.tooSmall > 0) || !app.H || staleBg > 2 || (vision.floodGuard && vision.mode === 'object') ||
+      (!kleurStand.ok && kleurTelt()) ||
       (app.camLuma >= 0 && app.camLuma < 40) || (vision.mode === 'object' && !vision.hasBackground) ? ' warn' : '');
     houdWakker();
   }
@@ -2739,6 +3180,7 @@ function toonStartStatus() {
  */
 function toonMuurStart() {
   if (!APART_VENSTER) status(t('Muur + beamer kan alleen met een laptop of computer — speel hier op een scherm of de demo'), 'err');
+  else if (!app.ingesteld && app.H) status(t('Klik op "Start: alles klaarzetten" — de rest gaat vanzelf'));
   else if (!SCHERMEN_HERKENNEN) status(t('Klik op "Alles automatisch instellen" — en sleep daarna het beamervenster naar de beamer'));
   else status(t('Klik op "Alles automatisch instellen"'));
 }
@@ -3112,15 +3554,23 @@ function schermLeer() {
 
 // ---- knoppen
 
+// Muur + beamer kiezen is een klik: daarin mag het beamervenster open, dus begint meteen het
+// hele instellen (camera, beamervenster, kalibratie, licht, de muur en de bak).
 document.querySelectorAll('#welkom .plekknop').forEach(k => {
   k.onclick = () => {
     const plek = k.dataset.plek;
     if (plek === 'demo') { demoStart(); return; }
     zetSpeelplek(plek);
     if (plek === 'scherm') schermStart();
-    else toonMuurStart();
+    else muurStart();
   };
 });
+/** Muur + beamer gekozen: meteen alles automatisch instellen (zie autoSetup). */
+function muurStart() {
+  toonAutoKnop();
+  if (!APART_VENSTER || app.busy) { toonMuurStart(); return; }
+  autoSetup();
+}
 document.querySelectorAll('#plekSeg button').forEach(k => {
   k.onclick = () => {
     k.blur();
@@ -3137,7 +3587,7 @@ document.querySelectorAll('.sv-cta button').forEach(k => {
     if (k.dataset.plek === 'scherm') { schermStart(); return; }
     sluitSpeelvenster();
     zetSpeelplek('muur');
-    toonMuurStart();
+    muurStart();
   };
 });
 $('btnDemo').onclick = demoStart;
@@ -3213,6 +3663,7 @@ function nieuweTaal() {
   toonLosHint();
   toonSchermenHint();
   toonVastzetHint();
+  toonBeamerHulp();
   toonFps();
   renderClasses();
   updateCal();
@@ -3246,15 +3697,18 @@ $('fill').value = Math.round(app.fill * 100);
 $('fillOut').textContent = Math.round(app.fill * 100) + '%';
 $('fillAuto').checked = app.fillAuto;
 $('lockExp').checked = app.lockExposure;
+$('elkeMinuut').checked = app.elkeMinuut;
 game.fill = app.fill;
 pasSpeelplekToe();
 sfx.on = $('sound').checked;
 sfx.muziek.aan = $('muziek').checked;
+sfx.muziek.kies($('muziekStijl').value);
 game.effects = $('effecten').checked;
 applySpel();
 game.reset();
 game.time = +$('roundLen').value;
 fillDevices();
+toonAutoKnop();
 toonStartStatus();
 bekijkCamera();
 vraagCameraStand();
@@ -3279,9 +3733,10 @@ volgendBeeld();
 
 // handig bij het afstellen: in de console beschikbaar als window.sc. sc.prestatie: hoe vlot
 // het loopt; sc.kwaliteit.vast(0) zet de wacht voor trage computers vast op alles.
+// sc.omgeving: de controle van elke minuut (wacht, js/omgeving.js) en of de kleuren te vertrouwen zijn.
 window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon,
   zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster,
-  kwaliteit: kw, prestatie };
+  kwaliteit: kw, prestatie, omgeving: { wacht: omgWacht, kleur: kleurStand, OMG } };
 
 // Helemaal opgestart. Het kleine script bovenin index.html kijkt hiernaar: staat dit er na
 // het laden niet, dan kon deze browser het spel niet draaien, en zegt het dat (in plaats van

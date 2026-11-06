@@ -33,17 +33,23 @@ WHAT IS WHERE
   js/vision.js          the camera and recognizing objects (tricky, be careful)
   js/homography.js      converting the camera image to the projector image (math)
   js/audio.js           the sound effects
-  js/muziek.js          the background music
+  js/muziek.js          the background music: scheduler, pause, speed-up, switching style
+  js/muziek-stijlen.js  the three music styles: Chill, Happy and Arcade
   js/telefoon.js        your phone as a remote control; it opens telefoon.html
   js/qr.js              the QR code you scan with your phone
   js/app.js             installing as an app
   js/apparaat.js        what this computer and browser can do (full screen, iPad, tips)
   js/kwaliteit.js       slow computers: the game then draws a little simpler by itself
+  js/omgeving.js        checking every minute whether the light or the wall changed,
+                        and whether the camera can still see colours (decisions only)
   js/taal.js            the NL | EN language choice
   js/taal-en.js         all English texts (see CHANGING TEXTS)
   css/style.css         how the panel looks
   index.html            which buttons, sliders and texts are in the panel
   telefoon.html         the page on your phone, with its own English texts
+  uitleg.html           how to set it up: step by step with drawings, Dutch and
+                        English in one file, also for printing
+  maak-uitleg-pdf.mjs   makes the PDFs in docs/ again from uitleg.html
   sw.js                 playing without internet: which files the browser keeps
   manifest.webmanifest  name, icon and colors of the app
 
@@ -79,9 +85,13 @@ EASY CHANGES
     Confetti colors             const FX_CONFETTI
   Music (in js/muziek.js):
     Louder or softer            const MUZIEK_VOLUME = 0.18;  (higher = louder, 0 = silent)
-    Tempo                       const MUZIEK_TEMPO = 120;    (beats per minute)
+    Style when none is chosen   const MUZIEK_STANDAARD = 'arcade';  ('rustig', 'vrolijk' or 'arcade')
+    Tempo per style             const MUZIEK_TEMPO = { rustig: 88, vrolijk: 116, arcade: 124 };  (beats per minute)
     Faster at the end           const MUZIEK_SPURT = 1.25;   (1.25 = a quarter faster)
-    The tune itself             const MUZIEK_AKKOORDEN       (four bars, as MIDI notes)
+  The styles themselves: chords, melody and sound (in js/muziek-stijlen.js):
+    Chill (lo-fi)               export const MUZIEK_STIJL_RUSTIG
+    Happy (marimba)             export const MUZIEK_STIJL_VROLIJK
+    Arcade (synths)             export const MUZIEK_STIJL_ARCADE
   The demo without camera (in js/speelplek.js):
     Colors of plain notes       export const DEMO_KLEUREN
                                 (no red, green or blue: those are for the
@@ -90,7 +100,8 @@ EASY CHANGES
     The starting layout         export function demoOpstelling(  (source, bin, notes)
   Changing a number that is also in a text (5 hits, 20 seconds)? Then change that
   text too: see CHANGING TEXTS.
-  Sound, music and effects can each be turned off under More settings > Game.
+  Sound, music and effects can each be turned off under More settings > Game; that is
+  also where you pick the music style.
 
   Colors are written as #rrggbb, for example '#ff0000' for red. Search the internet
   for "color picker" to choose one.
@@ -126,6 +137,8 @@ CHANGING TEXTS
     - the messages for your phone: js/telefoon.js
     - the names of the colors (Aanvaller, Verdediger, Doel, Balbron): js/vision.js
     - the page on your phone: telefoon.html
+    - the setup guide: uitleg.html (both languages are in it, one below the other;
+      then  node maak-uitleg-pdf.mjs  for the PDFs)
   The English is in js/taal-en.js: on the left the Dutch sentence, exactly as it is
   in the code, on the right the English. The page on your phone has its own list, at
   the top of telefoon.html.

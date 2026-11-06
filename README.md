@@ -16,6 +16,12 @@ Rather play without internet? Download `sticky-clash.html`, the whole game in on
 (in the online game: *Download the game as a single file* at the bottom of the panel), or
 the whole folder via *Code → Download ZIP*.
 
+**Set it up step by step:** open [`uitleg.html`](uitleg.html) (also online:
+https://noaquim.github.io/sticky-clash/uitleg.html) or print
+[`docs/setup-en.pdf`](docs/setup-en.pdf). Setting up the projector, webcam and laptop, with
+drawings, and what to do when something doesn't work. In the game: **How do I set it up?** on
+the welcome card and at the bottom of the panel.
+
 ![Balls bouncing off paper notes on a wall towards the bin](docs/demo.gif)
 
 *Simulation, not real footage: the real game code played this run; the wall, notes and camera look were added afterwards.*
@@ -51,13 +57,19 @@ tab.
 1. Double-click **`sticky-clash.html`** (or on Windows, the shortcut / `start.bat`), or
    open the link above
 2. Choose how you play. The demo starts right away.
-3. With a projector: click **Set up everything automatically**, allow the camera and follow
-   the instructions on the wall. On a screen: allow the camera and keep your hands out of
-   view for a moment while the game learns the empty table.
+3. With a projector: choose **Wall + projector**. Setup starts right away: the projector
+   window opens, you allow the camera, and you follow the instructions on the wall (the
+   game calibrates, adjusts the light, learns the empty wall and finds the bin). When you
+   come back later, there's one big button: **Start: set everything up**. On a screen: allow
+   the camera and keep your hands out of view for a moment while the game learns the empty
+   table.
 4. **Start round**
 
 That's it. With a projector, calibration takes care of itself: the game projects a white
-area and four dots and finds them again in the camera image on its own. On a screen there
+area and four dots and finds them again in the camera image on its own. When you come back,
+it first checks whether last time's calibration still fits; if it does, it skips
+calibrating. After that, the game keeps an eye on the light and the wall every minute and
+adjusts by itself (see [Checking every minute](#checking-every-minute)). On a screen there
 is nothing to calibrate: the camera image is the playing field.
 
 ## English or Dutch
@@ -201,14 +213,16 @@ the projector window opens on the projector by itself — even if the projector 
 main screen.
 
 **Firefox and Safari** (and Chrome until you've allowed that) don't know where the
-projector is. Then *Set up everything automatically* opens the projector window on your
-laptop screen and waits; the window itself says *Drag this window to the projector*. Drag
-it there (Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>, Chromebook:
-<kbd>Search</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
+projector is. Then setup opens the projector window on your laptop screen and waits: the
+window itself says *Drag this window to the projector*, and an orange box in the panel says
+step by step what to do. Drag it there (Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>,
+Chromebook: <kbd>Search</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
 <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>) and click in it, or press <kbd>F</kbd>,
 for full screen: the setup then carries on by itself. Already in the right place? Click
-**Continue** in the panel. (On Linux with Wayland, Ubuntu's default, no browser may place
-its own windows, so there you always drag it.)
+**Continue** in the panel. In Chrome and Edge, that box also has **Let the browser find the
+projector**: allow it, and the window jumps to the projector by itself and setup carries on.
+(On Linux with Wayland, Ubuntu's default, no browser may place its own windows, so there you
+always drag it.)
 
 No website is allowed to go full screen without a click, so: one click in the projector
 window. Until you've done that, a small line at the bottom of the projected image says
@@ -337,11 +351,13 @@ no light falls on your post-its and the camera can't see them — no matter how 
 detection is. That's why the projector lights the wall with a soft gray: the **Wall
 light**.
 
-During **Set up everything automatically**, the game measures how bright the projected
-area looks to the camera and sets the light just high enough. In a normal, lit room it
-stays off (0%); only when it's dark does it go to 12%, 25%, 40% or 55%. You can also set
-it yourself with the slider under Play mode. Relearn the wall afterwards, because the
-light is part of the empty wall.
+During setup, the game measures how bright the projected area looks to the camera and sets
+the light just high enough. In a normal, lit room it stays off (0%); only when it's dark does
+it go to 12%, 25%, 40% or 55%. If colours count (special notes, the duel), it also sets it
+high enough for the camera to see the colours well (see [Colours in the dark](#colours-in-the-dark)).
+You can also set it yourself with the slider under Play mode. Relearn the wall afterwards,
+because the light is part of the empty wall. With *Check every minute* on, the game also
+adjusts it later, when the light in the room changes.
 
 On top of that, the threshold scales with how bright the wall is. A post-it reflects a
 fixed share of the light differently from the wall; on a dim wall that's a small
@@ -363,6 +379,84 @@ exposure — only if the image flickers*) if the image really flickers; the game
 that the image doesn't get darker because of it, and switches it back if it does. When
 the camera starts, the game resets any exposure still locked from a previous session back
 to automatic.
+
+### Colours in the dark
+
+In the dark, a camera sees colours badly: it amplifies the image and with it the colour
+grain, its noise filter makes colours duller, and its white balance shifts along with the
+coloured light of the projector. Then a pink note can suddenly become a trampoline. So the
+game keeps measuring, on the empty wall, whether colours can be trusted: how bright it is,
+how much the colour jumps from frame to frame, and whether the wall has shifted in colour
+since it was learned.
+
+- If colours can't be trusted, the game first turns the **Wall light** up (only outside a
+  round, and if *Adjust automatically during setup* and *Check every minute* are on): with
+  more light on the wall, the camera sees the colours again. The wall briefly shows
+  *Adjusting — more light, so the camera can see the colours*.
+- If that doesn't help (not even at 55%), or isn't allowed, special notes count as ordinary
+  notes: no trampolines that aren't there, and the word above the note disappears. The panel
+  says *Too dark for colours: special notes now count as ordinary notes — more light helps*,
+  the wall says *Too dark for colours: special notes are ordinary now* for eight seconds, and
+  the counter adds *too dark for colours*. In duel mode there's a warning in the panel and,
+  outside a round, permanently on the wall.
+- When it's light enough again, colours count again by themselves after four seconds
+  (*Enough light again: the colours count again*). Deliberately not right away: around the
+  threshold it would otherwise keep flipping back and forth.
+
+Measured (`test/omgeving.mjs`): in a simulated dark room where the camera shifts its white
+balance warm, a pink note became a trampoline without this check; with it, no note got a
+type at all. With 25% wall light in the same room, red, green and blue work normally. In
+the benchmark's dark rooms, dim (50% light) and dark (35%) keep their colours, and very dark
+(22%) is too dark.
+
+## Checking every minute
+
+The light changes while you play: someone switches on a lamp, the sun comes through the
+curtain, something gets hung on the wall. With **Check every minute** on (at the top of the
+panel, on by default; the game remembers your choice), the game watches for that itself.
+
+- Twice a second it measures a sample of the wall (that costs almost nothing), and once a
+  minute it decides: is the empty wall a lot brighter or darker than when it was learned (30%
+  or more), is it too dark for detection while the wall light can still go up, or has part
+  of the wall (2% or more) been permanently different for half a minute — a lamp shining on
+  the wall, a new shadow, a curtain that opened, something hanging on the wall that isn't a
+  note?
+- If so, it adjusts by itself: the wall light if needed (just like during setup), then it
+  relearns the wall. The wall briefly shows *Adjusting*, then *Light and wall adjusted* for
+  three seconds, and the panel says *Adjusted by itself — 5 objects still count*. Whatever
+  counted as an object keeps counting: your notes, including the red, green and blue ones,
+  and the bin.
+- **Not in the middle of a normal round.** Then the status line says *The light or the wall
+  has changed — I'll adjust it by myself after this round*, and it happens as soon as the
+  round is over.
+- **If you play with *No time limit*** (or the round still has more than three minutes to
+  go), the end of the round never comes. Then the status line says *I'll adjust it shortly, at
+  a quiet moment*, and the game waits for a quiet moment: nobody in view, nothing moving (two
+  and a half seconds), and no ball close to the bin. Then the game pauses briefly, the wall
+  shows *Adjusting*, it adjusts (a few seconds) and carries on by itself (*GO*, the panel says
+  *Adjusted — the game carries on*). Score and time stay; the clock doesn't count the pause.
+  At most once every four minutes.
+- **Never while someone is in front of the wall**, or a hand is in view. Then it waits until
+  it's empty and still for a few seconds (*I'll adjust it as soon as nobody is in front of the
+  wall*). If someone walks through anyway while it's learning the wall, it keeps the old wall
+  and tries again shortly.
+- **Only if detection is really broken** — almost the whole image is seen as an object, or
+  the image is overexposed, for example because the light went off — it doesn't wait for the
+  minute: after four seconds a running round is paused (on the wall: *Short pause: the light
+  changed. Step aside and I'll adjust it*). As soon as nothing moves any more it adjusts, and
+  then the round carries on by itself (*GO*). Outside a round it adjusts right away. If you
+  click **Resume** yourself, you play on and it waits until after the round.
+- If it fails three times in a row, it stops and tells you: click **Set up again**.
+
+If the camera or projector has moved, the game already notices within two seconds: that's
+*Redo setup automatically if the camera or projector moves* (More settings → Calibration).
+
+Measured in a simulated room with the real detection (`test/muurwacht.mjs`): ten minutes of
+rounds, balls and people walking past or standing still for a while: relearned zero times.
+Light off: adjusted after four seconds (in the middle of a round: pause, and straight back
+to playing). Light on, a lamp on the wall, a new shadow, a curtain opening slowly or all at
+once, a cable or a sheet half outside the projected area: adjusted within two minutes.
+Afterwards all notes still counted, with their colour, and the change itself didn't.
 
 ## Testing without a setup
 
@@ -489,8 +583,8 @@ For first-time players, the start screen shows short tips on the wall: how to bu
 and what the special notes do.
 
 **Sound, music and effects** are under *More settings* → Game, each one on or off
-separately. During a round, soft music plays (drums, bass and a little riff, without any
-music files). It goes quiet when you pause and carries on afterwards; after the round it
+separately. During a round, soft music plays, without any music files: pick *Chill*
+(lo-fi), *Happy* (marimba) or *Arcade* (synths, the default) next to the Music checkbox. It goes quiet when you pause and carries on afterwards; after the round it
 stops. In Challenge it gets a bit faster with every level. The trampoline says *boing*,
 the turbo *whoosh*, a gold ball in the bin sounds like a little bell and the bonus bin
 like a coin. At 3, 5 and 10 in a row a jingle plays, and a fanfare for a cleared level or
@@ -572,6 +666,13 @@ exactly around the projected image.
 If it fails, it tells you *why* — too little contrast, or the projected area isn't
 completely in the camera image.
 
+When you come back with a saved calibration (the button is then called **Start: set
+everything up**), the game first quickly checks whether it still fits: four dots, and
+whether they land where the calibration says, to within a cell and a half. If they do, the
+calibration stays as it was (*Last time's calibration still fits — no need to redo it*);
+otherwise it simply calibrates again. With a different camera, always again. **Set up
+again** (what the button is called afterwards) redoes everything, calibration included.
+
 ## If detection isn't working well
 
 Turn on the **What the game sees** tab above the camera image. It shows exactly what
@@ -636,6 +737,9 @@ node test/gids.mjs          # CUSTOMIZE.txt and ZELF AANPASSEN.txt: every code s
 node test/speelplek.mjs     # three ways to play: first-visit choice, demo layout (does it play?), notes, screen, embedded camera
 node test/kwaliteit.mjs     # slow computers: a normal one never changes, a slow one draws simpler and never runs in slow motion
 node test/apparaat.mjs      # every computer: full screen in old Safari, iPad and tablets, operating system, "browser too old"
+node test/omgeving.mjs      # checking every minute: when to adjust and when not; colours in the dark, with hysteresis
+node test/muurwacht.mjs     # simulated room: 10 quiet minutes = never relearn; light, lamp, curtain, shadow = do; notes stay
+node test/uitleg.mjs        # the setup guide (uitleg.html, the PDFs): both languages match, links work, buttons named as in the game
 ```
 
 The tests talk Dutch: "alles goed" at the end means "all good". `bench.mjs` only
@@ -664,6 +768,7 @@ to 34 px. That's the yardstick every change to the detection has been measured a
 | [js/game.js](js/game.js) | physics: circle vs. convex polygon, scoring, drawing |
 | [js/audio.js](js/audio.js) | synthesized sound, no audio files |
 | [js/muziek.js](js/muziek.js) | background music, scheduled ahead on the sound card's clock |
+| [js/muziek-stijlen.js](js/muziek-stijlen.js) | the three music styles (Chill, Happy, Arcade), all synthesized |
 | [js/main.js](js/main.js) | wizard, automatic calibration, projector window, test mode, welcome card and game screen |
 | [js/speelplek.js](js/speelplek.js) | wall, screen or demo: the choice at startup, the demo's notes, the playing field on a screen |
 | [js/app.js](js/app.js) | installing as an app; registers the service worker (never from file://) |
@@ -750,6 +855,13 @@ estimated from the median of a sample and subtracted. Tested from 25% darker to 
 brighter: no ghost blobs, and an object stays visible. Before, with darker light *all*
 detection stopped *without* any warning, because the whole image was discarded as
 shadow.
+
+What such a factor can't absorb (a lamp shining on one spot of the wall, daylight from one
+side), the game adjusts by itself every minute (see [Checking every minute](#checking-every-minute)).
+The decisions live separately in `js/omgeving.js`: only arithmetic on measurements, so
+`test/omgeving.mjs` can check them exactly. A light patch or shadow that gets seen as an
+object is recognised by its colour (equally brighter or darker than the wall everywhere) and
+its soft edge; it then counts as a changed wall, and isn't kept when the wall is relearned.
 
 ### Tracking without glitches
 

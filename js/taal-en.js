@@ -24,6 +24,25 @@ export const TAAL_EN = {
     'Sets up the projector, camera, calibration and wall in one go. Follow the instructions on the wall.',
   'Afbreken': 'Cancel',
   'Verder': 'Continue',
+  // wie terugkomt met een bewaarde kalibratie (main.js toonAutoKnop)
+  'Start: alles klaarzetten': 'Start: set everything up',
+  'Opent de beamer en de camera, kijkt of de kalibratie nog klopt en leert de muur — in één keer.':
+    'Opens the projector and camera, checks the calibration still fits and learns the wall — in one go.',
+  'Klik op "Start: alles klaarzetten" — de rest gaat vanzelf': 'Click "Start: set everything up" — the rest happens by itself',
+  'De kalibratie van de vorige keer klopt nog — die hoeft niet opnieuw': "Last time's calibration still fits — no need to redo it",
+  // het beamervenster moet nog naar de beamer (#beamerHulp)
+  'Zet het beamervenster op de beamer': 'Put the projector window on the projector',
+  'Sleep het beamervenster naar de beamer.': 'Drag the projector window to the projector.',
+  'Sleep het beamervenster naar de beamer (of druk op Win+Shift+→).': 'Drag the projector window to the projector (or press Win+Shift+→).',
+  'Sleep het beamervenster naar de beamer (of druk op Zoeken+Alt+M).': 'Drag the projector window to the projector (or press Search+Alt+M).',
+  'Sleep het beamervenster naar de beamer (of druk op Super+Shift+→).': 'Drag the projector window to the projector (or press Super+Shift+→).',
+  'Klik erin, of druk op F: volledig scherm. Dan gaat het vanzelf verder.': 'Click inside it, or press F: full screen. Then it carries on by itself.',
+  'Laat de browser de beamer zoeken': 'Let the browser find the projector',
+  'Staat het al goed op de beamer? Klik dan op Verder.': 'Already on the projector? Then click Continue.',
+  // elke minuut controleren (index.html)
+  'Elke minuut controleren': 'Check every minute',
+  'Kijkt elke minuut of het licht of de muur veranderd is, en stelt het dan vanzelf bij — midden in het spel alleen op een rustig moment, en nooit als er iemand in beeld is.':
+    'Checks every minute whether the light or the wall has changed, and then adjusts by itself — during play only at a quiet moment, and never while someone is in view.',
   'Installeer als app': 'Install as app',
   'Als app op je iPad of iPhone: Deel → Zet op beginscherm. Op een Mac in Safari: Archief → Voeg toe aan Dock. Daarna start het spel ook zonder internet.':
     'As an app on your iPad or iPhone: Share → Add to Home Screen. On a Mac in Safari: File → Add to Dock. After that the game also starts without internet.',
@@ -112,6 +131,10 @@ export const TAAL_EN = {
   'Baltempo': 'Ball rate',
   'Geluid': 'Sound',
   'Muziek — zacht, alleen tijdens een ronde': 'Music — soft, only during a round',
+  'Muziekstijl': 'Music style',
+  'Rustig — lo-fi, ontspannen': 'Chill — lo-fi, relaxed',
+  'Vrolijk — marimba, opgewekt': 'Happy — marimba, cheerful',
+  'Arcade — vlotte synthesizers': 'Arcade — upbeat synths',
   'Effecten — confetti, sterretjes, COMBO en feest bij een record': 'Effects — confetti, sparkles, COMBO and a celebration for a record',
   'Voorwerpen omlijnen op de muur': 'Outline objects on the wall',
   'Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.':
@@ -120,6 +143,9 @@ export const TAAL_EN = {
   'Doel en bron verplaatsen:': 'Moving the goal and source:',
   'Download het spel als één bestand': 'Download the game as a single file',
   '— speelt daarna ook zonder internet, op elke computer.': '— then it also plays without internet, on any computer.',
+  // de uitleg om het op te zetten (uitleg.html), op het welkomstkaartje en onderaan het paneel
+  'Hoe zet ik het op?': 'How do I set it up?',
+  '— stap voor stap, ook om af te drukken.': '— step by step, also to print out.',
   'sleep ze met de muis in de rechter weergave. Het doel pak je door erin te klikken, de bron met':
     'drag them with the mouse in the right-hand view. Grab the goal by clicking inside it, the source with',
   '+klik. Of met de pijltjestoetsen en': '+click. Or use the arrow keys and',
@@ -366,6 +392,40 @@ export const TAAL_EN = {
   'De camera wisselde van beeldformaat — leer de muur opnieuw': 'The camera changed its image format — relearn the wall',
   'De camera wisselde van beeldformaat — klik op Opnieuw leren': 'The camera changed its image format — click Learn again',
 
+  // ---- elke minuut controleren, en kleuren in het donker (main.js)
+  'Het spel kijkt elke minuut of het licht of de muur veranderd is': 'The game checks every minute whether the light or the wall has changed',
+  'Niet meer elke minuut controleren': 'No longer checking every minute',
+  'De herkenning werkt even niet (het licht is veranderd) — de ronde staat op pauze tot het bijgesteld is':
+    "Detection isn't working right now (the light changed) — the round is paused until it's adjusted",
+  'Het licht of de muur is veranderd — na deze ronde stel ik het vanzelf bij': "The light or the wall has changed — I'll adjust it by myself after this round",
+  'Het licht of de muur is veranderd — ik stel het bij zodra er niemand voor de muur staat': "The light or the wall has changed — I'll adjust it as soon as nobody is in front of the wall",
+  'Het licht of de muur is veranderd, maar vanzelf bijstellen lukte niet — klik op "Opnieuw instellen"':
+    'The light or the wall has changed, but adjusting by itself didn\'t work — click "Set up again"',
+  'Muurverlichting hoger gezet, zodat de camera de kleuren ziet': 'Wall light turned up, so the camera can see the colours',
+  'Vanzelf bijgesteld — {n} voorwerp telt nog mee': 'Adjusted by itself — {n} object still counts',
+  'Vanzelf bijgesteld — {n} voorwerpen tellen nog mee': 'Adjusted by itself — {n} objects still count',
+  'Vanzelf bijgesteld': 'Adjusted by itself',
+  'Er bewoog iets voor de muur — ik probeer het zo nog eens': "Something moved in front of the wall — I'll try again shortly",
+  'Vanzelf bijstellen lukte niet — ik probeer het zo nog eens': "Adjusting by itself didn't work — I'll try again shortly",
+  'Bijgesteld — de ronde gaat verder': 'Adjusted — the round carries on',
+  'Bijgesteld — het spel gaat verder': 'Adjusted — the game carries on',
+  'Even bijstellen…': 'Adjusting…',
+  'Het licht of de muur is veranderd — ik stel het zo even bij, op een rustig moment': "The light or the wall has changed — I'll adjust it shortly, at a quiet moment",
+  'Te donker voor kleuren: speciale briefjes tellen nu als gewone briefjes — meer licht helpt':
+    'Too dark for colours: special notes now count as ordinary notes — more light helps',
+  'Te donker voor de kleuren van het duel — de kleuren kunnen verkeerd gelezen worden. Meer licht helpt':
+    'Too dark for the duel colours — the colours may be misread. More light helps',
+  'Weer genoeg licht: de kleuren tellen weer': 'Enough light again: the colours count again',
+  'Bijna alles wordt als voorwerp gezien — het licht is veranderd. Ik stel het zo vanzelf bij':
+    "Almost everything is seen as an object — the light changed. I'll adjust it by myself shortly",
+  'te donker voor kleuren': 'too dark for colours',
+  // op de muur (kort: het moet op één regel passen)
+  'Even pauze: het licht is veranderd. Ga even opzij, dan stel ik het bij': "Short pause: the light changed. Step aside and I'll adjust it",
+  'Meer licht: de camera ziet de kleuren weer': 'More light: the camera sees the colours again',
+  'Licht en muur bijgesteld': 'Light and wall adjusted',
+  'Te donker voor de kleuren — meer licht helpt': 'Too dark for the colours — more light helps',
+  'Te donker voor kleuren: speciale briefjes zijn nu gewoon': 'Too dark for colours: special notes are ordinary now',
+
   // ---- de teller onder "Doel aanwijzen"
   '{n} obstakel (testmodus)': '{n} obstacle (test mode)',
   '{n} obstakels (testmodus)': '{n} obstacles (test mode)',
@@ -443,6 +503,11 @@ export const TAAL_EN = {
   'en ga daarna zelf uit beeld': 'then step out of view yourself',
   'Zoeken…': 'Searching…',
   'Licht afstellen': 'Adjusting the light',
+  'Kalibratie controleren': 'Checking calibration',
+  'Even bijstellen': 'Adjusting',
+  'het licht is veranderd — even niet voor de muur': "the light changed — please don't stand in front of the wall",
+  'de muur is veranderd — even niet voor de muur': "the wall changed — please don't stand in front of the wall",
+  'meer licht, zodat de camera de kleuren ziet': 'more light, so the camera can see the colours',
   'Klaar': 'All set',
   'veel plezier': 'have fun',
   'Klik kruis {n} aan in het camerabeeld op de laptop': 'Click cross {n} in the camera view on the laptop',

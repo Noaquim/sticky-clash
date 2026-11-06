@@ -33,17 +33,23 @@ WAT STAAT WAAR
   js/vision.js          de camera en het herkennen van voorwerpen (lastig, pas op)
   js/homography.js      het omrekenen van camerabeeld naar beamerbeeld (wiskunde)
   js/audio.js           de geluidjes
-  js/muziek.js          de achtergrondmuziek
+  js/muziek.js          de achtergrondmuziek: planner, pauze, sneller, stijl wisselen
+  js/muziek-stijlen.js  de drie muziekstijlen: Rustig, Vrolijk en Arcade
   js/telefoon.js        je telefoon als afstandsbediening; die opent telefoon.html
   js/qr.js              de QR-code die je met je telefoon scant
   js/app.js             installeren als app
   js/apparaat.js        wat deze computer en browser kunnen (volledig scherm, iPad, tips)
   js/kwaliteit.js       trage computers: het spel tekent dan vanzelf wat eenvoudiger
+  js/omgeving.js        elke minuut controleren of het licht of de muur veranderd is,
+                        en of de camera de kleuren nog ziet (alleen de beslissingen)
   js/taal.js            de taalkeuze NL | EN
   js/taal-en.js         alle Engelse teksten (zie TEKSTEN VERANDEREN)
   css/style.css         hoe het paneel eruitziet
   index.html            welke knoppen, schuifjes en teksten er in het paneel staan
   telefoon.html         de pagina op je telefoon, met zijn eigen Engelse teksten
+  uitleg.html           zo zet je het op: stap voor stap met tekeningen, Nederlands en
+                        Engels in één bestand, ook om af te drukken
+  maak-uitleg-pdf.mjs   maakt de pdf's in docs/ opnieuw uit uitleg.html
   sw.js                 zonder internet spelen: welke bestanden de browser bewaart
   manifest.webmanifest  naam, pictogram en kleuren van de app
 
@@ -79,9 +85,13 @@ MAKKELIJKE AANPASSINGEN
     Kleuren van de confetti     const FX_CONFETTI
   Muziek (in js/muziek.js):
     Harder of zachter           const MUZIEK_VOLUME = 0.18;  (hoger = harder, 0 = stil)
-    Tempo                       const MUZIEK_TEMPO = 120;    (tellen per minuut)
+    Stijl als niets gekozen is  const MUZIEK_STANDAARD = 'arcade';  ('rustig', 'vrolijk' of 'arcade')
+    Tempo per stijl             const MUZIEK_TEMPO = { rustig: 88, vrolijk: 116, arcade: 124 };  (tellen per minuut)
     Sneller op het eind         const MUZIEK_SPURT = 1.25;   (1.25 = een kwart sneller)
-    Het deuntje zelf            const MUZIEK_AKKOORDEN       (vier maten, als MIDI-noten)
+  De stijlen zelf: akkoorden, melodie en klank (in js/muziek-stijlen.js):
+    Rustig (lo-fi)              export const MUZIEK_STIJL_RUSTIG
+    Vrolijk (marimba)           export const MUZIEK_STIJL_VROLIJK
+    Arcade (synthesizers)       export const MUZIEK_STIJL_ARCADE
   De demo zonder camera (in js/speelplek.js):
     Kleur gewone briefjes       export const DEMO_KLEUREN
                                 (geen rood, groen of blauw: die zijn voor de
@@ -90,7 +100,8 @@ MAKKELIJKE AANPASSINGEN
     De beginopstelling          export function demoOpstelling(  (bron, bak, briefjes)
   Verander je een getal dat ook in een tekst staat (5 tikken, 20 seconden), pas dan
   ook die tekst aan: zie TEKSTEN VERANDEREN.
-  Geluid, muziek en effecten zet je los uit onder Meer instellingen > Spel.
+  Geluid, muziek en effecten zet je los uit onder Meer instellingen > Spel; daar kies je
+  ook de muziekstijl.
 
   Kleuren schrijf je als #rrggbb, bijvoorbeeld '#ff0000' voor rood. Zoek op internet
   naar "color picker" om er een te kiezen.
@@ -126,6 +137,8 @@ TEKSTEN VERANDEREN
     - de meldingen voor je telefoon: js/telefoon.js
     - de namen van de kleuren (Aanvaller, Verdediger, Doel, Balbron): js/vision.js
     - de pagina op je telefoon: telefoon.html
+    - de uitleg om het spel op te zetten: uitleg.html (beide talen staan erin, onder
+      elkaar; daarna  node maak-uitleg-pdf.mjs  voor de pdf's)
   Het Engels staat in js/taal-en.js: links de Nederlandse zin, precies zoals in de
   code, rechts het Engels. De pagina op je telefoon heeft een eigen lijstje, bovenin
   telefoon.html.

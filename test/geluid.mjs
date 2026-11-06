@@ -2,7 +2,10 @@
 // met een nep-klok, zodat precies te zien is wanneer elke noot klinkt.
 import { Game, normalizePoly, rng, check, klaar } from './hulp.mjs';
 const { Sfx } = await import('../js/audio.js');
-const { MUZIEK_VOLUME, MUZIEK_TEMPO, MUZIEK_SPURT, MUZIEK_VOORUIT, MUZIEK_LUIDST } = await import('../js/muziek.js');
+const { MUZIEK_VOLUME, MUZIEK_TEMPO: TEMPI, MUZIEK_SPURT, MUZIEK_VOORUIT, MUZIEK_LUIDST, MUZIEK_STIJLEN, MUZIEK_STANDAARD } = await import('../js/muziek.js');
+// De ritmeproeven hieronder gaan over Arcade (bassdrum op elke tel, een arpeggio); de
+// andere stijlen hebben verderop hun eigen proef.
+const MUZIEK_TEMPO = TEMPI.arcade;
 
 Math.random = rng(20250926);
 
@@ -82,13 +85,23 @@ function nepKaart() {
     }
     return p;
   };
-  const node = (x) => Object.assign({ connect() {}, disconnect() { this.los = true; } }, x);
+  const node = (x) => Object.assign({ connect(n) { return n; }, disconnect() { this.los = true; } }, x);
   const start = (t) => { if (!(t >= k.currentTime - 1e-9)) k.fout.push('start in het verleden (' + t + ' < ' + k.currentTime + ')'); };
   k.createGain = () => { const g = node({ gain: param(1) }); k.gains.push(g); return g; };
-  k.createOscillator = () => { k.osc++; return node({ type: 'sine', frequency: param(440), start, stop() {} }); };
-  k.createBiquadFilter = () => node({ type: 'lowpass', frequency: param(350), Q: param(1) });
-  k.createBufferSource = () => { k.bron++; return node({ buffer: null, loop: false, start, stop() {} }); };
-  k.createBuffer = (ch, n) => { const d = new Float32Array(n); return { getChannelData: () => d }; };
+  k.createOscillator = () => { k.osc++; return node({ type: 'sine', frequency: param(440), detune: param(0), start, stop() {}, setPeriodicWave() {} }); };
+  k.createBiquadFilter = () => node({ type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0), detune: param(0) });
+  k.createBufferSource = () => { k.bron++; return node({ buffer: null, loop: false, playbackRate: param(1), detune: param(0), start, stop() {} }); };
+  k.createBuffer = (ch, n, sr) => {
+    const d = Array.from({ length: ch }, () => new Float32Array(n));
+    return { numberOfChannels: ch, length: n, sampleRate: sr, duration: n / sr, getChannelData: (i = 0) => d[i] };
+  };
+  // voor de muziekstijlen: galm, echo, stereo, compressor
+  k.createPeriodicWave = () => ({});
+  k.createDelay = () => node({ delayTime: param(0) });
+  k.createChannelMerger = () => node({});
+  k.createStereoPanner = () => node({ pan: param(0) });
+  k.createConvolver = () => node({ buffer: null, normalize: true });
+  k.createDynamicsCompressor = () => node({ threshold: param(-24), knee: param(30), ratio: param(12), attack: param(0.003), release: param(0.25) });
   return k;
 }
 function nepGeluid() {
@@ -98,6 +111,7 @@ function nepGeluid() {
   sfx.master = kaart.createGain();
   const noten = [];
   sfx.muziek.opNoot = (soort, t) => noten.push({ soort, t, nu: kaart.currentTime });
+  sfx.muziek.kies('arcade');
   return { sfx, kaart, m: sfx.muziek, noten };
 }
 /**
@@ -212,7 +226,7 @@ const gaten = (ts) => ts.slice(1).map((t, i) => t - ts[i]);
     !!fade && fade[1] === 0 && fade[3] <= 0.15 && m.stand === 'pauze');
   kaart.currentTime += 0.01;
   m.volg('play', false, 0);
-  const verder = (m.stap - stapBijPauze + 64) % 64;
+  const verder = (m.stap - stapBijPauze + m.lengte()) % m.lengte();
   draai(kaart, m, 1);
   const na = noten.filter(n => n.nu > tPauze + 1);
   const inval = m.bus && m.bus.gain.ev.find(e => e[0] === 'exponentialRampToValueAtTime');
@@ -247,6 +261,62 @@ const gaten = (ts) => ts.slice(1).map((t, i) => t - ts[i]);
   check('muziek zachter dan de effecten', MUZIEK_VOLUME * MUZIEK_LUIDST < 0.1,
     `(hardste muzieknoot ${(MUZIEK_VOLUME * MUZIEK_LUIDST).toFixed(3)}, tik 0.1, doelpunt 0.13)`);
   check('muziek: geen ongeldige waarden naar de geluidskaart', kaart.fout.length === 0, kaart.fout.slice(0, 2).join('; '));
+}
+
+// ---- 3b. muziek: elke stijl, en wisselen tijdens een ronde ----------------------------------
+for (const naam of Object.keys(MUZIEK_STIJLEN)) {
+  const { kaart, m, noten } = nepGeluid();
+  m.kies(naam);
+  const T = TEMPI[naam], d = 15 / T;
+  draai(kaart, m, 14);                         // Rustig begint met een intro van vier maten
+  const soorten = new Set(noten.map(n => n.soort));
+  const vooruit = Math.max(...noten.map(n => n.t - n.nu));
+  check(`stijl ${naam}: speelt, met drums, bas en akkoorden of melodie`, m.stand === 'speelt' && noten.length > 50 &&
+    soorten.has('kick') && soorten.has('bas') && soorten.size >= 5, `(${noten.length} noten, ${[...soorten].join(' ')})`);
+  check(`stijl ${naam}: plant op tijd en hooguit 0,12 s + een zestiende vooruit`,
+    noten.every(n => n.t >= n.nu - 1e-9) && vooruit <= MUZIEK_VOORUIT + d + 1e-9, `(${vooruit.toFixed(3)} s)`);
+  const perSec = (a, b) => noten.filter(n => n.nu > a && n.nu <= b).length / (b - a);
+  const t1 = kaart.currentTime;
+  draai(kaart, m, 3, { level: 9 });
+  const tLevel = m.tempo;
+  const t2 = kaart.currentTime;
+  draai(kaart, m, 6, { spurt: true, level: 9 });
+  check(`stijl ${naam}: sneller per level en in de laatste 10 s, met meer drukte`,
+    Math.abs(tLevel - T * 1.2) < 1e-9 && Math.abs(m.tempo - T * 1.2 * MUZIEK_SPURT) < 1e-9 &&
+    perSec(t2, t2 + 6) > perSec(0, t1) * 1.3 && vanSoort(noten, 'riser', t2).length > 0,
+    `(${perSec(0, t1).toFixed(1)} -> ${perSec(t2, t2 + 6).toFixed(1)} noten/s)`);
+  const tP = kaart.currentTime, bus = m.bus;
+  draai(kaart, m, 1, { state: 'paused' });
+  const fade = bus.gain.ev.find(e => e[0] === 'setTargetAtTime');
+  draai(kaart, m, 1);
+  const tO = kaart.currentTime;
+  draai(kaart, m, 0.5, { state: 'over' });
+  check(`stijl ${naam}: pauze, verder en einde`, !!fade && fade[1] === 0 && !noten.some(n => n.nu > tP + 0.02 && n.nu < tP + 1) &&
+    noten.some(n => n.nu > tP + 1) && m.stand === 'stil' && m.stap === 0 && !m.bus && timers.size === 0 &&
+    !noten.some(n => n.nu > tO + 0.02));
+  check(`stijl ${naam}: geen ongeldige waarden naar de geluidskaart`, kaart.fout.length === 0, kaart.fout.slice(0, 2).join('; '));
+  check(`stijl ${naam}: muziek zachter dan de effecten`, MUZIEK_VOLUME * (MUZIEK_STIJLEN[naam].piek || MUZIEK_STIJLEN[naam].luidst) < 0.1);
+}
+{
+  const { kaart, m, noten } = nepGeluid();
+  check('standaardstijl bestaat; onbekende naam wordt de standaard', !!MUZIEK_STIJLEN[MUZIEK_STANDAARD] &&
+    (m.kies('bestaat-niet'), m.naam === MUZIEK_STANDAARD));
+  m.kies('vrolijk');
+  check('stijl kiezen buiten een ronde: meteen', m.naam === 'vrolijk' && m.stap === 0);
+  m.kies('arcade');
+  draai(kaart, m, 2.3);
+  const start = vanSoort(noten, 'kick')[0].t, oud = m.bus;
+  m.kies('rustig');
+  draai(kaart, m, 0.2);
+  check('stijl wisselen in een ronde: nog even de oude stijl', m.naam === 'arcade' || m.bus !== oud);
+  draai(kaart, m, 5);
+  const uit = oud.gain.ev.find(e => e[0] === 'setTargetAtTime'), maat = 16 * 15 / TEMPI.arcade;
+  const k = uit ? (uit[2] - start) / maat : NaN, nieuw = m.bus;
+  const op = nieuw && nieuw.gain.ev.find(e => e[0] === 'exponentialRampToValueAtTime');
+  check('stijl wisselen in een ronde: precies op een maat, oude uit en nieuwe zacht erin', m.naam === 'rustig' && !!uit &&
+    uit[1] === 0 && Math.abs(k - Math.round(k)) < 1e-6 && !!op && op[1] > 0.1 && Math.abs(m.tempo - TEMPI.rustig) < 1e-9 &&
+    noten.filter(n => n.t >= uit[2] - 1e-9).length > 3 && kaart.fout.length === 0,
+    `(na ${k.toFixed(3)} maten, ${noten.filter(n => n.t >= uit[2] - 1e-9).length} noten erna, tempo ${m.tempo.toFixed(1)})`);
 }
 
 // ---- 4. effectgeluiden: niet te vaak, allemaal geldig ------------------------------------

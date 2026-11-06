@@ -12,7 +12,7 @@
 // Heeft het spel een nieuw bestand nodig? Zet het in NODIG en verhoog VERSIE.
 // test/app.mjs controleert dat alles in de lijst ook echt bestaat.
 
-const VERSIE = 'sticky-clash-v4';
+const VERSIE = 'sticky-clash-v7';
 const NODIG = [
   './',
   'index.html',
@@ -25,6 +25,8 @@ const NODIG = [
   'js/homography.js',
   'js/kwaliteit.js',
   'js/muziek.js',
+  'js/muziek-stijlen.js',
+  'js/omgeving.js',
   'js/qr.js',
   'js/speelplek.js',
   'js/taal.js',
@@ -36,6 +38,9 @@ const NODIG = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
+  // de uitleg om het op te zetten (de pdf's in docs/ niet: die zijn groot, en de uitleg
+  // heeft zelf een knop Afdrukken)
+  'uitleg.html',
 ];
 // mag ontbreken; dan installeert de rest gewoon
 const MISSCHIEN = ['telefoon.html'];

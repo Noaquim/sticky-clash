@@ -8,3 +8,4 @@ start.command text eol=lf
 *.ico binary
 *.png binary
 *.gif binary
+*.pdf binary

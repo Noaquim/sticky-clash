@@ -31,9 +31,11 @@
 <link rel="modulepreload" href="js/game.js">
 <link rel="modulepreload" href="js/audio.js">
 <link rel="modulepreload" href="js/muziek.js">
+<link rel="modulepreload" href="js/muziek-stijlen.js">
 <link rel="modulepreload" href="js/app.js">
 <link rel="modulepreload" href="js/apparaat.js">
 <link rel="modulepreload" href="js/kwaliteit.js">
+<link rel="modulepreload" href="js/omgeving.js">
 <link rel="modulepreload" href="js/telefoon.js">
 <link rel="modulepreload" href="js/qr.js">
 <link rel="modulepreload" href="js/taal.js">
@@ -103,6 +105,7 @@
       <button class="plekknop" data-plek="scherm"><b>Scherm, zonder beamer</b><span>De camera kijkt naar een tafel, muur of bord; je speelt op dit scherm.</span></button>
       <p class="hint camniet hidden"></p>
       <button class="plekknop demo" data-plek="demo"><b>Probeer zonder camera</b><span>Meteen spelen met je muis of vinger. Niets installeren of toestaan.</span></button>
+      <a class="uitlegknop naar-uitleg" href="uitleg.html" target="_blank" rel="noopener"><i aria-hidden="true">?</i>Hoe zet ik het op?</a>
     </section>
 
     <section class="quick">
@@ -145,8 +148,19 @@
       </ol>
       <button id="btnSchermLeer" class="alleen-scherm">Opnieuw leren</button>
       <p id="wizHint" class="hint alleen-muur">Doet de beamer, de camera, de kalibratie en de muur in één keer. Volg de aanwijzingen op de muur.</p>
-      <button id="btnVerder" class="hidden">Verder</button>
+      <div id="beamerHulp" class="beamerhulp hidden" role="status">
+        <b>Zet het beamervenster op de beamer</b>
+        <ol>
+          <li id="beamerSleep">Sleep het beamervenster naar de beamer.</li>
+          <li>Klik erin, of druk op F: volledig scherm. Dan gaat het vanzelf verder.</li>
+        </ol>
+        <button id="btnZoekBeamer" class="hidden">Laat de browser de beamer zoeken</button>
+        <p class="hint">Staat het al goed op de beamer? Klik dan op Verder.</p>
+      </div>
+      <button id="btnVerder" class="primary big hidden">Verder</button>
       <button id="btnAbort" class="hidden">Afbreken</button>
+      <label class="check alleen-camera"><input type="checkbox" id="elkeMinuut" checked> Elke minuut controleren</label>
+      <p class="hint alleen-camera">Kijkt elke minuut of het licht of de muur veranderd is, en stelt het dan vanzelf bij — midden in het spel alleen op een rustig moment, en nooit als er iemand in beeld is.</p>
       <div id="appInstall" class="installeer hidden">
         <button id="btnInstall" class="klein">Installeer als app</button>
         <p class="hint">Eigen venster en pictogram, en daarna start het spel ook zonder internet.</p>
@@ -293,6 +307,13 @@
         <label class="slider">Baltempo <input type="range" id="rate" min="2" max="40" value="10"><output id="rateOut">1.0/s</output></label>
         <label class="check"><input type="checkbox" id="sound" checked> Geluid</label>
         <label class="check"><input type="checkbox" id="muziek" checked> Muziek — zacht, alleen tijdens een ronde</label>
+        <label class="camkeuze">Muziekstijl
+          <select id="muziekStijl">
+            <option value="rustig">Rustig — lo-fi, ontspannen</option>
+            <option value="vrolijk">Vrolijk — marimba, opgewekt</option>
+            <option value="arcade" selected>Arcade — vlotte synthesizers</option>
+          </select>
+        </label>
         <label class="check"><input type="checkbox" id="effecten" checked> Effecten — confetti, sterretjes, COMBO en feest bij een record</label>
         <label class="check alleen-muur"><input type="checkbox" id="outline"> Voorwerpen omlijnen op de muur</label>
         <p class="hint alleen-muur">Uit in voorwerpmodus: licht op een voorwerp maakt dat voorwerp onzichtbaar voor de camera. Op je laptop zie je de omlijningen altijd.</p>
@@ -302,6 +323,10 @@
         <p class="hint"><b>Doel en bron verplaatsen:</b> sleep ze met de muis in de rechter weergave. Het doel pak je door erin te klikken, de bron met <kbd>Ctrl</kbd>+klik. Of met de pijltjestoetsen en <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. <kbd>spatie</kbd> = pauze.</p>
       </section>
     </details>
+
+    <section class="foot">
+      <p class="hint"><a class="naar-uitleg" href="uitleg.html" target="_blank" rel="noopener" style="color:inherit">Hoe zet ik het op?</a> — stap voor stap, ook om af te drukken.</p>
+    </section>
 
     <!-- los:weg -->
     <section class="foot">
@@ -357,6 +382,24 @@
   </div>
 </div>
 
+<script>
+/* "Hoe zet ik het op?" (op het welkomstkaartje en onderaan het paneel) opent uitleg.html in
+   een nieuw tabblad, in de taal van het spel: js/taal.js zet die op <html lang>. Het losse
+   bestand dat in zijn eentje is doorgestuurd, heeft geen uitleg.html naast zich: dan de
+   online uitleg. Of de map erbij is, verraadt sticky-clash.ico: een plaatje mag ook vanaf
+   file:// laden, een pagina navragen niet. */
+(function () {
+  var d = document, adres = 'uitleg.html', proef = new Image();
+  function zet() {
+    var taal = d.documentElement.lang === 'en' ? 'en' : 'nl', a = d.querySelectorAll('a.naar-uitleg');
+    for (var i = 0; i < a.length; i++) a[i].href = adres + '?taal=' + taal;
+  }
+  proef.onerror = function () { adres = 'https://noaquim.github.io/sticky-clash/uitleg.html'; zet(); };
+  proef.src = 'sticky-clash.ico';
+  zet();
+  if (window.MutationObserver) new MutationObserver(zet).observe(d.documentElement, { attributes: true, attributeFilter: ['lang'] });
+})();
+</script>
 <script type="module" src="js/main.js" onerror="window.scNetFout=1"></script>
 </body>
 </html>

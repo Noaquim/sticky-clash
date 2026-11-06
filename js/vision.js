@@ -269,6 +269,9 @@ export class Vision {
     this.respPadDark = 0.1;      // en eronder
     this.quietFactor = 1;        // < 1 bij een stille camera, zie endBackground
     this.quietGap = 4;           // zoveel cellen vrij van al gezien voorwerp, zie acceptQuiet
+    // Kunnen we de kleuren vertrouwen? In het donker niet: dan krijgt geen briefje een
+    // soort (zie zetKleurOk en js/omgeving.js).
+    this.kleurOk = true;
   }
 
   /**
@@ -1791,8 +1794,9 @@ export class Vision {
 
       // Soort briefje (zie noteKindOf). undefined = nu niet te meten: te veel van ons
       // eigen licht erop. Dan telt deze meting niet mee (zie kindVote).
+      // In het donker (kleurOk uit) helemaal niet: dan is elk briefje een gewoon briefje.
       let kind;
-      if (objectMode && kw >= 3 && kw >= n * 0.3) {
+      if (objectMode && this.kleurOk && kw >= 3 && kw >= n * 0.3) {
         const c = balanceToWall(kr / kw, kg / kw, kb / kw, kwr / kw, kwg / kw, kwb / kw, this.balTmp, true);
         kind = noteKindOf(c[0], c[1], c[2], kr / Math.max(kw, kwr), kg / Math.max(kw, kwg), kb / Math.max(kw, kwb));
       }
@@ -2334,6 +2338,326 @@ export class Vision {
     }
     // Een paar frames gezien zijn voordat iets meetelt, anders flikkert ruis erin.
     return this.tracks.filter(t => t.age >= 2);
+  }
+
+  // ---- de omgeving: licht, muur en kleur (zie js/omgeving.js) ----------------
+  //
+  // Alleen meten; de herkenning hierboven verandert er niets door. main.js roept dit eens per
+  // halve seconde aan, js/omgeving.js beslist wat er moet gebeuren.
+
+  /**
+   * Kunnen we de kleuren vertrouwen? Zo niet (te donker), dan krijgt geen enkel briefje een
+   * soort: een oranje briefje mag in het donker nooit een trampoline worden. Wat al een soort
+   * had verliest die meteen; komt het licht terug, dan stemmen de sporen gewoon opnieuw (zie
+   * kindVote, binnen een paar beelden).
+   */
+  zetKleurOk(ok) {
+    this.kleurOk = !!ok;
+    if (ok) return;
+    for (const t of this.tracks.concat(this.lostTracks || [])) { t.kind = null; t.kindCand = null; t.kindN = 0; }
+  }
+
+  /**
+   * De vaste steekproef voor omgevingMeting: elke tweede cel in beide richtingen, op het
+   * beamervlak (insideFn) en minstens twee cellen van de rand ervan. Opnieuw als de sleutel
+   * (de kalibratie) of het raster verandert.
+   */
+  omgevingCellen(sleutel) {
+    if (this.omgCel && this.omgSleutel === sleutel && this.omgCols === this.cols && this.omgRows === this.rows) return this.omgCel;
+    const cols = this.cols, rows = this.rows, cell = this.cell, f = this.insideFn;
+    const op = (cx, cy) => !f || f((cx + 0.5) * cell, (cy + 0.5) * cell);
+    const lijst = [];
+    for (let cy = 2; cy < rows - 2; cy += 2) {
+      for (let cx = 2; cx < cols - 2; cx += 2) {
+        if (op(cx, cy) && op(cx - 2, cy) && op(cx + 2, cy) && op(cx, cy - 2) && op(cx, cy + 2)) lijst.push(cy * cols + cx);
+      }
+    }
+    const m = lijst.length;
+    this.omgCel = Int32Array.from(lijst);
+    this.omgEma = new Float32Array(m);           // hoe vaak deze cel anders is dan de geleerde muur
+    this.omgVorig = new Float32Array(m * 3);     // de kleur bij de vorige meting
+    this.omgHeeftVorig = false;
+    this.omgTmp = new Float32Array(m * 5);
+    this.omgUit = new Uint8Array(cols * rows);   // onder iets wat als voorwerp telt
+    this.omgSleutel = sleutel; this.omgCols = cols; this.omgRows = rows; this.omgBg = this.bg;
+    return this.omgCel;
+  }
+
+  /**
+   * Eén meting voor de controle van elke minuut en voor de kleuren. Kost bijna niets: een vaste
+   * steekproef van hooguit een paar duizend cellen, op wat classifyObject dit beeld al uitrekende.
+   *
+   * Per cel een glijdend gemiddelde van hoe vaak hij anders is dan de geleerde muur (voorgrond
+   * of half), behalve onder wat als voorwerp telt (uitgezonderd): een briefje is geen veranderde
+   * muur. Een lichtvlek of schaduw telt wél, ook als die als voorwerp gezien wordt (zie
+   * egaalAnders). Een cel die bijna altijd anders is, is blijvend veranderd: een lamp die nu op
+   * de muur schijnt, een gordijn dat open ging, een nieuwe schaduw. Een voorbijganger is na een
+   * paar tellen weer weg en telt nauwelijks.
+   *
+   * Op de lege muur ook de kleur: hoeveel die van meting tot meting verspringt (de kleurkorrel
+   * van de camera, die in het donker groot wordt), hoeveel de kleur van het hele beeld sinds de
+   * vorige meting meeschoof (drift), en hoeveel hij afwijkt van de geleerde muur (zweem: in het
+   * donker stelt de camera zijn witbalans bij op het gekleurde licht van de beamer). Korrel en
+   * drift werken ook zonder geleerde muur (in de duelmodus).
+   *
+   * @param {number} dt  s sinds de vorige meting
+   * @param {(t: object) => boolean} uitgezonderd  telt dit spoor als voorwerp (briefje, bak)?
+   * @param {*} sleutel  verandert met de kalibratie (main.js geeft app.H)
+   * @param {number} tau  s: zo snel volgt het glijdende gemiddelde
+   * @param {number} drempel  zo hoog: blijvend veranderd
+   * @returns {{gain: number, bedekt: number, vloed: boolean, deel: number, clip: number, L: number,
+   *   beweging: number, n: number, kleur: {n: number, L: number, ruis: number, drift: number, zweem: number}}}
+   */
+  omgevingMeting(dt, uitgezonderd, sleutel, tau = 20, drempel = 0.85) {
+    const cel = this.omgevingCellen(sleutel), m = cel.length;
+    const cols = this.cols, rows = this.rows, cell = this.cell, proj = this.projLuma;
+    const obj = this.mode === 'object' && !!this.bg;
+    if (this.omgBg !== this.bg) { this.omgEma.fill(0); this.omgBg = this.bg; }
+    // Wat als voorwerp telt, met twee cellen marge: de wazige rand eromheen hoort erbij.
+    const uit = this.omgUit;
+    uit.fill(0);
+    if (obj && uitgezonderd) {
+      for (const t of this.tracks) {
+        if (!uitgezonderd(t) || this.egaalAnders(t)) continue;
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const c of t.corners) { x0 = Math.min(x0, c[0]); y0 = Math.min(y0, c[1]); x1 = Math.max(x1, c[0]); y1 = Math.max(y1, c[1]); }
+        const cx0 = Math.max(0, ((x0 / cell) | 0) - 2), cx1 = Math.min(cols - 1, ((x1 / cell) | 0) + 2);
+        const cy0 = Math.max(0, ((y0 / cell) | 0) - 2), cy1 = Math.min(rows - 1, ((y1 / cell) | 0) + 2);
+        for (let cy = cy0; cy <= cy1; cy++) uit.fill(1, cy * cols + cx0, cy * cols + cx1 + 1);
+      }
+    }
+    // De camera kan intussen zijn belichting bijgesteld hebben: die factor eerst eruit.
+    const vor = this.omgVorig, tmp = this.omgTmp, heeft = this.omgHeeftVorig;
+    const luma = (j) => 0.299 * vor[j * 3] + 0.587 * vor[j * 3 + 1] + 0.114 * vor[j * 3 + 2];
+    let sNu = 0, sVor = 0;
+    if (heeft) {
+      for (let j = 0; j < m; j++) { const i = cel[j]; if (proj[i] >= 6) continue; sNu += this.cl[i]; sVor += luma(j); }
+    }
+    const k = sVor > 1 && sNu > 1 ? sNu / sVor : 1;
+    // Hoeveel ruist de camera nu? Na een flinke lichtverandering versterkt hij misschien veel
+    // meer dan toen de muur geleerd werd (de ruis per cel, this.noise, hoort bij toen). Uit het
+    // verschil met de vorige meting zelf, met de mediaan: wat beweegt telt daar niet in mee.
+    let ruisNu = 0;
+    if (heeft) {
+      let nd = 0;
+      const d = tmp.subarray(4 * m, 5 * m);
+      for (let j = 0; j < m; j++) { const i = cel[j]; if (proj[i] >= 6) continue; d[nd++] = Math.abs(this.cl[i] - luma(j) * k); }
+      if (nd >= 20) { const ds = d.subarray(0, nd).sort(); ruisNu = 1.4826 * ds[nd >> 1] / Math.SQRT2; }
+    }
+    const a = 1 - Math.exp(-Math.max(0, dt) / tau);
+    const ema = this.omgEma;
+    const bg = this.bg, gain = this.gain || 1;
+    let blijvend = 0, clip = 0, nL = 0, sumL = 0, nBew = 0, nVers = 0, nk = 0, nz = 0;
+    for (let j = 0; j < m; j++) {
+      const i = cel[j], r = this.cr[i], g = this.cg[i], b = this.cb[i], l = this.cl[i];
+      if (r >= 250 || g >= 250 || b >= 250) clip++;
+      const vers = !(proj[i] >= 6);                       // valt hier geen eigen licht
+      const anders = obj && (this.mask[i] !== 0 || this.candCell[i] === 1);
+      if (vers) {
+        if (heeft) {
+          nVers++;
+          if (Math.abs(l - luma(j) * k) > Math.max(8 + 3 * this.noise[i], 5 * ruisNu)) nBew++;
+          if (!anders) {
+            tmp[nk] = (r - g) - (vor[j * 3] - vor[j * 3 + 1]) * k;
+            tmp[m + nk] = (b - g) - (vor[j * 3 + 2] - vor[j * 3 + 1]) * k;
+            nk++;
+          }
+        }
+        if (!anders) {
+          sumL += l; nL++;
+          if (obj) {
+            tmp[2 * m + nz] = (r - g) - gain * (bg[i * 3] - bg[i * 3 + 1]);
+            tmp[3 * m + nz] = (b - g) - gain * (bg[i * 3 + 2] - bg[i * 3 + 1]);
+            nz++;
+          }
+        }
+        if (obj) ema[j] += ((anders && !uit[i] ? 1 : 0) - ema[j]) * a;
+      }
+      if (obj && ema[j] > drempel) blijvend++;
+      vor[j * 3] = r; vor[j * 3 + 1] = g; vor[j * 3 + 2] = b;
+    }
+    this.omgHeeftVorig = m > 0;
+    // Kleurkorrel: de spreiding van het kleurverschil met de vorige meting (mediaan, zodat een
+    // bal of een voorbijganger niet meetelt), en hoeveel alles samen verschoof.
+    let ruis = 0, drift = 0;
+    if (nk >= 20) {
+      const p = tmp.subarray(0, nk).sort(), q = tmp.subarray(m, m + nk).sort();
+      const mp = p[nk >> 1], mq = q[nk >> 1];
+      drift = Math.hypot(mp, mq);
+      for (let j = 0; j < nk; j++) { p[j] = Math.abs(p[j] - mp); q[j] = Math.abs(q[j] - mq); }
+      p.sort(); q.sort();
+      // 1,48 maakt van de mediaan van de afwijking een standaardafwijking; / √2 omdat het
+      // het verschil van twee metingen is.
+      ruis = 1.4826 * (p[nk >> 1] + q[nk >> 1]) / 2 / Math.SQRT2;
+    }
+    let zweem = 0;
+    if (nz >= 20) {
+      const p = tmp.subarray(2 * m, 2 * m + nz).sort(), q = tmp.subarray(3 * m, 3 * m + nz).sort();
+      zweem = Math.hypot(p[nz >> 1], q[nz >> 1]);
+    }
+    const L = nL ? sumL / nL : 0;
+    return {
+      gain: this.gain || 1, bedekt: (this.fgFraction || 0) + (this.shadowFraction || 0), vloed: !!this.floodGuard,
+      deel: obj && m ? blijvend / m : 0, clip: m ? clip / m : 0, L,
+      beweging: nVers ? nBew / nVers : 0, n: m,
+      kleur: { n: nk, L, ruis, drift, zweem },
+    };
+  }
+
+  /** Hoe de lege muur er net na het leren uitziet (helderheid, overbelicht deel), voor js/omgeving.js. */
+  omgevingBasis(sleutel) {
+    const bg = this.bg;
+    if (!bg) return null;
+    const cel = this.omgevingCellen(sleutel);
+    let s = 0, n = 0, clip = 0;
+    for (let j = 0; j < cel.length; j++) {
+      const i = cel[j], r = bg[i * 3], g = bg[i * 3 + 1], b = bg[i * 3 + 2];
+      if (r >= 250 || g >= 250 || b >= 250) clip++;
+      if (this.resident[i]) continue;
+      s += 0.299 * r + 0.587 * g + 0.114 * b; n++;
+    }
+    return { L: n ? s / n : 0, clip: cel.length ? clip / cel.length : 0 };
+  }
+
+  /**
+   * Is dit spoor alleen licht of schaduw op de muur, geen voorwerp? Overal even veel lichter
+   * (of donkerder) in alle drie de kleuren — de kleur van de muur zelf, alleen feller of valer —
+   * en met een zachte rand, of heel groot. Een lamp die op de muur schijnt, of een nieuwe
+   * schaduw. Een wit of grijs briefje is ook alleen lichter of donkerder, maar heeft een
+   * scherpe rand en is klein.
+   */
+  egaalAnders(t) {
+    const bg = this.bg, cell = this.cell, cols = this.cols, rows = this.rows, gain = this.gain || 1;
+    if (!bg || !t.corners || t.corners.length < 3) return false;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const c of t.corners) { x0 = Math.min(x0, c[0]); y0 = Math.min(y0, c[1]); x1 = Math.max(x1, c[0]); y1 = Math.max(y1, c[1]); }
+    const cx0 = Math.max(0, (x0 / cell) | 0), cx1 = Math.min(cols - 1, (x1 / cell) | 0);
+    const cy0 = Math.max(0, (y0 / cell) | 0), cy1 = Math.min(rows - 1, (y1 / cell) | 0);
+    let n = 0, sr = 0, sg = 0, sb = 0, er = 0, eg = 0, eb = 0, verschil = 0;
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const i = cy * cols + cx;
+        if (!this.mask[i] || !inConvex(t.corners, (cx + 0.5) * cell, (cy + 0.5) * cell)) continue;
+        const wr = bg[i * 3] * gain, wg = bg[i * 3 + 1] * gain, wb = bg[i * 3 + 2] * gain;
+        n++; sr += this.cr[i]; sg += this.cg[i]; sb += this.cb[i]; er += wr; eg += wg; eb += wb;
+        verschil += Math.abs(this.cl[i] - (0.299 * wr + 0.587 * wg + 0.114 * wb));
+      }
+    }
+    if (n < 8 || er < 1 || eg < 1 || eb < 1) return false;
+    const kr = sr / er, kg = sg / eg, kb = sb / eb;
+    const lo = Math.min(kr, kg, kb), hi = Math.max(kr, kg, kb), mid = (kr + kg + kb) / 3;
+    if (hi - lo > 0.1 * mid || Math.abs(mid - 1) < 0.12) return false;
+    const zacht = Number.isFinite(t.medStep) && t.medStep < 0.3 * (verschil / n);
+    const groot = n > 0.08 * (this.omgCel ? this.omgCel.length * 4 : cols * rows);
+    return zacht || groot;
+  }
+
+  /**
+   * Na opnieuw leren: wat hier als voorwerp telde, moet voorwerp blijven. De nieuwe muur heeft
+   * die voorwerpen nu in zich. Op hun plek zetten we de oude muur terug (oud: de geleerde muur
+   * van vóór het opnieuw leren, op hetzelfde raster), maal hoeveel lichter of donkerder de muur
+   * eromheen nu is, per kleur. Zo blijft een briefje een briefje, met zijn eigen kleur, ook als
+   * het licht intussen veranderde. Net als bij findResident: haal je het eraf, dan is het weg.
+   *
+   * @param {number[][][]} omtrekken  omtrekken in werkpixels
+   * @param {Float32Array} oud  de geleerde muur van vóór het leren
+   * @returns {number} hoeveel voorwerpen vastgehouden zijn
+   */
+  houdVast(omtrekken, oud) {
+    const bg = this.bg;
+    if (!bg || !oud || oud.length !== bg.length || !omtrekken || !omtrekken.length) return 0;
+    const cols = this.cols, rows = this.rows, cell = this.cell, n = cols * rows;
+    // Zo kan "wat al hing telt mee" uit: dan komt de muur zoals hij geleerd is terug (dropResident).
+    if (!this.bgLearned || this.bgLearned.length !== bg.length) this.bgLearned = Float32Array.from(bg);
+    // Eerst alle plekken (met één cel marge), dan pas de ringen: een ring mag niet over een
+    // buurvoorwerp lopen.
+    const bezet = new Uint8Array(n), plekken = [];
+    for (const poly of omtrekken) {
+      if (!poly || poly.length < 3) continue;
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const c of poly) { x0 = Math.min(x0, c[0]); y0 = Math.min(y0, c[1]); x1 = Math.max(x1, c[0]); y1 = Math.max(y1, c[1]); }
+      const cx0 = Math.max(0, ((x0 / cell) | 0) - 1), cx1 = Math.min(cols - 1, ((x1 / cell) | 0) + 1);
+      const cy0 = Math.max(0, ((y0 / cell) | 0) - 1), cy1 = Math.min(rows - 1, ((y1 / cell) | 0) + 1);
+      const binnen = [];
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          let raak = false;
+          for (let dy = -1; dy <= 1 && !raak; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (inConvex(poly, (cx + dx + 0.5) * cell, (cy + dy + 0.5) * cell)) { raak = true; break; }
+            }
+          }
+          if (raak) binnen.push(cy * cols + cx);
+        }
+      }
+      if (!binnen.length) continue;
+      for (const i of binnen) bezet[i] = 1;
+      plekken.push({ binnen, cx0, cx1, cy0, cy1 });
+    }
+    const med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
+    let alles = null;
+    let gehouden = 0;
+    for (const p of plekken) {
+      const rr = [], rg = [], rb = [];
+      for (let cy = Math.max(0, p.cy0 - 3); cy <= Math.min(rows - 1, p.cy1 + 3); cy++) {
+        for (let cx = Math.max(0, p.cx0 - 3); cx <= Math.min(cols - 1, p.cx1 + 3); cx++) {
+          const i = cy * cols + cx;
+          if (bezet[i] || (cx >= p.cx0 && cx <= p.cx1 && cy >= p.cy0 && cy <= p.cy1)) continue;
+          if (oud[i * 3] < 8 || oud[i * 3 + 1] < 8 || oud[i * 3 + 2] < 8) continue;
+          rr.push(bg[i * 3] / oud[i * 3]); rg.push(bg[i * 3 + 1] / oud[i * 3 + 1]); rb.push(bg[i * 3 + 2] / oud[i * 3 + 2]);
+        }
+      }
+      let f;
+      if (rr.length >= 6) f = [med(rr), med(rg), med(rb)];
+      else {
+        // Geen muur eromheen te zien (vlak bij de rand): de verhouding van het hele beeld.
+        if (!alles) {
+          const ar = [], ag = [], ab = [];
+          for (let i = 0; i < n; i += 7) {
+            if (bezet[i] || oud[i * 3] < 8 || oud[i * 3 + 1] < 8 || oud[i * 3 + 2] < 8) continue;
+            ar.push(bg[i * 3] / oud[i * 3]); ag.push(bg[i * 3 + 1] / oud[i * 3 + 1]); ab.push(bg[i * 3 + 2] / oud[i * 3 + 2]);
+          }
+          alles = ar.length ? [med(ar), med(ag), med(ab)] : [1, 1, 1];
+        }
+        f = alles;
+      }
+      for (const i of p.binnen) {
+        for (let c = 0; c < 3; c++) bg[i * 3 + c] = clampByte(oud[i * 3 + c] * f[c]);
+        this.resident[i] = 1;
+      }
+      gehouden++;
+    }
+    if (gehouden) { this.residentCount += gehouden; this.tracks.length = 0; this.lostTracks = []; }
+    return gehouden;
+  }
+
+  /**
+   * Bewoog er iets in de laatste beelden? Het aandeel (van een steekproef) cellen dat duidelijk
+   * anders is dan drie beelden terug, na een eventuele belichtingssprong. Voor het leren van de
+   * muur: wie er dan doorheen loopt, mag niet in de geleerde muur terechtkomen. Drie beelden en
+   * niet één: dan is een voorbijganger een paar cellen verder, en de korrel niet groter.
+   * De korrel van nu telt mee (zie omgevingMeting): in het donker versterkt de camera meer
+   * dan toen de oude muur geleerd werd. begin: opnieuw beginnen (geeft 0).
+   */
+  bewegingSindsVorig(begin = false) {
+    const n = this.cl.length, m = Math.ceil(n / 5), LAG = 3;
+    if (begin || !this.leerRing || this.leerRing.m !== m) { this.leerRing = { m, lijst: [] }; }
+    const ring = this.leerRing.lijst;
+    const nu = new Float32Array(m);
+    for (let i = 0, j = 0; i < n; i += 5, j++) nu[j] = this.cl[i];
+    ring.push(nu);
+    if (ring.length <= LAG) return 0;
+    const v = ring.shift();
+    let sn = 0, sv = 0;
+    for (let j = 0; j < m; j++) { sn += nu[j]; sv += v[j]; }
+    const k = sv > 1 && sn > 1 ? sn / sv : 1;
+    const d = new Float32Array(m);
+    for (let j = 0; j < m; j++) d[j] = Math.abs(nu[j] - v[j] * k);
+    const ds = Float32Array.from(d).sort();
+    const korrel = 1.4826 * ds[m >> 1] / Math.SQRT2;
+    let bew = 0;
+    for (let i = 0, j = 0; i < n; i += 5, j++) if (d[j] > Math.max(10 + 3 * this.noise[i], 5 * korrel)) bew++;
+    return bew / m;
   }
 
   /**

@@ -16,6 +16,12 @@ hieronder. Liever zonder internet? Download `sticky-clash.html`, het hele spel i
 bestand (in het online spel: *Download het spel als één bestand*, onderaan het paneel), of
 de hele map via *Code → Download ZIP*.
 
+**Stap voor stap opzetten:** open [`uitleg.html`](uitleg.html) (ook online:
+https://noaquim.github.io/sticky-clash/uitleg.html) of print
+[`docs/opzetten-nl.pdf`](docs/opzetten-nl.pdf). Beamer, webcam en laptop klaarzetten, met
+tekeningen, en wat je doet als iets niet lukt. In het spel: **Hoe zet ik het op?** op het
+welkomstkaartje en onderaan het paneel.
+
 ![Ballen stuiteren over briefjes op een muur naar de bak](docs/demo.gif)
 
 *Simulatie, geen echte opname: de echte spelcode speelde deze baan; muur, briefjes en camerabeeld kwamen er later bij.*
@@ -51,14 +57,19 @@ openen.
 1. Dubbelklik **`sticky-clash.html`** (of op Windows de snelkoppeling / `start.bat`), of
    open de link hierboven
 2. Kies hoe je speelt. De demo begint meteen.
-3. Met een beamer: klik op **Alles automatisch instellen**, sta de camera toe en volg de
-   aanwijzingen op de muur. Op een scherm: sta de camera toe en haal je handen even uit
-   beeld terwijl het spel de lege tafel leert.
+3. Met een beamer: kies **Muur + beamer**. Dan begint het instellen meteen: het
+   beamervenster gaat open, je staat de camera toe, en je volgt de aanwijzingen op de muur
+   (het spel kalibreert, stelt het licht af, leert de lege muur en zoekt de bak). Kom je
+   later terug, dan staat er één grote knop: **Start: alles klaarzetten**. Op een scherm:
+   sta de camera toe en haal je handen even uit beeld terwijl het spel de lege tafel leert.
 4. **Start ronde**
 
 Dat is alles. Met een beamer gaat de kalibratie vanzelf: het spel projecteert een wit vlak
-en vier stippen en zoekt ze zelf terug in het camerabeeld. Op een scherm is er niets te
-kalibreren: het camerabeeld is het speelveld.
+en vier stippen en zoekt ze zelf terug in het camerabeeld. Kom je terug, dan kijkt het eerst
+of de kalibratie van de vorige keer nog klopt; klopt die, dan slaat het het kalibreren over.
+Daarna let het spel elke minuut zelf op of het licht of de muur veranderd is, en stelt het
+dat bij (zie [Elke minuut controleren](#elke-minuut-controleren)). Op een scherm is er niets
+te kalibreren: het camerabeeld is het speelveld.
 
 ## Nederlands of Engels
 
@@ -201,14 +212,16 @@ Beeldschermen → Samenvoegen*.
 beamervenster voortaan vanzelf op de beamer — ook als de beamer je hoofdscherm is.
 
 **Firefox en Safari** (en Chrome zolang je dat nog niet toestond) weten niet waar de beamer
-hangt. Dan opent *Alles automatisch instellen* het beamervenster op je laptopscherm, en
-wacht: in het venster zelf staat *Sleep dit venster naar de beamer*. Sleep het erheen
-(Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>, Chromebook:
-<kbd>Zoeken</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
+hangt. Dan opent het instellen het beamervenster op je laptopscherm, en wacht: in het venster
+zelf staat *Sleep dit venster naar de beamer*, en in het paneel staat in een oranje kader stap
+voor stap wat je doet. Sleep het erheen (Windows: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>,
+Chromebook: <kbd>Zoeken</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>, Linux/GNOME:
 <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd>) en klik erin, of druk op <kbd>F</kbd>, voor
 volledig scherm: dan gaat het instellen vanzelf verder. Staat het al goed? Klik in het
-paneel op **Verder**. (Op Linux met Wayland, de standaard van Ubuntu, mag geen enkele
-browser zijn vensters zelf neerzetten; daar sleep je het dus altijd.)
+paneel op **Verder**. In Chrome en Edge staat in dat kader ook **Laat de browser de beamer
+zoeken**: sta het toe, dan springt het venster zelf naar de beamer en gaat het instellen
+verder. (Op Linux met Wayland, de standaard van Ubuntu, mag geen enkele browser zijn vensters
+zelf neerzetten; daar sleep je het dus altijd.)
 
 Zonder klik mag geen enkele website volledig scherm openen, dus: één klik in het
 beamervenster. Zolang dat nog niet gebeurd is staat er klein onderin het beamerbeeld "Klik
@@ -337,10 +350,14 @@ In een donkere kamer is de beamer de enige lichtbron op de muur. Projecteert het
 zwart, dan valt er niets op je post-its en ziet de camera ze niet — hoe goed de herkenning
 verder ook is. Daarom verlicht de beamer de muur zacht grijs: de **muurverlichting**.
 
-Bij **Alles automatisch instellen** meet het spel hoe helder de camera het beamervlak ziet
-en zet de verlichting precies hoog genoeg. In een gewone, verlichte kamer blijft hij uit (0%);
-alleen als het donker is gaat hij naar 12%, 25%, 40% of 55%. Je kunt hem ook zelf schuiven onder
-Speelmodus. Leer daarna de muur opnieuw, want de verlichting hoort bij de lege muur.
+Bij het instellen meet het spel hoe helder de camera het beamervlak ziet en zet de
+verlichting precies hoog genoeg. In een gewone, verlichte kamer blijft hij uit (0%); alleen
+als het donker is gaat hij naar 12%, 25%, 40% of 55%. Tellen de kleuren mee (speciale
+briefjes, het duel), dan zet hij hem ook zo hoog dat de camera de kleuren goed ziet (zie
+[Kleuren in het donker](#kleuren-in-het-donker)). Je kunt hem ook zelf schuiven onder
+Speelmodus. Leer daarna de muur opnieuw, want de verlichting hoort bij de lege muur. Met
+*Elke minuut controleren* aan stelt het spel hem ook later nog bij, als het licht in de kamer
+verandert.
 
 Daarnaast schaalt de drempel mee met hoe licht de muur is. Een post-it kaatst een vast deel
 van het licht anders terug dan de muur; op een schemerige muur is dat in getallen een klein
@@ -361,6 +378,85 @@ in een donkere kamer gaf dat een bijna zwart beeld. Aanzetten kan onder Meer ins
 Camera, als het beeld echt flikkert; het spel controleert dan of het beeld er niet donkerder
 van wordt en zet hem anders terug. Bij het starten van de camera zet het spel een eventueel
 nog vastgezette belichting van een vorige keer terug op automatisch.
+
+### Kleuren in het donker
+
+In het donker ziet een camera de kleuren slecht: hij versterkt het beeld en daarmee ook de
+kleurkorrel, zijn ruisfilter maakt kleuren grauwer, en zijn witbalans schuift mee met het
+gekleurde licht van de beamer. Dan kan een roze briefje ineens een trampoline worden. Daarom
+meet het spel steeds, op de lege muur, of de kleuren te vertrouwen zijn: hoe licht het is,
+hoeveel de kleur van beeld tot beeld verspringt, en of de muur van kleur verschoven is sinds
+hij geleerd werd.
+
+- Zijn de kleuren niet te vertrouwen, dan zet het spel eerst de **muurverlichting** hoger
+  (alleen buiten een ronde, en als *Automatisch afstellen bij instellen* en *Elke minuut
+  controleren* aan staan): met meer licht op de muur ziet de camera de kleuren weer. Op de
+  muur staat dan kort *Even bijstellen — meer licht, zodat de camera de kleuren ziet*.
+- Helpt dat niet (ook niet op 55%), of mag het niet, dan tellen de speciale briefjes als
+  gewone briefjes: geen trampolines die er niet zijn, en het woordje boven het briefje
+  verdwijnt. In het paneel staat *Te donker voor kleuren: speciale briefjes tellen nu als
+  gewone briefjes — meer licht helpt*, op de muur acht seconden lang *Te donker voor kleuren:
+  speciale briefjes zijn nu gewoon*, en de teller zegt *te donker voor kleuren*. In de
+  duelmodus staat er een waarschuwing in het paneel en, buiten een ronde, vast op de muur.
+- Wordt het weer licht genoeg, dan tellen de kleuren na vier seconden vanzelf weer mee
+  (*Weer genoeg licht: de kleuren tellen weer*). Bewust niet meteen: rond de grens zou het
+  anders steeds heen en weer springen.
+
+Gemeten (`test/omgeving.mjs`): in een nagebouwde donkere kamer waarin de camera zijn
+witbalans warm bijstelt, werd een roze briefje zonder deze controle een trampoline; met de
+controle kreeg geen enkel briefje een soort. Met 25% muurverlichting in dezelfde kamer werken
+rood, groen en blauw gewoon. In de donkere kamers van de meetlat houden schemerig (50% licht)
+en donker (35%) hun kleuren, en is heel donker (22%) te donker.
+
+## Elke minuut controleren
+
+Het licht verandert terwijl je speelt: iemand doet een lamp aan, de zon komt door het
+gordijn, er komt iets aan de muur te hangen. Staat **Elke minuut controleren** aan (bovenaan in
+het paneel, standaard aan; het spel onthoudt je keuze), dan let het spel daar zelf op.
+
+- Eens per halve seconde meet het een steekproef van de muur (dat kost bijna niets), en eens
+  per minuut beslist het: is de lege muur een stuk lichter of donkerder dan toen hij geleerd
+  werd (30% of meer), is hij te donker voor de herkenning terwijl de muurverlichting nog
+  hoger kan, of is een deel van de muur (2% of meer) al een halve minuut blijvend anders — een
+  lamp die op de muur schijnt, een nieuwe schaduw, een gordijn dat open ging, iets wat aan de
+  muur hangt maar geen briefje is?
+- Zo ja, dan stelt het zelf bij: eventueel de muurverlichting (net als bij het instellen),
+  en dan de muur opnieuw leren. Op de muur staat even *Even bijstellen*, daarna drie seconden
+  *Licht en muur bijgesteld*, en in het paneel *Vanzelf bijgesteld — 5 voorwerpen tellen nog
+  mee*. Wat als voorwerp telde, blijft meetellen: je briefjes, ook de rode, groene en blauwe,
+  en de bak.
+- **Niet midden in een gewone ronde.** Dan zegt de statusregel *Het licht of de muur is
+  veranderd — na deze ronde stel ik het vanzelf bij*, en gebeurt het zodra de ronde voorbij is.
+- **Speel je met *Geen tijdslimiet*** (of duurt de ronde nog meer dan drie minuten), dan komt
+  het eind van de ronde niet. Dan zegt de statusregel *ik stel het zo even bij, op een rustig
+  moment*, en wacht het spel op een rustig moment: niemand in beeld, niets wat beweegt (twee
+  en een halve seconde), en geen bal vlak bij de bak. Dan gaat het spel even op pauze, staat op
+  de muur *Even bijstellen*, stelt het bij (een paar seconden), en gaat het vanzelf verder
+  (*GO*, in het paneel *Bijgesteld — het spel gaat verder*). Score en tijd blijven staan; de
+  klok telt de pauze niet mee. Hooguit eens per vier minuten.
+- **Nooit als er iemand voor de muur staat**, of een hand in beeld is. Dan wacht het tot het
+  een paar seconden leeg en stil is (*ik stel het bij zodra er niemand voor de muur staat*).
+  Loopt er toch iemand doorheen terwijl het de muur leert, dan houdt het de oude muur en
+  probeert het het zo nog eens.
+- **Alleen als de herkenning echt stuk is** — bijna het hele beeld wordt als voorwerp gezien,
+  of het beeld is overbelicht, bijvoorbeeld omdat het licht uit ging — wacht het niet op de
+  minuut: na vier seconden gaat een lopende ronde op pauze (op de muur: *Even pauze: het licht
+  is veranderd. Ga even opzij, dan stel ik het bij*). Zodra niemand meer beweegt stelt het
+  bij, en dan gaat de ronde vanzelf verder (*GO*). Buiten een ronde stelt het meteen bij.
+  Klik je zelf op **Pauze opheffen**, dan speel je verder en wacht het tot na de ronde.
+- Lukt het drie keer achter elkaar niet, dan houdt het op en zegt het: klik op **Opnieuw
+  instellen**.
+
+Is de camera of de beamer verschoven, dan merkt het spel dat al binnen twee seconden: dat is
+*Vanzelf opnieuw instellen als de camera of beamer verschuift* (Meer instellingen →
+Kalibratie).
+
+Gemeten in een nagebouwde kamer met de echte herkenning (`test/muurwacht.mjs`): tien minuten
+met rondes, ballen en mensen die langslopen of even blijven staan: nul keer opnieuw geleerd.
+Licht uit: na vier seconden bijgesteld (midden in een ronde: pauze, en meteen erna verder).
+Licht aan, een lamp op de muur, een nieuwe schaduw, een gordijn dat langzaam of ineens
+opengaat, een kabel of een vel half buiten het beamervlak: binnen twee minuten bijgesteld.
+Daarna telden alle briefjes nog mee, met hun kleur, en de verandering zelf niet.
 
 ## Testen zonder opstelling
 
@@ -485,7 +581,8 @@ Voor wie het voor het eerst speelt, staan er op het startscherm korte tips op de
 hoe je een baan bouwt en wat de speciale briefjes doen.
 
 **Geluid, muziek en effecten** staan onder *Meer instellingen* → Spel, elk los aan of uit.
-Tijdens een ronde speelt zachte muziek (drums, bas en een loopje, zonder muziekbestanden).
+Tijdens een ronde speelt zachte muziek, zonder muziekbestanden: kies naast het vinkje Muziek
+*Rustig* (lo-fi), *Vrolijk* (marimba) of *Arcade* (synthesizers, de standaard).
 Bij pauze wordt hij stil en daarna speelt hij verder; na de ronde stopt hij. In de
 Uitdaging gaat hij per level iets sneller. De trampoline zegt *boing*, de turbo *whoosh*,
 een gouden bal in de bak klinkt als een klokje en de bonusbak als een muntje. Bij 3, 5 en
@@ -567,6 +664,13 @@ rand: die moet precies om het beamerbeeld vallen.
 Lukt het niet, dan zegt hij erbij waaróm — te weinig contrast, of het beamervlak ligt niet
 volledig in het camerabeeld.
 
+Kom je terug met een bewaarde kalibratie (de knop heet dan **Start: alles klaarzetten**), dan
+controleert het spel eerst snel of hij nog klopt: vier stippen, en kijken of ze vallen waar de
+kalibratie zegt, op hooguit anderhalve cel na. Klopt het, dan blijft de kalibratie zoals hij
+was (*De kalibratie van de vorige keer klopt nog — die hoeft niet opnieuw*); anders kalibreert
+het gewoon opnieuw. Met een andere camera altijd opnieuw. **Opnieuw instellen** (zo heet de
+knop daarna) doet alles opnieuw, ook de kalibratie.
+
 ## Als de herkenning tegenvalt
 
 Zet het tabblad **"Wat het spel ziet"** aan boven het camerabeeld. Daar zie je precies wat
@@ -629,6 +733,9 @@ node test/gids.mjs          # ZELF AANPASSEN.txt en CUSTOMIZE.txt: elk stukje co
 node test/speelplek.mjs     # drie speelplekken: welkomstkeuze, demo-opstelling (en speelt hij?), briefjes, scherm, camera ingesloten
 node test/kwaliteit.mjs     # trage computers: een gewone verandert nooit, een trage tekent eenvoudiger en loopt nooit in slow motion
 node test/apparaat.mjs      # elke computer: volledig scherm in oude Safari, iPad en tablets, besturingssysteem, "browser te oud"
+node test/omgeving.mjs      # elke minuut controleren: wanneer wel en niet bijstellen; kleuren in het donker, met hysterese
+node test/muurwacht.mjs     # nagebouwde kamer: 10 min rustig = nooit opnieuw leren; licht, lamp, gordijn, schaduw = wel; briefjes blijven
+node test/uitleg.mjs        # de uitleg om op te zetten (uitleg.html, de pdf's): beide talen gelijk, links kloppen, knoppen heten zoals in het spel
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code
@@ -655,6 +762,7 @@ afgewogen.
 | [js/game.js](js/game.js) | physics: cirkel tegen convexe veelhoek, scoren, tekenen |
 | [js/audio.js](js/audio.js) | gesynthetiseerd geluid, geen audiobestanden |
 | [js/muziek.js](js/muziek.js) | achtergrondmuziek, vooruit ingepland op de klok van de geluidskaart |
+| [js/muziek-stijlen.js](js/muziek-stijlen.js) | de drie muziekstijlen (Rustig, Vrolijk, Arcade), allemaal gesynthetiseerd |
 | [js/main.js](js/main.js) | wizard, automatische kalibratie, beamervenster, testmodus, welkomstkaartje en speelscherm |
 | [js/speelplek.js](js/speelplek.js) | muur, scherm of demo: de keuze bij het opstarten, de briefjes van de demo, het speelveld op een scherm |
 | [js/app.js](js/app.js) | installeren als app; meldt de service worker aan (nooit vanaf file://) |
@@ -740,6 +848,14 @@ Een globale lichtsprong (lamp aan, of de camera stelt zijn belichting bij) wordt
 de mediaan van een steekproef en weggerekend. Getest van 25% donkerder tot 25% lichter:
 geen spookvlekken, en een voorwerp blijft zichtbaar. Voorheen viel bij donkerder licht álle
 herkenning stil zónder waarschuwing, omdat het hele beeld als schaduw werd weggegooid.
+
+Wat zo'n factor niet kan opvangen (een lamp die op één plek op de muur schijnt, daglicht van
+één kant), stelt het spel elke minuut zelf bij (zie [Elke minuut controleren](#elke-minuut-controleren)).
+De beslissingen staan los van de rest in `js/omgeving.js`: alleen rekenwerk op metingen, zodat
+ze in `test/omgeving.mjs` precies na te rekenen zijn. Een lichtvlek of schaduw die als voorwerp
+gezien wordt, herkent het aan de kleur (overal even veel lichter of donkerder dan de muur) en
+de zachte rand; die telt dan als veranderde muur, en wordt bij het opnieuw leren niet
+vastgehouden.
 
 ### Volgen zonder glitches
 

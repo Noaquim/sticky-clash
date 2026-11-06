@@ -33,6 +33,7 @@ const TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.gif': 'image/gif',
+  '.pdf': 'application/pdf',
   '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm',

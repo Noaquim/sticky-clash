@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="nl" class="toon-nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zo zet je Sticky Clash op</title>
+<meta name="description" content="Stap voor stap: beamer, webcam en laptop klaarzetten voor Sticky Clash. Step by step: setting up the projector, webcam and laptop for Sticky Clash.">
+<meta name="theme-color" content="#101217">
+<link rel="icon" href="sticky-clash.ico">
+<!--
+  Hoe je Sticky Clash opzet: voor op het scherm, en om af te drukken op A4. Alles staat in
+  dit ene bestand, zonder losse css of js: dan werkt het ook als je het dubbelklikt.
+
+  Tekst aanpassen: elke tekst staat er twee keer, eerst Nederlands (lang="nl") en meteen
+  daarna Engels (lang="en"). Verander ze allebei. Namen van knoppen en vinkjes in het spel
+  staan tussen <b class="ui">…</b>, en wat het spel op de muur zet tussen <b class="op-muur">…</b>.
+  test/uitleg.mjs controleert dat beide talen evenveel stappen en regels hebben, en dat
+  die namen precies zo in het spel staan (in js/taal-en.js).
+
+  De pdf's in docs/ (om te printen) maak je daarna opnieuw:   node maak-uitleg-pdf.mjs
+-->
+<script>
+/* Welke taal: ?taal=nl of ?taal=en in het adres (zo opent het spel deze pagina), anders wat
+   je in het spel koos (NL | EN, bewaard in deze browser), anders de taal van de browser.
+   Al in de kop, zodat je nooit eerst de andere taal ziet. Bewust ouderwets JavaScript,
+   net als het noodscript in index.html. */
+(function () {
+  var d = document.documentElement, taal = '';
+  var m = /[?&]taal=(nl|en)(?:&|$)/.exec(location.search);
+  if (m) taal = m[1];
+  else {
+    try { taal = localStorage.getItem('stickyclash.taal') || ''; } catch (e) { taal = ''; }
+  }
+  if (taal !== 'nl' && taal !== 'en') {
+    taal = /^nl/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '') ? 'nl' : 'en';
+  }
+  d.lang = taal;
+  d.className = 'toon-' + taal;
+})();
+</script>
+<style>
+:root{
+  color-scheme:dark;
+  /* dezelfde kleuren als het spel (css/style.css) */
+  --bg:#0c0d10; --panel:#15171c; --line:#252932; --ink:#e8eaf0; --dim:#8b93a5;
+  --acc:#ff8a1e; --acc2:#3aa0ff; --ok:#3ddc84; --fout:#ff6b6b;
+  --vak:#1b1f28; --knop:#1d2029;
+  /* de tekeningen */
+  --t-ink:#e8eaf0; --t-dim:#8b93a5; --t-muur:#232733; --t-vloer:#1a1d25;
+  --t-beeld:#3a3123; --t-beeldrand:#ff8a1e; --t-kegel:rgba(255,138,30,.15);
+  --t-zicht:rgba(58,160,255,.10); --t-zichtrand:#3aa0ff; --t-vak:#2b303c; --t-scherm:#24425f;
+  --t-wit:#f3efe6; --t-nacht:#08090c; --t-menu:#1d2029; --t-keus:rgba(255,138,30,.2);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+/* maar één taal tegelijk (de kop zet toon-nl of toon-en op <html>) */
+.toon-nl [lang="en"], .toon-en [lang="nl"]{display:none !important}
+a{color:var(--acc2)}
+
+/* ---- de balk bovenin, zoals in het spel */
+.balk{position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:10px 16px; background:#101217; border-bottom:1px solid var(--line)}
+.logo{margin-right:auto; font-size:17px; font-weight:700; letter-spacing:.02em; color:var(--ink); text-decoration:none; white-space:nowrap}
+.logo em{font-style:normal; color:var(--acc)}
+.balk .knop{display:inline-block; padding:6px 11px; border-radius:7px; border:1px solid var(--line); background:var(--knop); color:var(--ink); font:inherit; font-size:13px; text-decoration:none; cursor:pointer; white-space:nowrap}
+.balk .knop:hover{background:#262a35}
+.taal{display:flex; align-items:center; gap:1px; font-size:11px; color:#3a404d}
+.taal button{padding:4px 8px; border:0; border-radius:5px; background:none; color:var(--dim); font:inherit; font-size:12px; font-weight:600; letter-spacing:.06em; cursor:pointer}
+.taal button:hover{background:#1d2029; color:var(--ink)}
+.taal button.on{background:#2f3542; color:#fff}
+
+main{max-width:900px; margin:0 auto; padding:22px 16px 40px}
+h1{margin:4px 0 8px; font-size:32px; line-height:1.15; letter-spacing:-.01em}
+.intro{margin:0; max-width:62ch; font-size:16.5px; color:#c3c8d4}
+.online{margin:10px 0 0; font-size:13px; color:var(--dim)}
+.online a{color:var(--dim)}
+
+/* inhoud */
+.inhoud{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:6px; margin:20px 0 4px; padding:0; list-style:none}
+@media (max-width:520px){ .inhoud{grid-template-columns:repeat(2,minmax(0,1fr))} .inhoud a{padding:6px 8px; font-size:13px} }
+.inhoud a{display:flex; align-items:center; gap:9px; height:100%; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-decoration:none; font-size:14px}
+.inhoud a:hover{border-color:var(--acc)}
+.inhoud b{flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:#272c36; font-size:12px}
+
+/* delen en stappen */
+.deelkop{display:flex; align-items:center; gap:12px; margin:30px 0 10px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.09em; color:var(--dim)}
+.deelkop::after{content:""; flex:1; height:1px; background:var(--line)}
+.stap{display:grid; grid-template-columns:minmax(0,1fr); gap:14px 24px; margin:12px 0; padding:16px 18px 18px; border:1px solid var(--line); border-radius:12px; background:var(--panel); scroll-margin-top:64px}
+.stap h3{display:flex; align-items:center; gap:11px; margin:0 0 10px; font-size:19px; line-height:1.25}
+.nr{flex:none; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--acc); color:#1a1000; font-size:16px; font-weight:800}
+.vakje .nr{background:#2f3542; color:#fff; font-size:15px}
+ol.doen{margin:0; padding:0; list-style:none; counter-reset:doen}
+ol.doen > li{position:relative; margin:0; padding:3px 0 3px 31px; counter-increment:doen}
+ol.doen > li::before{content:counter(doen); position:absolute; left:0; top:4px; display:grid; place-items:center; width:21px; height:21px; border-radius:6px; border:1.5px solid #3a4152; color:var(--dim); font-size:12px; font-weight:700; line-height:1}
+ul.nodig{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:2px 20px; margin:0; padding:0; list-style:none}
+ul.nodig li{position:relative; padding:3px 0 3px 29px}
+ul.nodig li::before{content:""; position:absolute; left:2px; top:7px; width:15px; height:15px; border-radius:4px; border:1.5px solid #4a5163}
+ul.keus{margin:4px 0 2px; padding-left:18px}
+ul.keus li{margin:2px 0}
+.tip{margin:10px 0 0; padding:8px 12px; border-radius:8px; background:var(--vak); color:#c3c8d4; font-size:14px}
+.tip b{color:var(--ink)}
+/* naam van een knop of vinkje in het spel */
+.ui{padding:0 5px; border-radius:5px; border:1px solid #363c4b; background:#232835; color:#fff; font-weight:600; -webkit-box-decoration-break:clone; box-decoration-break:clone}
+kbd{padding:0 5px; border:1px solid #333a47; border-bottom-width:2px; border-radius:4px; background:#272c36; font:inherit; font-size:.9em}
+
+/* tekeningen */
+figure{margin:0}
+.tek{display:block; width:100%; height:auto}
+figcaption{margin-top:6px; font-size:13px; line-height:1.4; color:var(--dim)}
+.panelen{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px}
+.panelen.zes{grid-template-columns:repeat(3,minmax(0,1fr))}
+.goed::before{content:"✓ "; color:var(--ok); font-weight:800}
+.fout::before{content:"✗ "; color:var(--fout); font-weight:800}
+.tek text{fill:var(--t-ink); font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; font-size:13px}
+.tek .klein{font-size:11px; fill:var(--t-dim)}
+.groot-tekst text{font-size:16px}
+.groot-tekst .klein{font-size:13px}
+.tek .midden{text-anchor:middle}
+.tek .l{fill:none; stroke:var(--t-ink); stroke-width:2; stroke-linecap:round; stroke-linejoin:round}
+.tek .dun{stroke-width:1.2}
+.tek .muur{fill:var(--t-muur)}
+.tek .vloer{fill:var(--t-vloer)}
+.tek .kader{fill:none; stroke:var(--t-dim); stroke-width:2}
+.tek .beeld{fill:var(--t-beeld); stroke:var(--t-beeldrand); stroke-width:2}
+.tek .kegel{fill:var(--t-kegel)}
+.tek .zicht{fill:var(--t-zicht); stroke:var(--t-zichtrand); stroke-width:1.5; stroke-dasharray:5 4}
+.tek .vak{fill:var(--t-vak); stroke:var(--t-ink); stroke-width:1.6; stroke-linejoin:round}
+.tek .lens{fill:var(--t-ink)}
+.tek .scherm{fill:var(--t-scherm)}
+.tek .kabel{fill:none; stroke:var(--t-ink); stroke-width:3; stroke-linecap:round}
+.tek .maat{fill:none; stroke:var(--t-dim); stroke-width:1.4}
+.tek .pijlkop{fill:var(--t-dim)}
+.tek .briefje{stroke:rgba(0,0,0,.4); stroke-width:1}
+.tek .geel{fill:#ffd84d} .tek .rood{fill:#ff4d4d} .tek .groen{fill:#3ddc84} .tek .blauw{fill:#3aa0ff}
+.tek .grijs{fill:#6b7080}
+.tek .letter{fill:#1a1000; font-size:12px; font-weight:800; text-anchor:middle}
+.tek .baan{fill:none; stroke:var(--t-ink); stroke-width:1.6; stroke-dasharray:1 5; stroke-linecap:round}
+.tek .bal{fill:#fff; stroke:#1a1000; stroke-width:1}
+.tek .bron{fill:var(--t-dim)}
+.tek .wit{fill:var(--t-wit)}
+.tek .stip{fill:#15171c}
+.tek .groenrand{fill:none; stroke:#3ddc84; stroke-width:5}
+.tek .grijs1{fill:#5a5e68} .tek .grijs2{fill:#7d828e} .tek .grijs3{fill:#a3a8b3}
+.tek .nacht{fill:var(--t-nacht)}
+.tek .donkerbeeld{fill:#16130e; stroke:#4a3a24; stroke-width:1.5}
+.tek .toets{fill:var(--t-vak); stroke:var(--t-ink); stroke-width:1.4}
+.tek .menu{fill:var(--t-menu); stroke:var(--t-dim); stroke-width:1.2}
+.tek .keus{fill:var(--t-keus); stroke:var(--acc); stroke-width:1.8}
+.tek .vet{font-weight:800}
+.tek .menutekst{font-size:14px}
+.tek .groot{font-size:38px; font-weight:800}
+.tek .vink{fill:none; stroke:var(--ok); stroke-width:7; stroke-linecap:round; stroke-linejoin:round}
+.tek .oud{fill:none; stroke:var(--t-ink); stroke-width:1.5; stroke-dasharray:4 3}
+.tek .raam{fill:#fffbe6; stroke:var(--t-ink); stroke-width:1.4}
+.tek .straal{stroke:#ffd84d; stroke-width:2.2; stroke-linecap:round}
+.tek .vaag{opacity:.4}
+
+/* hulp bij problemen */
+.hulp{display:grid; grid-template-columns:minmax(0,1fr); gap:10px 22px; margin:0}
+.hulp > div{padding:10px 12px; border-radius:9px; background:var(--vak)}
+.hulp dt{font-weight:700}
+.hulp dd{position:relative; margin:3px 0 0; padding-left:18px; font-size:14px; color:#c3c8d4}
+.hulp dd::before{content:"→"; position:absolute; left:0; color:var(--acc)}
+.vakjes{display:grid; grid-template-columns:minmax(0,1fr); gap:12px}
+.vakje{margin:0}
+.vakje h3{font-size:17px}
+
+.voet{max-width:900px; margin:0 auto; padding:0 16px 30px; font-size:13px; color:var(--dim)}
+.voet a{color:var(--dim)}
+
+@media (min-width:720px){
+  /* twee korte stappen (class="half") naast elkaar */
+  .deel{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:12px}
+  .deel > *{grid-column:1 / -1}
+  .deel > .half{grid-column:auto}
+  .stap.met-tek{grid-template-columns:minmax(0,1fr) 330px}
+  .panelen.zes{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .panelen.vier{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .hulp{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vakjes{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:520px){
+  .balk{position:static; padding:10px 12px}
+  h1{font-size:26px}
+  .stap{padding:14px 14px 16px}
+}
+
+/* ---- afdrukken: A4, wit papier, zwarte letters, ook goed in zwart-wit */
+@page{size:A4; margin:11mm 12mm 12mm}
+@media print{
+  :root{
+    color-scheme:light;
+    --bg:#fff; --panel:#fff; --line:#999; --ink:#000; --dim:#333; --acc:#000; --acc2:#000; --vak:#fff;
+    --t-ink:#000; --t-dim:#555; --t-muur:#e9e9e9; --t-vloer:#cfcfcf; --t-beeld:#fff; --t-beeldrand:#000;
+    --t-kegel:#e2e2e2; --t-zicht:none; --t-zichtrand:#000; --t-vak:#fff; --t-scherm:#d8d8d8;
+    --t-wit:#fff; --t-nacht:#5c5c5c; --t-menu:#fff; --t-keus:#e6e6e6;
+  }
+  body{background:#fff; color:#000; font-size:9.2pt; line-height:1.34}
+  a{color:#000; text-decoration:none}
+  .balk, .inhoud{display:none !important}
+  main{max-width:none; padding:0}
+  h1{margin:0 0 1.5mm; font-size:19pt}
+  .intro{max-width:none; font-size:10.5pt; color:#000}
+  .online{margin-top:1.5mm; font-size:8.5pt; color:#333}
+  .deel{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:6mm}
+  .deel > *{grid-column:1 / -1}
+  .deel > .half{grid-column:auto}
+  /* elk deel met class="blad" begint op een nieuwe bladzijde: zo worden het er drie */
+  .deel.blad{break-before:page}
+  .deelkop{margin:4mm 0 1mm; font-size:8.5pt; color:#000; letter-spacing:.12em}
+  .deelkop::after{background:#000}
+  .deel.blad > .deelkop{margin-top:0}
+  .stap{gap:1.5mm 6mm; margin:0; padding:2.3mm 0 2.1mm; border:0; border-top:.6pt solid #aaa; border-radius:0; background:none; break-inside:avoid}
+  .deelkop + .stap, .deelkop + .half + .half{border-top:0}
+  .stap.met-tek{grid-template-columns:minmax(0,1fr) 76mm}
+  .stap h3{margin:0 0 1.2mm; gap:2.4mm; font-size:12pt}
+  .nr, .vakje .nr{width:6.4mm; height:6.4mm; border:1.3pt solid #000; background:none; color:#000; font-size:10.5pt}
+  ol.doen > li{padding:.5mm 0 .5mm 6.2mm}
+  ol.doen > li::before{top:.9mm; width:4.2mm; height:4.2mm; border:.8pt solid #000; border-radius:1mm; color:#000; font-size:7pt}
+  ul.nodig{grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 6mm}
+  ul.nodig li{padding:.4mm 0 .4mm 6mm}
+  ul.nodig li::before{top:1.2mm; width:3.4mm; height:3.4mm; border:.8pt solid #000; border-radius:.8mm}
+  ul.keus{margin:.6mm 0 .4mm; padding-left:4.5mm}
+  ul.keus li{margin:.2mm 0}
+  .tip{margin:1.6mm 0 0; padding:.6mm 0 .6mm 2.6mm; border-left:1.6pt solid #000; border-radius:0; background:none; color:#000; font-size:8.8pt}
+  .ui{padding:0 .8mm; border:.6pt solid #000; border-radius:.8mm; background:none; color:#000}
+  kbd{border:.6pt solid #000; border-bottom-width:1.2pt; background:none}
+  figcaption{margin-top:1mm; font-size:7.8pt; line-height:1.3; color:#000}
+  .panelen{gap:3mm}
+  .panelen.zes{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .panelen.vier{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .goed::before, .fout::before{color:#000}
+  .tek .groenrand{stroke:#000; stroke-width:5}
+  .tek .vink{stroke:#000}
+  .tek .keus{stroke:#000}
+  .tek .straal{stroke:#000; stroke-width:1.4}
+  .tek .donkerbeeld{fill:#333; stroke:#000}
+  .tek .zicht{stroke-width:1.3}
+  .hulp{grid-template-columns:repeat(2,minmax(0,1fr)); gap:2mm 6mm}
+  .hulp > div{padding:0; background:none; break-inside:avoid}
+  .hulp dt{font-size:9.6pt}
+  .hulp dd{margin-top:.4mm; padding-left:4mm; font-size:9pt; color:#000}
+  .hulp dd::before{color:#000}
+  .vakjes{grid-template-columns:repeat(2,minmax(0,1fr)); gap:6mm; margin-top:1mm}
+  .vakje{padding:2.6mm 3.2mm 3mm; border:.8pt solid #000; border-radius:2mm}
+  .vakje h3{font-size:11pt}
+  .voet{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="balk">
+  <a class="logo" href="index.html" translate="no">Sticky <em>Clash</em></a>
+  <a class="knop" href="index.html"><span lang="nl">Naar het spel</span><span lang="en">To the game</span></a>
+  <button class="knop" id="afdrukken" type="button"><span lang="nl">Afdrukken</span><span lang="en">Print</span></button>
+  <a class="knop" lang="nl" href="docs/opzetten-nl.pdf">PDF</a><a class="knop" lang="en" href="docs/setup-en.pdf">PDF</a>
+  <div id="taalKeuze" class="taal" role="group" aria-label="Taal / Language">
+    <button type="button" data-taal="nl" translate="no" title="Nederlands">NL</button><span aria-hidden="true">|</span><button type="button" data-taal="en" translate="no" title="English">EN</button>
+  </div>
+</header>
+
+<main>
+  <h1 lang="nl">Zo zet je Sticky Clash op</h1>
+  <h1 lang="en">How to set up Sticky Clash</h1>
+  <p class="intro" lang="nl">Een beamer, een webcam en een muur. Zet ze één keer goed neer. Daarna stelt het spel zichzelf in, en houdt het zichzelf elke minuut bij.</p>
+  <p class="intro" lang="en">A projector, a webcam and a wall. Set them up properly once. After that the game sets itself up, and keeps itself right every minute.</p>
+  <p class="online" lang="nl">De eerste keer duurt het zo'n tien minuten. Deze uitleg online: <a href="https://noaquim.github.io/sticky-clash/uitleg.html">noaquim.github.io/sticky-clash/uitleg.html</a></p>
+  <p class="online" lang="en">The first time takes about ten minutes. This guide online: <a href="https://noaquim.github.io/sticky-clash/uitleg.html">noaquim.github.io/sticky-clash/uitleg.html</a></p>
+
+  <nav aria-label="Inhoud / Contents">
+    <ol class="inhoud">
+      <li><a href="#stap-0"><b>0</b><span lang="nl">Wat je nodig hebt</span><span lang="en">What you need</span></a></li>
+      <li><a href="#stap-1"><b>1</b><span lang="nl">Beamer neerzetten</span><span lang="en">Set up the projector</span></a></li>
+      <li><a href="#stap-2"><b>2</b><span lang="nl">Webcam neerzetten</span><span lang="en">Set up the webcam</span></a></li>
+      <li><a href="#stap-3"><b>3</b><span lang="nl">Laptop aansluiten</span><span lang="en">Connect the laptop</span></a></li>
+      <li><a href="#stap-4"><b>4</b><span lang="nl">Spel openen</span><span lang="en">Open the game</span></a></li>
+      <li><a href="#stap-5"><b>5</b><span lang="nl">Kies Muur + beamer</span><span lang="en">Choose Wall + projector</span></a></li>
+      <li><a href="#stap-6"><b>6</b><span lang="nl">De bak</span><span lang="en">The bin</span></a></li>
+      <li><a href="#stap-7"><b>7</b><span lang="nl">Briefjes plakken</span><span lang="en">Stick on notes</span></a></li>
+      <li><a href="#stap-8"><b>8</b><span lang="nl">Start ronde</span><span lang="en">Start a round</span></a></li>
+      <li><a href="#stap-9"><b>9</b><span lang="nl">Laat het aan staan</span><span lang="en">Leave it on</span></a></li>
+      <li><a href="#stap-10"><b>10</b><span lang="nl">Lukt het niet?</span><span lang="en">Not working?</span></a></li>
+      <li><a href="#scherm"><b>+</b><span lang="nl">Zonder beamer of camera</span><span lang="en">Without projector or camera</span></a></li>
+    </ol>
+  </nav>
+
+  <!-- ================================================================ deel 1 -->
+  <div class="deel" id="klaarzetten">
+    <h2 class="deelkop"><span lang="nl">Klaarzetten</span><span lang="en">Getting ready</span></h2>
+
+    <section class="stap" id="stap-0">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">0</b>Wat je nodig hebt</h3>
+          <ul class="nodig">
+            <li>Een laptop of computer</li>
+            <li>Een beamer en een HDMI-kabel</li>
+            <li>Een webcam, of je telefoon als webcam (gratis app: DroidCam of Camo)</li>
+            <li>Een effen, lichte muur</li>
+            <li>Een emmer, prullenbak of doos: dat is de bak</li>
+            <li>Briefjes (post-its) of andere spullen: boeken, doosjes, een liniaal</li>
+          </ul>
+          <p class="tip">Chrome of Edge werkt het best. Firefox en Safari kunnen het ook.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">0</b>What you need</h3>
+          <ul class="nodig">
+            <li>A laptop or computer</li>
+            <li>A projector and an HDMI cable</li>
+            <li>A webcam, or your phone as a webcam (free app: DroidCam or Camo)</li>
+            <li>A plain, light-coloured wall</li>
+            <li>A bucket, waste bin or box: that's the bin</li>
+            <li>Sticky notes or other things: books, small boxes, a ruler</li>
+          </ul>
+          <p class="tip">Chrome or Edge works best. Firefox and Safari work too.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stap met-tek" id="stap-1">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">1</b>Beamer neerzetten</h3>
+          <ol class="doen">
+            <li>Zet de beamer recht voor de muur, op een tafel of kast.</li>
+            <li>Zet hem aan.</li>
+            <li>Maak het beeld scherp met de focusring.</li>
+            <li>Groter beeld? Zet de beamer verder weg.</li>
+            <li>Doe het licht wat zachter. Schemer is het best.</li>
+          </ol>
+          <p class="tip">Niet helemaal donker: dan ziet de camera de kleuren slecht. En geen zon of fel raam op de muur.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">1</b>Set up the projector</h3>
+          <ol class="doen">
+            <li>Put the projector straight in front of the wall, on a table or cabinet.</li>
+            <li>Turn it on.</li>
+            <li>Make the picture sharp with the focus ring.</li>
+            <li>Bigger picture? Move the projector further back.</li>
+            <li>Dim the lights. Twilight is best.</li>
+          </ol>
+          <p class="tip">Not pitch-dark: then the camera can't see colours well. And no sun or bright window on the wall.</p>
+        </div>
+      </div>
+      <figure>
+        <svg class="tek groot-tekst" viewBox="0 0 420 300" aria-hidden="true">
+          <defs>
+            <marker id="pijl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="pijlkop" d="M0 0 L10 5 L0 10 z"/></marker>
+          </defs>
+          <!-- de muur, van bovenaf -->
+          <rect class="muur" x="6" y="6" width="408" height="22"/>
+          <line class="l" x1="6" y1="28" x2="414" y2="28"/>
+          <text lang="nl" x="14" y="22">muur</text><text lang="en" x="14" y="22">wall</text>
+          <!-- licht van de beamer, en wat de webcam ziet (breder dan het beeld) -->
+          <polygon class="kegel" points="210,210 100,30 320,30"/>
+          <polygon class="zicht" points="252,214 70,30 352,30"/>
+          <rect class="beeld" x="100" y="24" width="220" height="8" rx="1"/>
+          <!-- de bak tegen de muur, in het beeld -->
+          <circle class="vak" cx="268" cy="48" r="13"/><circle class="l dun" cx="268" cy="48" r="8"/>
+          <text lang="nl" x="287" y="53">bak</text><text lang="en" x="287" y="53">bin</text>
+          <!-- beamer, met de webcam ernaast -->
+          <rect class="vak" x="182" y="210" width="56" height="36" rx="5"/>
+          <rect class="lens" x="200" y="205" width="20" height="8" rx="2"/>
+          <rect class="vak" x="243" y="215" width="18" height="13" rx="3"/>
+          <circle class="lens" cx="252" cy="215" r="3.5"/>
+          <text lang="nl" class="midden" x="210" y="264">beamer</text><text lang="en" class="midden" x="210" y="264">projector</text>
+          <text x="268" y="232">webcam</text>
+          <!-- laptop met kabel -->
+          <rect class="vak" x="34" y="216" width="82" height="56" rx="5"/>
+          <rect class="scherm" x="40" y="221" width="70" height="9" rx="2"/>
+          <rect class="l dun" x="46" y="238" width="58" height="24" rx="2"/>
+          <text class="midden" x="75" y="290">laptop</text>
+          <path class="kabel" d="M116 248 C 146 250, 150 230, 182 230"/>
+          <text class="klein" x="132" y="265">HDMI</text>
+          <!-- afstand -->
+          <line class="maat" x1="386" y1="34" x2="386" y2="244" marker-start="url(#pijl)" marker-end="url(#pijl)"/>
+          <text class="midden" transform="translate(404 139) rotate(90)">± 2–4 m</text>
+        </svg>
+        <figcaption><span lang="nl">Van bovenaf gezien. Grijs: het licht van de beamer. Stippellijn: wat de webcam ziet.</span><span lang="en">Seen from above. Grey: the projector's light. Dotted line: what the webcam sees.</span></figcaption>
+      </figure>
+    </section>
+
+    <section class="stap met-tek" id="stap-2">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">2</b>Webcam neerzetten</h3>
+          <ol class="doen">
+            <li>Zet de webcam naast of op de beamer.</li>
+            <li>Richt hem op de muur.</li>
+            <li>Hij moet het hele beeld zien, met een randje muur eromheen.</li>
+            <li>Plak hem vast met plakband.</li>
+          </ol>
+          <p class="tip">Schuift hij later toch een stukje? Geen probleem: het spel stelt zich vanzelf opnieuw in. De camera in je laptop werkt niet: die kijkt naar jou, niet naar de muur.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">2</b>Set up the webcam</h3>
+          <ol class="doen">
+            <li>Put the webcam next to or on top of the projector.</li>
+            <li>Point it at the wall.</li>
+            <li>It must see the whole picture, with a strip of wall around it.</li>
+            <li>Tape it down.</li>
+          </ol>
+          <p class="tip">Does it shift a little later on? No problem: the game sets itself up again. Your laptop's own camera won't do: it looks at you, not at the wall.</p>
+        </div>
+      </div>
+      <div class="panelen">
+        <figure>
+          <svg class="tek" viewBox="0 0 220 160" aria-hidden="true">
+            <rect class="muur" x="4" y="4" width="212" height="152" rx="10"/>
+            <rect class="beeld" x="34" y="26" width="152" height="100" rx="2"/>
+            <rect class="briefje geel" x="60" y="46" width="20" height="20" transform="rotate(-14 70 56)"/>
+            <rect class="briefje rood" x="128" y="58" width="20" height="20" transform="rotate(12 138 68)"/>
+            <rect class="briefje blauw" x="84" y="84" width="20" height="20" transform="rotate(-6 94 94)"/>
+            <path class="vak" d="M120 110 H152 L148 142 H124 Z"/>
+            <line class="maat" x1="8" y1="76" x2="31" y2="76" marker-start="url(#pijl)" marker-end="url(#pijl)"/>
+            <line class="maat" x1="110" y1="8" x2="110" y2="23" marker-start="url(#pijl)" marker-end="url(#pijl)"/>
+            <rect class="kader" x="4" y="4" width="212" height="152" rx="10"/>
+          </svg>
+          <figcaption class="goed"><span lang="nl">Goed: het hele beeld, met een rand muur eromheen.</span><span lang="en">Good: the whole picture, with a strip of wall around it.</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 220 160" aria-hidden="true">
+            <defs><clipPath id="knip-cam"><rect x="4" y="4" width="212" height="152" rx="10"/></clipPath></defs>
+            <rect class="muur" x="4" y="4" width="212" height="152" rx="10"/>
+            <g clip-path="url(#knip-cam)">
+              <rect class="beeld" x="80" y="44" width="170" height="112" rx="2"/>
+              <rect class="briefje geel" x="108" y="66" width="20" height="20" transform="rotate(-14 118 76)"/>
+              <rect class="briefje rood" x="178" y="80" width="20" height="20" transform="rotate(12 188 90)"/>
+              <path class="vak" d="M176 136 H208 L204 168 H180 Z"/>
+            </g>
+            <rect class="kader" x="4" y="4" width="212" height="152" rx="10"/>
+          </svg>
+          <figcaption class="fout"><span lang="nl">Fout: een stuk van het beeld valt erbuiten.</span><span lang="en">Wrong: part of the picture is cut off.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="stap met-tek" id="stap-3">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">3</b>Laptop aansluiten</h3>
+          <ol class="doen">
+            <li>Steek de HDMI-kabel in de laptop en in de beamer.</li>
+            <li>Zet het tweede scherm op <b>Uitbreiden</b>, niet op Dupliceren:
+              <ul class="keus">
+                <li>Windows: <kbd>Win</kbd> + <kbd>P</kbd> → <b>Uitbreiden</b></li>
+                <li>Mac: Systeeminstellingen → Beeldschermen → gebruik als <b>uitgebreid beeldscherm</b></li>
+                <li>Chromebook: Instellingen → Beeldschermen → vink <b>Ingebouwd scherm spiegelen</b> uit</li>
+                <li>Linux: Instellingen → Beeldschermen → <b>Samenvoegen</b></li>
+              </ul>
+            </li>
+          </ol>
+          <p class="tip">Nu blijft het paneel op je laptop, en komt het spel straks op de muur.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">3</b>Connect the laptop</h3>
+          <ol class="doen">
+            <li>Plug the HDMI cable into the laptop and the projector.</li>
+            <li>Set the second screen to <b>Extend</b>, not Duplicate:
+              <ul class="keus">
+                <li>Windows: <kbd>Win</kbd> + <kbd>P</kbd> → <b>Extend</b></li>
+                <li>Mac: System Settings → Displays → use as <b>extended display</b></li>
+                <li>Chromebook: Settings → Displays → untick <b>Mirror built-in display</b></li>
+                <li>Linux: Settings → Displays → <b>Join Displays</b></li>
+              </ul>
+            </li>
+          </ol>
+          <p class="tip">Now the panel stays on your laptop, and the game will soon be on the wall.</p>
+        </div>
+      </div>
+      <div class="panelen">
+        <figure>
+          <svg class="tek" viewBox="0 0 220 140" aria-hidden="true">
+            <!-- laptop -->
+            <rect class="vak" x="14" y="18" width="78" height="54" rx="4"/>
+            <rect class="scherm" x="20" y="24" width="66" height="42" rx="2"/>
+            <path class="vak" d="M6 74 H100 L108 86 H-2 Z" transform="translate(4 0)"/>
+            <!-- kabel naar de beamer -->
+            <path class="kabel" d="M110 80 C 128 80, 124 112, 140 108 S 146 90, 150 88"/>
+            <text class="midden" x="112" y="128">HDMI</text>
+            <!-- beamer -->
+            <rect class="vak" x="150" y="64" width="64" height="36" rx="6"/>
+            <circle class="lens" cx="198" cy="82" r="9"/>
+            <line class="l dun" x1="204" y1="60" x2="214" y2="48"/>
+            <line class="l dun" x1="190" y1="58" x2="194" y2="44"/>
+            <line class="l dun" x1="176" y1="58" x2="174" y2="44"/>
+          </svg>
+          <figcaption><span lang="nl">HDMI-kabel van laptop naar beamer.</span><span lang="en">HDMI cable from laptop to projector.</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 180 136" aria-hidden="true">
+            <!-- de toetsen -->
+            <rect class="toets" x="30" y="4" width="58" height="26" rx="5"/>
+            <rect class="lens" x="38" y="10" width="6" height="6"/><rect class="lens" x="45" y="10" width="6" height="6"/>
+            <rect class="lens" x="38" y="17" width="6" height="6"/><rect class="lens" x="45" y="17" width="6" height="6"/>
+            <text x="56" y="23">Win</text>
+            <text class="midden" x="99" y="23">+</text>
+            <rect class="toets" x="110" y="4" width="30" height="26" rx="5"/>
+            <text class="midden vet" x="125" y="23">P</text>
+            <!-- het menu van Windows -->
+            <rect class="menu" x="2" y="38" width="176" height="96" rx="7"/>
+            <rect class="keus" x="6" y="88" width="168" height="22" rx="4"/>
+            <text lang="nl" class="menutekst" x="13" y="58">Alleen pc-scherm</text><text lang="en" class="menutekst" x="13" y="58">PC screen only</text>
+            <text lang="nl" class="menutekst" x="13" y="81">Dupliceren</text><text lang="en" class="menutekst" x="13" y="81">Duplicate</text>
+            <text lang="nl" class="menutekst vet" x="13" y="104">Uitbreiden</text><text lang="en" class="menutekst vet" x="13" y="104">Extend</text>
+            <text lang="nl" class="menutekst" x="13" y="127">Alleen tweede scherm</text><text lang="en" class="menutekst" x="13" y="127">Second screen only</text>
+            <path class="l" d="M148 99 l5 5 l11 -12"/>
+          </svg>
+          <figcaption><span lang="nl">Windows: <kbd>Win</kbd> + <kbd>P</kbd> → Uitbreiden.</span><span lang="en">Windows: <kbd>Win</kbd> + <kbd>P</kbd> → Extend.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================================================ deel 2 -->
+  <div class="deel blad" id="instellen">
+    <h2 class="deelkop"><span lang="nl">Het spel instellen</span><span lang="en">Setting up the game</span></h2>
+
+    <section class="stap" id="stap-4">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">4</b>Spel openen</h3>
+          <ol class="doen">
+            <li>Open het spel op een van deze manieren:
+              <ul class="keus">
+                <li>de snelkoppeling <b>Sticky Clash</b> op het bureaublad</li>
+                <li>van een USB-stick: open de map en dubbelklik <b>sticky-clash.html</b></li>
+                <li>uit de zip: pak hem eerst uit, dubbelklik dan <b>sticky-clash.html</b></li>
+                <li>online: <a href="https://noaquim.github.io/sticky-clash/">noaquim.github.io/sticky-clash</a></li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">4</b>Open the game</h3>
+          <ol class="doen">
+            <li>Open the game in one of these ways:
+              <ul class="keus">
+                <li>the <b>Sticky Clash</b> shortcut on the desktop</li>
+                <li>from a USB stick: open the folder and double-click <b>sticky-clash.html</b></li>
+                <li>from the zip: unzip it first, then double-click <b>sticky-clash.html</b></li>
+                <li>online: <a href="https://noaquim.github.io/sticky-clash/">noaquim.github.io/sticky-clash</a></li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="stap" id="stap-5">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">5</b>Kies <span class="ui">Muur + beamer</span></h3>
+          <ol class="doen">
+            <li>Klik op het welkomstkaartje op <b class="ui">Muur + beamer</b>. Kwam je al eerder? Klik dan op <b class="ui">Start: alles klaarzetten</b>.</li>
+            <li>Vraagt de browser om de camera of de schermen? Klik op <b>Toestaan</b>.</li>
+            <li>Ga uit beeld en wacht. Het spel doet nu alles zelf: camera, beamervenster, kalibratie, muurlicht, de muur leren en de bak zoeken.</li>
+            <li>Zegt de muur <b class="op-muur">Zet nu de bak neer</b>? Zet hem neer en stap weer opzij (zie <a href="#stap-6">stap 6</a>).</li>
+          </ol>
+          <p class="tip"><b>Beamervenster op je laptop?</b> (Firefox, Safari) Volg het oranje kader in het paneel: sleep het naar de beamer en klik erin. Staat het al goed? Klik op <b class="ui">Verder</b>. <b>Hangen er al briefjes?</b> Laat maar hangen: die vindt het spel ook.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">5</b>Choose <span class="ui">Wall + projector</span></h3>
+          <ol class="doen">
+            <li>On the welcome card, click <b class="ui">Wall + projector</b>. Been here before? Then click <b class="ui">Start: set everything up</b>.</li>
+            <li>Does the browser ask for the camera or the screens? Click <b>Allow</b>.</li>
+            <li>Step out of the picture and wait. The game now does everything itself: camera, projector window, calibration, wall light, learning the wall and finding the bin.</li>
+            <li>Does the wall say <b class="op-muur">Now place the bin</b>? Put it down and step aside again (see <a href="#stap-6">step 6</a>).</li>
+          </ol>
+          <p class="tip"><b>Projector window on your laptop?</b> (Firefox, Safari) Follow the orange box in the panel: drag it to the projector and click in it. Already in place? Click <b class="ui">Continue</b>. <b>Notes already on the wall?</b> Leave them: the game finds those too.</p>
+        </div>
+      </div>
+      <div class="panelen zes">
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="wit" x="9" y="7" width="102" height="66" rx="1"/>
+            <circle class="stip" cx="28" cy="21" r="5"/><circle class="stip" cx="92" cy="21" r="5"/>
+            <circle class="stip" cx="28" cy="59" r="5"/><circle class="stip" cx="92" cy="59" r="5"/>
+          </svg>
+          <figcaption><span lang="nl">Wit vlak en stippen: kalibreren</span><span lang="en">White area and dots: calibrating</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="beeld" x="9" y="7" width="102" height="66" rx="1"/>
+            <rect class="groenrand" x="12" y="10" width="96" height="60"/>
+          </svg>
+          <figcaption><span lang="nl">Een groene rand om het beeld</span><span lang="en">A green border around the picture</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="grijs1" x="9" y="7" width="34" height="66"/>
+            <rect class="grijs2" x="43" y="7" width="34" height="66"/>
+            <rect class="grijs3" x="77" y="7" width="34" height="66"/>
+            <rect class="kader" x="9" y="7" width="102" height="66"/>
+          </svg>
+          <figcaption><span lang="nl">Grijs licht: het muurlicht afstellen</span><span lang="en">Grey light: setting the wall light</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="beeld" x="9" y="7" width="102" height="66" rx="1"/>
+            <text class="groot midden" x="46" y="54">3</text>
+            <circle class="l" cx="88" cy="28" r="5"/>
+            <path class="l" d="M88 33 V50 M88 50 L82 63 M88 50 L95 62 M88 39 L80 45 M88 39 L97 43"/>
+            <path class="l" d="M98 22 H110 M105 17 L110 22 L105 27"/>
+          </svg>
+          <figcaption><span lang="nl">„Ga even uit beeld”: de muur leren</span><span lang="en">“Step out of view”: learning the wall</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="beeld" x="9" y="7" width="102" height="66" rx="1"/>
+            <path class="l" d="M60 14 V36 M52 29 L60 37 L68 29"/>
+            <path class="vak" d="M45 46 H75 L71 78 H49 Z"/>
+          </svg>
+          <figcaption><span lang="nl">„Zet nu de bak neer”: de bak zoeken</span><span lang="en">“Now place the bin”: finding the bin</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 120 80" aria-hidden="true">
+            <rect class="muur" width="120" height="80" rx="5"/>
+            <rect class="beeld" x="9" y="7" width="102" height="66" rx="1"/>
+            <path class="vink" d="M40 41 L54 55 L82 25"/>
+          </svg>
+          <figcaption><span lang="nl">Klaar: start de ronde</span><span lang="en">All set: start the round</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="stap met-tek" id="stap-6">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">6</b>De bak</h3>
+          <ol class="doen">
+            <li>Zet een emmer of doos onder tegen de muur, met de opening in het beeld.</li>
+            <li>Komt het beeld niet tot de vloer? Zet de bak op een stoel of kruk.</li>
+            <li>Doe dat als de muur <b class="op-muur">Zet nu de bak neer</b> zegt. Eerder mag ook.</li>
+          </ol>
+          <p class="tip"><b>Geen bak?</b> Dan speel je met de getekende bak op de muur. Verschuif hem met de muis in het speelveld op je laptop.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">6</b>The bin</h3>
+          <ol class="doen">
+            <li>Put a bucket or box at the bottom against the wall, with its opening inside the picture.</li>
+            <li>Picture doesn't reach the floor? Put the bin on a chair or stool.</li>
+            <li>Do it when the wall says <b class="op-muur">Now place the bin</b>. Earlier is fine too.</li>
+          </ol>
+          <p class="tip"><b>No bin?</b> Then you play with the bin drawn on the wall. Drag it with the mouse in the play field on your laptop.</p>
+        </div>
+      </div>
+      <figure>
+        <svg class="tek" viewBox="0 0 300 226" aria-hidden="true">
+          <rect class="muur" x="0" y="0" width="300" height="208"/>
+          <rect class="vloer" x="0" y="208" width="300" height="18"/>
+          <line class="l" x1="0" y1="208" x2="300" y2="208"/>
+          <rect class="beeld" x="18" y="8" width="264" height="184" rx="2"/>
+          <!-- waar de ballen vandaan komen, en een baan naar de bak -->
+          <rect class="bron" x="128" y="15" width="44" height="7" rx="3.5"/>
+          <text lang="nl" class="klein" x="178" y="22">ballen</text><text lang="en" class="klein" x="178" y="22">balls</text>
+          <path class="baan" d="M150 26 V56 Q 170 66 180 90 Q 186 104 194 108 Q 208 128 198 166"/>
+          <circle class="bal" cx="150" cy="38" r="4.5"/>
+          <circle class="bal" cx="181" cy="92" r="4.5"/>
+          <circle class="bal" cx="201" cy="146" r="4.5"/>
+          <!-- briefjes: R rood = trampoline, G groen = turbo, B blauw = breekt -->
+          <rect class="briefje geel" x="136" y="58" width="28" height="28" transform="rotate(28 150 72)"/>
+          <rect class="briefje groen" x="187" y="111" width="24" height="24" transform="rotate(-10 199 123)"/>
+          <text class="letter" x="199" y="127">G</text>
+          <rect class="briefje rood" x="62" y="98" width="24" height="24" transform="rotate(16 74 110)"/>
+          <text class="letter" x="74" y="115">R</text>
+          <rect class="briefje blauw" x="232" y="56" width="24" height="24" transform="rotate(-12 244 68)"/>
+          <text class="letter" x="244" y="73">B</text>
+          <rect class="briefje geel" x="92" y="148" width="24" height="24" transform="rotate(-24 104 160)"/>
+          <!-- de bak: staat op de vloer, de opening in het beeld -->
+          <path class="vak" d="M172 168 H226 L219 208 H179 Z"/>
+          <ellipse class="vak" cx="199" cy="168" rx="27" ry="5"/>
+          <text lang="nl" x="234" y="190">bak</text><text lang="en" x="234" y="190">bin</text>
+        </svg>
+        <figcaption><span lang="nl">De bak onderaan, de opening in het beeld. Briefjes schuin erboven. R = rood, G = groen, B = blauw.</span><span lang="en">The bin at the bottom, its opening in the picture. Notes at an angle above it. R = red, G = green, B = blue.</span></figcaption>
+      </figure>
+    </section>
+
+    <section class="stap" id="stap-7">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">7</b>Briefjes plakken</h3>
+          <ol class="doen">
+            <li>Plak briefjes schuin op de muur, als een knikkerbaan naar de bak.</li>
+            <li>Elke kleur werkt. Boeken, doosjes of een liniaal ook.</li>
+            <li>Speciale kleuren: <b>rood</b> = trampoline, <b>groen</b> = turbo, <b>blauw</b> = breekt na 5 tikken.</li>
+          </ol>
+          <p class="tip">De speciale kleuren werken alleen als er genoeg licht is. Te donker? Dan zet het spel zelf de <b class="ui">Muurverlichting</b> hoger. Helpt dat niet, dan tellen ze als gewone briefjes en staat er op de muur <b class="op-muur">Te donker voor kleuren: speciale briefjes zijn nu gewoon</b>. Een lamp aan helpt. Je handen tellen nooit mee, mensen ook niet. Een voorwerp in je hand wel.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">7</b>Stick on notes</h3>
+          <ol class="doen">
+            <li>Stick notes on the wall at an angle, like a marble run to the bin.</li>
+            <li>Any colour works. Books, small boxes or a ruler too.</li>
+            <li>Special colours: <b>red</b> = trampoline, <b>green</b> = turbo, <b>blue</b> = breaks after 5 hits.</li>
+          </ol>
+          <p class="tip">The special colours only work with enough light. Too dark? Then the game turns the <b class="ui">Wall light</b> up by itself. If that doesn't help, they count as ordinary notes and the wall says <b class="op-muur">Too dark for colours: special notes are ordinary now</b>. Turning on a lamp helps. Your hands never count, and neither do people. An object in your hand does.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ================================================================ deel 3 -->
+  <div class="deel blad" id="spelen">
+    <h2 class="deelkop"><span lang="nl">Spelen</span><span lang="en">Playing</span></h2>
+
+    <section class="stap half" id="stap-8">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">8</b>Start ronde</h3>
+          <ol class="doen">
+            <li>Klik op <b class="ui">Start ronde</b>. De muur telt af: 3, 2, 1.</li>
+            <li>Stuur de ballen met je briefjes de bak in.</li>
+            <li>Verschuif gerust briefjes tijdens het spelen.</li>
+          </ol>
+          <p class="tip"><b>Handig:</b> klik op <b class="ui">Telefoon koppelen</b> en scan de QR-code. Dan start en pauzeer je met je telefoon. <kbd>Spatie</kbd> = pauze, en na de ronde een nieuwe ronde.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">8</b>Start a round</h3>
+          <ol class="doen">
+            <li>Click <b class="ui">Start round</b>. The wall counts down: 3, 2, 1.</li>
+            <li>Steer the balls into the bin with your notes.</li>
+            <li>Feel free to move notes while you play.</li>
+          </ol>
+          <p class="tip"><b>Handy:</b> click <b class="ui">Connect phone</b> and scan the QR code. Then you start and pause from your phone. <kbd>Space</kbd> = pause, and after the round a new round.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stap half" id="stap-9">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">9</b>Laat het aan staan</h3>
+          <ol class="doen">
+            <li>Laat <b class="ui">Elke minuut controleren</b> (bovenaan in het paneel) aan staan. Dat staat al goed.</li>
+            <li>Speel gewoon door. Elke minuut kijkt het spel of het licht of de muur veranderd is.</li>
+            <li>Is er iets veranderd? Dan stelt het spel het na de ronde vanzelf bij. Ga even opzij tot de muur <b class="op-muur">Licht en muur bijgesteld</b> zegt.</li>
+          </ol>
+          <p class="tip">Speel je zonder tijdslimiet, dan neemt het spel daarvoor zelf een korte pauze. Gaat de herkenning echt mis (het licht gaat uit), dan pauzeert het meteen en speelt daarna vanzelf verder. Je briefjes blijven meetellen. Schuift de camera of de beamer? Dan stelt het alles vanzelf opnieuw in.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">9</b>Leave it on</h3>
+          <ol class="doen">
+            <li>Leave <b class="ui">Check every minute</b> (at the top of the panel) on. It already is.</li>
+            <li>Just keep playing. Every minute, the game checks whether the light or the wall has changed.</li>
+            <li>Something changed? Then it adjusts by itself after the round. Step aside until the wall says <b class="op-muur">Light and wall adjusted</b>.</li>
+          </ol>
+          <p class="tip">Playing with no time limit? Then the game takes a short pause for it by itself. If detection really breaks (the light goes off), it pauses right away and then plays on by itself. Your notes keep counting. Camera or projector moved? Then it sets everything up again by itself.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================================================================ deel 4 -->
+  <div class="deel" id="hulp">
+    <h2 class="deelkop"><span lang="nl">Hulp</span><span lang="en">Help</span></h2>
+
+    <section class="stap" id="stap-10">
+      <div>
+        <div lang="nl">
+          <h3><b class="nr">10</b>Lukt het niet?</h3>
+          <dl class="hulp">
+            <div><dt>De camera wordt niet gevonden</dt>
+              <dd>Klik op <b>Toestaan</b>, of op het camera-icoon in de adresbalk.</dd>
+              <dd>Sluit Teams, Zoom of de Camera-app. Steek de webcam opnieuw in.</dd></div>
+            <div><dt>Het beamervenster staat op het verkeerde scherm</dt>
+              <dd>Sleep het naar de beamer (Windows: <kbd>Win</kbd> + <kbd>Shift</kbd> + <kbd>→</kbd>) en klik erin.</dd>
+              <dd>Zie je op de muur hetzelfde als op je laptop? <kbd>Win</kbd> + <kbd>P</kbd> → Uitbreiden (<a href="#stap-3">stap 3</a>).</dd></div>
+            <div><dt>Er wordt niets herkend</dt>
+              <dd>Meer licht, of zet <b class="ui">Muurverlichting</b> hoger (onder Speelmodus).</dd>
+              <dd>Zet <b class="ui">Gevoeligheid</b> hoger.</dd></div>
+            <div><dt>Alles wordt herkend: de hele muur licht op</dt>
+              <dd>Ga uit beeld en wacht: het spel stelt het zelf bij. Anders: klik op <b class="ui">Opnieuw instellen</b>.</dd>
+              <dd>Zet <b class="ui">Gevoeligheid</b> lager.</dd></div>
+            <div><dt>Kleuren kloppen niet in het donker</dt>
+              <dd>Doe een lamp aan, of zet <b class="ui">Muurverlichting</b> hoger.</dd>
+              <dd>Of speel zonder: rood, groen en blauw tellen dan als gewone briefjes.</dd></div>
+            <div><dt>Het beeld is niet scherp</dt>
+              <dd>Draai aan de focusring van de beamer.</dd>
+              <dd>Scheef beeld? Zet de beamer recht voor de muur, of gebruik de keystone-knop.</dd></div>
+          </dl>
+          <p class="tip"><b>Lukt het nog steeds niet?</b> Klik op <b class="ui">Foto van wat de camera ziet</b> en stuur die foto op: dan is precies te zien wat er gebeurt.</p>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">10</b>Not working?</h3>
+          <dl class="hulp">
+            <div><dt>The camera isn't found</dt>
+              <dd>Click <b>Allow</b>, or the camera icon in the address bar.</dd>
+              <dd>Close Teams, Zoom or the Camera app. Plug the webcam in again.</dd></div>
+            <div><dt>The projector window is on the wrong screen</dt>
+              <dd>Drag it to the projector (Windows: <kbd>Win</kbd> + <kbd>Shift</kbd> + <kbd>→</kbd>) and click in it.</dd>
+              <dd>Does the wall show the same as your laptop? <kbd>Win</kbd> + <kbd>P</kbd> → Extend (<a href="#stap-3">step 3</a>).</dd></div>
+            <div><dt>Nothing is detected</dt>
+              <dd>More light, or set <b class="ui">Wall light</b> higher (under Play mode).</dd>
+              <dd>Set <b class="ui">Sensitivity</b> higher.</dd></div>
+            <div><dt>Everything is detected: the whole wall lights up</dt>
+              <dd>Step out of view and wait: the game adjusts by itself. If not: click <b class="ui">Set up again</b>.</dd>
+              <dd>Set <b class="ui">Sensitivity</b> lower.</dd></div>
+            <div><dt>Colours are wrong in the dark</dt>
+              <dd>Turn on a lamp, or set <b class="ui">Wall light</b> higher.</dd>
+              <dd>Or play without: red, green and blue then count as ordinary notes.</dd></div>
+            <div><dt>The picture isn't sharp</dt>
+              <dd>Turn the projector's focus ring.</dd>
+              <dd>Slanted picture? Put the projector straight in front of the wall, or use the keystone button.</dd></div>
+          </dl>
+          <p class="tip"><b>Still not working?</b> Click <b class="ui">Photo of what the camera sees</b> and send that photo: it shows exactly what's going on.</p>
+        </div>
+      </div>
+      <div class="panelen vier">
+        <figure>
+          <svg class="tek" viewBox="0 0 160 110" aria-hidden="true">
+            <rect class="muur" x="3" y="3" width="154" height="104" rx="8"/>
+            <rect class="beeld" x="24" y="16" width="112" height="74" rx="2"/>
+            <rect class="briefje geel" x="44" y="30" width="16" height="16" transform="rotate(-14 52 38)"/>
+            <rect class="briefje rood" x="98" y="36" width="16" height="16" transform="rotate(12 106 44)"/>
+            <rect class="briefje groen" x="64" y="58" width="16" height="16" transform="rotate(-6 72 66)"/>
+            <path class="vak" d="M94 78 H120 L117 104 H97 Z"/>
+            <rect class="kader" x="3" y="3" width="154" height="104" rx="8"/>
+          </svg>
+          <figcaption class="goed"><span lang="nl">Goed: schemer, een effen muur.</span><span lang="en">Good: twilight, a plain wall.</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 160 110" aria-hidden="true">
+            <rect class="nacht" x="3" y="3" width="154" height="104" rx="8"/>
+            <rect class="donkerbeeld" x="24" y="16" width="112" height="74" rx="2"/>
+            <rect class="briefje grijs" x="44" y="30" width="16" height="16" transform="rotate(-14 52 38)"/>
+            <rect class="briefje grijs" x="98" y="36" width="16" height="16" transform="rotate(12 106 44)"/>
+            <rect class="briefje grijs" x="64" y="58" width="16" height="16" transform="rotate(-6 72 66)"/>
+            <text class="letter" x="52" y="43">?</text><text class="letter" x="106" y="49">?</text><text class="letter" x="72" y="71">?</text>
+            <rect class="kader" x="3" y="3" width="154" height="104" rx="8"/>
+          </svg>
+          <figcaption class="fout"><span lang="nl">Te donker: kleuren vallen weg. Doe een lamp aan.</span><span lang="en">Too dark: colours disappear. Turn on a lamp.</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 160 110" aria-hidden="true">
+            <rect class="muur" x="3" y="3" width="154" height="104" rx="8"/>
+            <rect class="raam" x="10" y="14" width="30" height="50" rx="1"/>
+            <path class="l dun" d="M25 14 V64 M10 39 H40"/>
+            <line class="straal" x1="44" y1="20" x2="52" y2="14"/><line class="straal" x1="45" y1="39" x2="55" y2="39"/><line class="straal" x1="44" y1="58" x2="52" y2="64"/>
+            <g class="vaag">
+              <rect class="beeld" x="60" y="20" width="90" height="66" rx="2"/>
+              <rect class="briefje geel" x="76" y="34" width="14" height="14" transform="rotate(-14 83 41)"/>
+              <rect class="briefje rood" x="116" y="42" width="14" height="14" transform="rotate(12 123 49)"/>
+            </g>
+            <rect class="kader" x="3" y="3" width="154" height="104" rx="8"/>
+          </svg>
+          <figcaption class="fout"><span lang="nl">Fel raam of zon in beeld: doe het gordijn dicht.</span><span lang="en">Bright window or sun in view: close the curtains.</span></figcaption>
+        </figure>
+        <figure>
+          <svg class="tek" viewBox="0 0 160 110" aria-hidden="true">
+            <rect class="muur" x="3" y="3" width="154" height="104" rx="8"/>
+            <rect class="oud" x="24" y="16" width="112" height="74" rx="2"/>
+            <g transform="rotate(7 92 60) translate(14 8)">
+              <rect class="beeld" x="24" y="16" width="112" height="74" rx="2"/>
+              <rect class="briefje geel" x="44" y="30" width="16" height="16" transform="rotate(-14 52 38)"/>
+              <rect class="briefje rood" x="98" y="36" width="16" height="16" transform="rotate(12 106 44)"/>
+            </g>
+            <path class="l" d="M18 100 Q 34 104 44 96 M38 92 L44 96 L40 102"/>
+            <rect class="kader" x="3" y="3" width="154" height="104" rx="8"/>
+          </svg>
+          <figcaption class="fout"><span lang="nl">Camera verschoven: plak hem vast. Het spel stelt zich vanzelf opnieuw in.</span><span lang="en">Camera moved: tape it down. The game sets itself up again.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="vakjes">
+      <section class="stap vakje" id="scherm">
+        <div lang="nl">
+          <h3><b class="nr">+</b>Zonder beamer: op een scherm</h3>
+          <ol class="doen">
+            <li>Kies <b class="ui">Scherm, zonder beamer</b>.</li>
+            <li>Zet de webcam boven een tafel, of tegenover een muur of bord.</li>
+            <li>Haal je handen uit beeld terwijl het spel de lege ondergrond leert.</li>
+            <li>Leg briefjes of spullen neer. Je speelt op je scherm.</li>
+          </ol>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">+</b>No projector: on a screen</h3>
+          <ol class="doen">
+            <li>Choose <b class="ui">Screen, no projector</b>.</li>
+            <li>Put the webcam above a table, or facing a wall or board.</li>
+            <li>Keep your hands out of view while the game learns the empty surface.</li>
+            <li>Put down notes or things. You play on your screen.</li>
+          </ol>
+        </div>
+      </section>
+      <section class="stap vakje" id="demo">
+        <div lang="nl">
+          <h3><b class="nr">+</b>Zonder camera: de demo</h3>
+          <ol class="doen">
+            <li>Kies <b class="ui">Probeer zonder camera</b>.</li>
+            <li>Sleep de briefjes met je muis of vinger, of teken nieuwe.</li>
+            <li>Werkt ook op een telefoon of tablet. Niets installeren.</li>
+          </ol>
+        </div>
+        <div lang="en">
+          <h3><b class="nr">+</b>No camera: the demo</h3>
+          <ol class="doen">
+            <li>Choose <b class="ui">Try it without a camera</b>.</li>
+            <li>Drag the notes with your mouse or finger, or draw new ones.</li>
+            <li>Works on a phone or tablet too. Nothing to install.</li>
+          </ol>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer class="voet">
+  <p lang="nl">Sticky Clash is gratis (MIT-licentie). Meer uitleg staat in README.nl.md. <a href="index.html">Naar het spel</a></p>
+  <p lang="en">Sticky Clash is free (MIT license). More details are in README.md. <a href="index.html">To the game</a></p>
+</footer>
+
+<script>
+/* De knoppen NL | EN en Afdrukken. De gekozen taal komt in het adres (?taal=en), zodat hij
+   na herladen blijft; de taal van het spel zelf verandert er niet door. */
+(function () {
+  var d = document.documentElement;
+  var TITEL = { nl: 'Zo zet je Sticky Clash op', en: 'How to set up Sticky Clash' };
+  var knoppen = document.querySelectorAll('#taalKeuze button');
+  function zet(taal, onthoud) {
+    d.lang = taal;
+    d.className = 'toon-' + taal;
+    document.title = TITEL[taal];
+    for (var i = 0; i < knoppen.length; i++) {
+      var aan = knoppen[i].getAttribute('data-taal') === taal;
+      knoppen[i].className = aan ? 'on' : '';
+      knoppen[i].setAttribute('aria-pressed', aan ? 'true' : 'false');
+    }
+    if (onthoud && window.history && history.replaceState) {
+      try { history.replaceState(null, '', '?taal=' + taal + location.hash); } catch (e) { /* mag niet vanaf file:// in elke browser */ }
+    }
+  }
+  for (var i = 0; i < knoppen.length; i++) {
+    knoppen[i].onclick = function () { zet(this.getAttribute('data-taal'), true); this.blur(); };
+  }
+  document.getElementById('afdrukken').onclick = function () { window.print(); };
+  zet(d.lang === 'en' ? 'en' : 'nl', false);
+})();
+</script>
+</body>
+</html>
