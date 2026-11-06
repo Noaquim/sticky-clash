@@ -10,6 +10,7 @@ import { SPEELPLEKKEN, DEMO_KLEUREN, DEMO_SPECIAAL, DEMO_MAX, SPEL_ADRES, bepaal
 import { vsElement, vsKan, vsAan, vsUit, isIOS, apartVensterKan, besturing } from './apparaat.js';
 import { Kwaliteit, kwaliteitBijStart, inStapjes } from './kwaliteit.js';
 import { OMGEVING, Omgevingswacht, versnelOmgeving, mensachtig, telAlsVoorwerp, nieuweKleurstand, kleurStap, kleurOordeel, samenOmtrekken } from './omgeving.js';
+import { StapVoorStap } from './stappen.js';
 
 const $ = (id) => document.getElementById(id);
 // Wat deze computer kan (zie js/apparaat.js). Niet de naam van de browser: Firefox en Safari
@@ -651,6 +652,8 @@ async function openProjector(auto) {
   let resizeTimer = 0;
   const naResize = async () => {
     if (!vision.ready || !projOk()) return;
+    // Stap voor stap klaarzetten: daar komt het kalibreren nog (zie js/stappen.js).
+    if (stappen.open) return;
     // Midden in het instellen? Dan straks nog eens kijken.
     if (app.busy) { resizeTimer = setTimeout(naResize, 1000); return; }
     // Net op precies dit formaat gekalibreerd (de wizard wachtte erop): niets te doen.
@@ -3673,12 +3676,34 @@ document.querySelectorAll('#welkom .plekknop').forEach(k => {
     else muurStart();
   };
 });
-/** Muur + beamer gekozen: meteen alles automatisch instellen (zie autoSetup). */
+/**
+ * Muur + beamer gekozen: klaarzetten, stap voor stap (zie js/stappen.js). Wie het gewoon gedaan
+ * wil hebben, klikt daarin op "Alles automatisch" (zie autoSetup).
+ */
 function muurStart() {
   toonAutoKnop();
   if (!APART_VENSTER || app.busy) { toonMuurStart(); return; }
-  autoSetup();
+  stappen.openen(0);
 }
+
+// ---- klaarzetten, stap voor stap (js/stappen.js). Het kaartje doet zelf niets met de camera
+// of de beamer: het gebruikt de functies hierboven.
+const stappen = new StapVoorStap({
+  vak: $('stappen'), app, vision, status, schermenHerkennen: SCHERMEN_HERKENNEN, besturing: BESTURING,
+  laatsteStatus: () => statusBron, projOk, openProjector, projectorScreen, zoekBeamer, startCamera, runExclusive,
+  volBeeld: () => { if (vision.roi) setRoi(null); }, mediaanBeeld, otsuDrempel, grootsteVlak,
+  kalibratieKlopt, autoCalibrate, autoLight, learnWall, findBin, autoSetup, sleepTip,
+  naKlaar: () => {
+    app.ingesteld = true; app.halfIngesteld = false;
+    toonAutoKnop();
+    status(t('Alles staat klaar — klik op "Start ronde"'), 'ok');
+  },
+  startRonde: () => { if (game.state !== 'play' && game.state !== 'count') $('btnPlay').click(); },
+});
+$('btnStappen').onclick = () => {
+  if (!APART_VENSTER) { toonMuurStart(); return; }
+  if (!app.busy) stappen.openen(0);
+};
 document.querySelectorAll('#plekSeg button').forEach(k => {
   k.onclick = () => {
     k.blur();
@@ -3772,6 +3797,7 @@ function nieuweTaal() {
   toonSchermenHint();
   toonVastzetHint();
   toonBeamerHulp();
+  stappen.render();
   toonFps();
   renderClasses();
   updateCal();
@@ -3842,7 +3868,7 @@ volgendBeeld();
 // handig bij het afstellen: in de console beschikbaar als window.sc. sc.prestatie: hoe vlot
 // het loopt; sc.kwaliteit.vast(0) zet de wacht voor trage computers vast op alles.
 // sc.omgeving: de controle van elke minuut (wacht, js/omgeving.js) en of de kleuren te vertrouwen zijn.
-window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon,
+window.sc = { app, game, vision, sfx, autoLight, learnWall, diagnoseFoto, rondeVoorbij, bewaarNaam, telefoon, stappen,
   zetSpeelplek, demoStart, schermStart, legDemoNeer, openSpeelvenster, sluitSpeelvenster,
   kwaliteit: kw, prestatie, omgeving: { wacht: omgWacht, kleur: kleurStand, OMG } };
 

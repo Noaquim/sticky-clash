@@ -3,7 +3,7 @@
 //   2. elke t('…') en tAantal(n, '…', '…') in js/*.js ook
 //   3. de {plekken} in een zin en in zijn vertaling zijn dezelfde
 //   4. geen Nederlandse tekst gaat buiten t() om naar het scherm (main.js, game.js,
-//      telefoon.js, app.js, speelplek.js): status(…), .textContent = …, fillText(…) en
+//      telefoon.js, app.js, speelplek.js, stappen.js): status(…), .textContent = …, fillText(…) en
 //      dergelijke
 //   5. telefoon.html heeft alles in zijn eigen woordenboek, ook wat de laptop hem stuurt
 //   6. en het werkt: zonder pagina (hier in node) Nederlands, wisselen, invullen, de muur
@@ -281,6 +281,8 @@ for (const f of bestanden) alleSleutels.push(...ontleed(bronnen[f], f).sleutels)
   const main = bronnen['main.js'], game = bronnen['game.js'], vision = bronnen['vision.js'];
   // de aanwijzingen op de muur tijdens het instellen: app.wiz = { title: '…', sub: '…' }
   for (const m of main.matchAll(/\b(?:title|sub):\s*'([^']+)'/g)) extra.push({ nl: m[1], waar: 'main.js app.wiz' });
+  // en die van het kaartje stap voor stap: zetWiz('…', '…')
+  for (const m of (bronnen['stappen.js'] || '').matchAll(/zetWiz\('([^']+)', '([^']+)'\)/g)) extra.push({ nl: m[1], waar: 'stappen.js zetWiz' }, { nl: m[2], waar: 'stappen.js zetWiz' });
   // waarom een vlek niet meetelt (de teller), en de codes op de diagnosefoto
   const redenen = (/const REDENEN = \{([\s\S]*?)\};/.exec(main) || [])[1] || '';
   for (const m of redenen.matchAll(/'([^']+)'/g)) extra.push({ nl: m[1], waar: 'main.js REDENEN' });
@@ -324,7 +326,7 @@ const TOEWIJZING = new Set(['textContent', 'innerText', 'title', 'placeholder', 
 const LOKAAL = new Set(['tekst', 'txt', 'klein', 'sub', 'text']);
 {
   const verdacht = [];
-  for (const f of ['main.js', 'game.js', 'telefoon.js', 'app.js', 'speelplek.js']) {
+  for (const f of ['main.js', 'game.js', 'telefoon.js', 'app.js', 'speelplek.js', 'stappen.js']) {
     verdacht.push(...ontleed(bronnen[f], f, PUTTEN, TOEWIJZING, LOKAAL).verdacht.filter(v => !TOEGESTAAN.has(v.tekst)));
   }
   check('geen Nederlandse tekst buiten t() naar het scherm', verdacht.length === 0, lijst(verdacht.map(v => JSON.stringify(v.tekst) + '  ' + v.waar)));

@@ -30,6 +30,7 @@ WHAT IS WHERE
                         and the effects on the wall (confetti, sparkles, COMBO, fireworks)
   js/main.js            the panel, the buttons, the wizard, what goes on the projector
   js/speelplek.js       where you play: wall + projector, screen, or the demo without camera
+  js/stappen.js         set up step by step: the card with the seven steps
   js/vision.js          the camera and recognizing objects (tricky, be careful)
   js/homography.js      converting the camera image to the projector image (math)
   js/audio.js           the sound effects

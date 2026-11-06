@@ -30,6 +30,7 @@ WAT STAAT WAAR
                         en de effecten op de muur (confetti, sterretjes, COMBO, vuurwerk)
   js/main.js            het paneel, de knoppen, de wizard, wat er op de beamer komt
   js/speelplek.js       waar je speelt: muur + beamer, scherm, of de demo zonder camera
+  js/stappen.js         klaarzetten, stap voor stap: het kaartje met de zeven stappen
   js/vision.js          de camera en het herkennen van voorwerpen (lastig, pas op)
   js/homography.js      het omrekenen van camerabeeld naar beamerbeeld (wiskunde)
   js/audio.js           de geluidjes

@@ -241,3 +241,82 @@ body.sv-open{overflow:hidden}
   .row > * + *, .sv-balk > * + *, .sv-palet > * + *, .sv-cta > * + *, .plekkeuze > * + *{margin-left:8px}
   .steps > li + li, .welkom > * + *{margin-top:6px}
 }
+
+/* ---- klaarzetten, stap voor stap (zie js/stappen.js): een groot kaartje met één stap per keer */
+.stappen{position:fixed; top:0; right:0; bottom:0; left:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(5,6,9,.74)}
+.st-kaart{width:100%; max-width:580px; max-height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding:18px 22px 16px; border-radius:16px; background:var(--panel); border:1px solid #2c313d; box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.st-kop{display:flex; align-items:center; gap:10px}
+.st-teller{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--dim)}
+.st-sluit{flex:none; margin-left:auto; width:34px; height:34px; padding:0; border-radius:50%; font-size:20px; line-height:1}
+.st-stippen{display:flex; gap:6px; margin:0; padding:0; list-style:none}
+.st-stippen li{flex:1}
+.st-stip{display:block; width:100%; height:8px; padding:0; border:0; border-radius:99px; background:#2a2f3a}
+.st-stip:hover{background:#3a4152}
+.st-stip.gedaan{background:var(--ok)}
+.st-stip.nu{background:var(--acc)}
+.st-stip:disabled{opacity:1; cursor:default}
+.st-titel{margin:2px 0 0; font-size:25px; font-weight:800; text-transform:none; letter-spacing:0; color:#fff}
+.st-doe{margin:0; font-size:16px; line-height:1.5; color:var(--ink)}
+.st-tek{display:flex; gap:14px; align-items:center; justify-content:center; padding:14px; border-radius:12px; background:#101217}
+.st-tek svg{display:block; flex:1 1 0; min-width:0; max-width:320px; max-height:190px; height:auto}
+.st-tek.live{padding:0; overflow:hidden; background:#000}
+.st-cam{display:block; width:100%; height:auto}
+.st-tek text{fill:var(--ink); font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; font-size:13px}
+.st-tek .midden{text-anchor:middle}
+.st-tek .vet{font-weight:800}
+.st-tek .menutekst{font-size:14px}
+.st-tek .l{fill:none; stroke:var(--ink); stroke-width:2; stroke-linecap:round; stroke-linejoin:round}
+.st-tek .dun{stroke-width:1.2}
+.st-tek .muur{fill:#232733}
+.st-tek .kader{fill:none; stroke:var(--dim); stroke-width:2}
+.st-tek .beeld{fill:#3a3123; stroke:var(--acc); stroke-width:2}
+.st-tek .wit{fill:#f3efe6}
+.st-tek .stip{fill:#15171c}
+.st-tek .gids{fill:none; stroke:var(--acc2); stroke-width:2; stroke-dasharray:6 5}
+.st-tek .vink{fill:none; stroke:var(--ok); stroke-width:7; stroke-linecap:round; stroke-linejoin:round}
+.st-tek .vak{fill:#2b303c; stroke:var(--ink); stroke-width:1.6; stroke-linejoin:round}
+.st-tek .lens{fill:var(--ink)}
+.st-tek .scherm{fill:#24425f}
+.st-tek .kabel{fill:none; stroke:var(--ink); stroke-width:3; stroke-linecap:round}
+.st-tek .baan{fill:none; stroke:var(--ink); stroke-width:2; stroke-dasharray:2 6; stroke-linecap:round}
+.st-tek .toets{fill:#2b303c; stroke:var(--ink); stroke-width:1.4}
+.st-tek .menu{fill:#1d2029; stroke:var(--dim); stroke-width:1.2}
+.st-tek .keus{fill:rgba(255,138,30,.2); stroke:var(--acc); stroke-width:1.8}
+.st-tek .briefje{stroke:rgba(0,0,0,.4); stroke-width:1}
+.st-tek .geel{fill:#ffd84d}
+.st-balk{height:8px; border-radius:99px; background:#262a35; overflow:hidden}
+.st-balk i{display:block; height:100%; width:0; background:var(--acc); transition:width .3s}
+.st-hints{margin:0; padding:0 0 0 18px; color:#c3c8d4; font-size:13.5px}
+.st-hints li + li{margin-top:3px}
+.st-check{display:flex; align-items:center; gap:10px; min-height:46px; padding:10px 12px; border-radius:10px; background:#1b1f28; color:var(--dim); font-size:14.5px}
+.st-check i{flex:none; display:grid; place-items:center; width:26px; height:26px; border-radius:50%; border:2px solid #3a4152; font-style:normal; font-weight:800; font-size:15px}
+.st-check.goed{background:#13291c; color:#c4f5d6}
+.st-check.goed i{background:var(--ok); border-color:var(--ok); color:#06210f}
+.st-check.fout{background:#2e1c1c; color:#ffc9b8}
+.st-check.fout i{border-color:#ff6b6b; color:#ff6b6b}
+.st-check.wacht{background:#2a2112; color:#ffd8a3}
+.st-check.wacht i{border-color:var(--acc)}
+.st-check.vraag{color:var(--ink)}
+.st-check.vraag i{border-color:var(--acc2); color:var(--acc2)}
+.st-check.bezig{color:var(--ink)}
+.st-check.bezig i{border-color:var(--acc); border-right-color:transparent; animation:st-draai .8s linear infinite}
+@keyframes st-draai{to{transform:rotate(360deg)}}
+.st-knoppen{display:flex; gap:8px}
+.st-knoppen button{padding:11px 14px; font-size:15px}
+.st-terug, .st-tweede{flex:none}
+.st-hoofd{flex:1}
+button.st-hoofd.klaar{background:var(--ok); border-color:var(--ok); color:#06210f}
+.st-voet{display:flex; align-items:center; gap:12px; padding-top:12px; border-top:1px solid var(--line)}
+.st-voet .hint{margin:0; flex:1}
+.st-auto{flex:none; padding:7px 12px; font-size:13px}
+button.stappenknop{width:100%; margin-top:8px}
+@media (max-width: 560px){
+  .stappen{padding:8px; align-items:flex-start}
+  .st-kaart{padding:14px 14px 12px}
+  .st-titel{font-size:21px}
+  .st-knoppen{flex-wrap:wrap}
+  .st-hoofd{flex-basis:100%; order:-1}
+  .st-terug, .st-tweede{flex:1}
+  .st-voet{flex-direction:column; align-items:stretch}
+}
+@media (prefers-reduced-motion: reduce){ .st-check.bezig i{animation:none} }

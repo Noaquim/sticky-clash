@@ -41,6 +41,7 @@
 <link rel="modulepreload" href="js/taal.js">
 <link rel="modulepreload" href="js/taal-en.js">
 <link rel="modulepreload" href="js/speelplek.js">
+<link rel="modulepreload" href="js/stappen.js">
 <!-- /los:weg -->
 <script>
 /* Een melding als deze browser het spel niet kan draaien, in plaats van een pagina waarop
@@ -119,6 +120,7 @@
       </div>
       <div class="alleen-muur">
         <button id="btnAuto" class="primary big">Alles automatisch instellen</button>
+        <button id="btnStappen" class="stappenknop">Stap voor stap klaarzetten</button>
       </div>
       <div class="alleen-scherm">
         <button id="btnScherm" class="primary big">Start op dit scherm</button>
@@ -381,6 +383,9 @@
     <div id="svNaam"></div>
   </div>
 </div>
+
+<!-- Klaarzetten, stap voor stap: js/stappen.js vult dit kaartje. -->
+<div id="stappen" class="stappen hidden" role="dialog" aria-modal="true"></div>
 
 <script>
 /* "Hoe zet ik het op?" (op het welkomstkaartje en onderaan het paneel) opent uitleg.html in
