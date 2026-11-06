@@ -32,7 +32,6 @@ WHAT IS WHERE
   js/speelplek.js       where you play: wall + projector, screen, or the demo without camera
   js/vision.js          the camera and recognizing objects (tricky, be careful)
   js/homography.js      converting the camera image to the projector image (math)
-  js/kalibratie.js      precise calibration: grid of dots and lens distortion
   js/audio.js           the sound effects
   js/muziek.js          the background music: scheduler, pause, speed-up, switching style
   js/muziek-stijlen.js  the three music styles: Chill, Happy and Arcade

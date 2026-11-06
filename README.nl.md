@@ -657,16 +657,9 @@ doorheen. Daarom staat er in dat geval een rode balk op de muur en in het paneel
 
 De automatische kalibratie werkt in twee stappen: eerst een volledig wit beeld, waarvan de
 vier hoeken van het heldere vlak al een bruikbare meting geven — dat signaal is zo sterk
-dat het ook in een verlichte kamer werkt. Daarna verfijnt hij met losse stippen, maar
+dat het ook in een verlichte kamer werkt. Daarna verfijnt hij met vier losse stippen, maar
 alleen als die goed genoeg te zien zijn. Daarna projecteert hij twee seconden een groene
 rand: die moet precies om het beamerbeeld vallen.
-
-Die verfijning is een raster van twintig stippen, één voor één (plus vijf
-controlestippen). Het spel wacht bij elke stip tot de camera hem echt laat zien, en past
-er dan een homografie plus de kromming van de cameralens doorheen; een stip die er ver
-naast ligt, telt niet mee. Zo klopt het ook in de hoeken met een groothoekwebcam. Zitten
-de controlestippen er toch naast, dan probeert hij het nog eens met grotere stippen, en
-anders valt hij terug op vier losse stippen.
 
 Lukt het niet, dan zegt hij erbij waaróm — te weinig contrast, of het beamervlak ligt niet
 volledig in het camerabeeld.
@@ -743,7 +736,6 @@ node test/apparaat.mjs      # elke computer: volledig scherm in oude Safari, iPa
 node test/omgeving.mjs      # elke minuut controleren: wanneer wel en niet bijstellen; kleuren in het donker, met hysterese
 node test/muurwacht.mjs     # nagebouwde kamer: 10 min rustig = nooit opnieuw leren; licht, lamp, gordijn, schaduw = wel; briefjes blijven
 node test/uitleg.mjs        # de uitleg om op te zetten (uitleg.html, de pdf's): beide talen gelijk, links kloppen, knoppen heten zoals in het spel
-node test/kalibratie.mjs    # kalibratie: lensvertekening heen en terug, passen met ruis en uitschieters, oude opslag
 ```
 
 Elke test in `tracking`, `regressie` en `physics` is een glitch die op de oude code

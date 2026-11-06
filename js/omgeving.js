@@ -20,6 +20,7 @@ export const OMGEVING = {
   muurDeel: 0.02,       // zoveel van het beamervlak blijvend veranderd: de muur is anders
   lichtMarge: 1.3,      // de lege muur zoveel keer lichter of donkerder dan bij het leren
   lichtTau: 8,          // s: glijdend gemiddelde van de lichtfactor (vision.gain)
+  flikker: 0.06,        // springt het licht gemiddeld meer dan zoveel per meting (flitsende lampen): niet op licht bijstellen
   donker: 45,           // de lege muur donkerder dan dit (0-255): meer muurverlichting
   kapotDeel: 0.45,      // zoveel van het beeld voorgrond of schaduw: de herkenning is stuk
   kapotClip: 0.12,      // zoveel meer overbelicht dan bij het leren: ook stuk
@@ -131,10 +132,14 @@ export class Omgevingswacht {
   oordeel(m, s) {
     const o = this.o, marge = Math.log(o.lichtMarge);
     const b = this.basis;
+    const L = m.L;
     let licht = Math.abs(Math.log(Math.max(0.05, this.gain))) > marge;
-    if (b && b.L > 8 && m.L > 0) licht = licht || Math.abs(Math.log(m.L / b.L)) > marge;
+    if (b && b.L > 8 && L > 0) licht = licht || Math.abs(Math.log(L / b.L)) > marge;
     // Te donker voor de herkenning, en de muurverlichting kan nog hoger.
-    const donker = m.L > 0 && m.L < o.donker && s.magLicht && s.fill < s.fillMax - 0.01;
+    let donker = L > 0 && L < o.donker && s.magLicht && s.fill < s.fillMax - 0.01;
+    // Flitsende lampen (een podium, een discobal): dan zegt het licht niets over de muur.
+    // Alleen wat blijvend anders is (muur) of echt stuk is, telt dan nog.
+    if ((this.flikker || 0) > o.flikker) { licht = false; donker = false; }
     const muur = m.deel > o.muurDeel;
     if (!licht && !donker && !muur) return null;
     return { licht: !!((licht || donker) && s.magLicht), leren: true, kleur: false,
@@ -147,6 +152,16 @@ export class Omgevingswacht {
     this.sindsPauze += dt;
     this.rust = Math.max(0, this.rust - dt);
     if (Number.isFinite(m.gain) && m.gain > 0) this.gain += (m.gain - this.gain) * (1 - Math.exp(-dt / o.lichtTau));
+    if (m.L > 0) {
+      // Hoe hard het licht van meting tot meting springt, glijdend over ~10 s. Ten opzichte
+      // van de vorige meting: een lamp die aangaat is één sprong, een flitslamp steeds weer.
+      // Hooguit 0,3 per meting: één lamp die aangaat telt dan als één klein sprongetje.
+      // Alleen bij een redelijk lichte muur: in het donker is elke meting korrelig.
+      const sprong = this.Lvorig > 0 && Math.max(m.L, this.Lvorig) > 35
+        ? Math.min(0.3, Math.abs(m.L - this.Lvorig) / Math.max(35, this.Lvorig)) : 0;
+      this.Lvorig = m.L;
+      this.flikker = (this.flikker || 0) + (sprong - (this.flikker || 0)) * (1 - Math.exp(-dt / 10));
+    }
     const kapot = m.bedekt > o.kapotDeel || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
       (!!this.basis && m.clip > this.basis.clip + o.kapotClip);
     this.kapotT = kapot ? this.kapotT + dt : 0;
@@ -165,7 +180,9 @@ export class Omgevingswacht {
       if (nodig) open = samenOpen(open, nodig);
     }
     if (this.kapotT >= o.kapotNa) {
-      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot', dringend: !this.geenPauze });
+      // Met flitsende lampen niet midden in het spel pauzeren: dat flitsen gaat gewoon door.
+      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot',
+        dringend: !this.geenPauze && !((this.flikker || 0) > o.flikker) });
     }
     if (s.kleur && !(open && open.kleur)) {
       open = samenOpen(open, { licht: false, leren: true, kleur: true, reden: 'kleur', dringend: false });

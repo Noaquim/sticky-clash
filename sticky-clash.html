@@ -3354,323 +3354,6 @@ function invertH(H) {
   return inv;
 }
 
-// ---- js/kalibratie.js
-// Nauwkeurige kalibratie: een raster van stippen, één voor één geprojecteerd, en daar
-// een lensvertekening (k1 en k2, rond het midden van het camerabeeld) plus homografie
-// doorheen gepast. Een groothoekwebcam buigt rechte lijnen krom; met alleen vier
-// punten zat het beamervlak daardoor aan de randen en in de hoeken ernaast.
-
-// De lens hoort bij een homografie: wie app.H verwisselt (muur/scherm), neemt de
-// lens vanzelf mee. Oude opgeslagen kalibraties hebben geen lens en blijven werken.
-const KAL_LENZEN = new WeakMap();
-
-function kalZetLens(H, lens) {
-  if (!H) return;
-  const k1 = lens && Number.isFinite(lens.k1) ? lens.k1 : 0, k2 = lens && Number.isFinite(lens.k2) ? lens.k2 : 0;
-  if (k1 || k2) KAL_LENZEN.set(H, { k1, k2, ar: (lens && lens.ar) || 4 / 3 });
-  else KAL_LENZEN.delete(H);
-}
-
-function kalLensVan(H) {
-  return (H && KAL_LENZEN.get(H)) || null;
-}
-
-/** Camerabeeld (0..1, met lensvertekening) naar het rechte, onvertekende beeld. */
-function kalOntvorm(L, x, y) {
-  if (!L || !(L.k1 || L.k2)) return [x, y];
-  const ar = L.ar || 4 / 3, k2 = L.k2 || 0;
-  const dx = (x - 0.5) * ar, dy = y - 0.5, r2 = dx * dx + dy * dy;
-  const f = 1 + L.k1 * r2 + k2 * r2 * r2;
-  return [0.5 + dx * f / ar, 0.5 + dy * f];
-}
-
-/** En terug: de straal r zo zoeken dat r(1 + k1·r² + k2·r⁴) de gewenste straal geeft. */
-function kalVervorm(L, x, y) {
-  if (!L || !(L.k1 || L.k2)) return [x, y];
-  const ar = L.ar || 4 / 3, k2 = L.k2 || 0;
-  const ux = (x - 0.5) * ar, uy = y - 0.5;
-  const ru = Math.hypot(ux, uy);
-  if (ru < 1e-9) return [x, y];
-  let r = ru;
-  for (let i = 0; i < 12; i++) {
-    const r2 = r * r;
-    const f = r * (1 + L.k1 * r2 + k2 * r2 * r2) - ru, df = 1 + 3 * L.k1 * r2 + 5 * k2 * r2 * r2;
-    if (Math.abs(df) < 1e-6) break;
-    const nr = r - f / df;
-    if (!(nr > 0)) break;
-    if (Math.abs(nr - r) < 1e-10) { r = nr; break; }
-    r = nr;
-  }
-  const s = r / ru;
-  return [0.5 + ux * s / ar, 0.5 + uy * s];
-}
-
-/** De ene afbeelding camera -> beamervlak (beide 0..1), mét lens als die er is. */
-function kalNaarBeamer(H, x, y) {
-  const p = kalOntvorm(kalLensVan(H), x, y);
-  return applyH(H, p[0], p[1]);
-}
-
-/** En beamervlak -> camera. Hinv is invertH(H). */
-function kalNaarCamera(H, Hinv, u, v) {
-  const p = applyH(Hinv, u, v);
-  return kalVervorm(kalLensVan(H), p[0], p[1]);
-}
-
-// ---------------------------------------------------------------- passen
-
-function kalLos(A, b) {
-  const n = b.length;
-  const M = A.map((row, i) => [...row, b[i]]);
-  for (let c = 0; c < n; c++) {
-    let p = c;
-    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
-    if (Math.abs(M[p][c]) < 1e-14) return null;
-    [M[c], M[p]] = [M[p], M[c]];
-    const piv = M[c][c];
-    for (let k = c; k <= n; k++) M[c][k] /= piv;
-    for (let r = 0; r < n; r++) {
-      if (r === c) continue;
-      const f = M[r][c];
-      if (!f) continue;
-      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
-    }
-  }
-  return M.map(r => r[n]);
-}
-
-/**
- * Homografie door N >= 4 punten, kleinste kwadraten. Twee keer herwogen met de noemer,
- * zodat de fout in beamerpixels telt en niet een algebraïsche bijfout.
- */
-function kalHomografieLS(src, dst) {
-  if (src.length < 4) return null;
-  let H = null;
-  for (let it = 0; it < 3; it++) {
-    const AtA = Array.from({ length: 8 }, () => new Array(8).fill(0)), Atb = new Array(8).fill(0);
-    for (let i = 0; i < src.length; i++) {
-      const [x, y] = src[i], [u, v] = dst[i];
-      let w = 1;
-      if (H) { const d = H[6] * x + H[7] * y + 1; w = Math.abs(d) > 1e-6 ? 1 / d : 1; }
-      const rows = [[x, y, 1, 0, 0, 0, -u * x, -u * y, u], [0, 0, 0, x, y, 1, -v * x, -v * y, v]];
-      for (const r of rows) {
-        for (let a = 0; a < 8; a++) {
-          const ra = r[a] * w;
-          if (!ra) continue;
-          Atb[a] += ra * r[8] * w;
-          for (let b = 0; b < 8; b++) AtA[a][b] += ra * r[b] * w;
-        }
-      }
-    }
-    const h = kalLos(AtA, Atb);
-    if (!h) return H;
-    H = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
-  }
-  return H;
-}
-
-function kalFouten(H, L, cam, proj) {
-  return cam.map((c, i) => {
-    const p = kalOntvorm(L, c[0], c[1]);
-    const q = applyH(H, p[0], p[1]);
-    return Math.hypot(q[0] - proj[i][0], q[1] - proj[i][1]);
-  });
-}
-
-/** Kleinste waarde van kost(x) tussen lo en hi: eerst grof, dan gulden snede. */
-function kalMinimum(kost, lo, hi, stap, rondes) {
-  let best = null;
-  for (let x = lo; x <= hi + 1e-9; x += stap) { const r = kost(x); if (!best || r.e < best.e) best = r; }
-  let a = best.x - stap, b = best.x + stap;
-  const g = (Math.sqrt(5) - 1) / 2;
-  let c = b - g * (b - a), d = a + g * (b - a), fc = kost(c), fd = kost(d);
-  for (let i = 0; i < rondes; i++) {
-    if (fc.e < fd.e) { b = d; d = c; fd = fc; c = b - g * (b - a); fc = kost(c); }
-    else { a = c; c = d; fc = fd; d = a + g * (b - a); fd = kost(d); }
-  }
-  for (const r of [fc, fd]) if (r.e < best.e) best = r;
-  return best;
-}
-
-function kalPasK(cam, proj, ar, metK2) {
-  const kost = (k1, k2) => {
-    const L = { k1, k2, ar };
-    const H = kalHomografieLS(cam.map(c => kalOntvorm(L, c[0], c[1])), proj);
-    if (!H) return { e: Infinity, H: null, k1, k2 };
-    const f = kalFouten(H, L, cam, proj);
-    return { e: f.reduce((s, v) => s + v * v, 0), H, k1, k2 };
-  };
-  const binnen = (k2) => { const r = kalMinimum(x => ({ ...kost(x, k2), x }), -0.6, 0.6, 0.1, 22); r.x = k2; return r; };
-  // k2 alleen met genoeg stippen: anders past hij ruis in plaats van de lens
-  return metK2 ? kalMinimum(binnen, -0.4, 0.4, 0.1, 16) : binnen(0);
-}
-
-/**
- * Robuust passen: lens (k1) + homografie door alle gemeten stippen. Een stip die er ver
- * naast ligt (iemand liep erdoor, een weerspiegeling) gaat eruit, één voor één, de
- * slechtste eerst. cam in 0..1 camerabeeld, proj in 0..1 beamervlak, ar = breedte/hoogte
- * van het camerabeeld. Geeft { H, lens, fouten, gebruikt } of null.
- */
-function kalPas(cam, proj, ar, opts = {}) {
-  const minPunten = opts.minPunten || 8;
-  const grens = opts.grens || 0.003;          // ~4 px op 1280 breed
-  let idx = cam.map((_, i) => i);
-  for (;;) {
-    if (idx.length < minPunten) return null;
-    const c = idx.map(i => cam[i]), p = idx.map(i => proj[i]);
-    const r = kalPasK(c, p, ar, idx.length >= 12);
-    if (!r.H) return null;
-    const L = { k1: r.k1, k2: r.k2, ar };
-    const f = kalFouten(r.H, L, c, p);
-    const med = [...f].sort((x, y) => x - y)[f.length >> 1];
-    let slechtst = 0;
-    for (let i = 1; i < f.length; i++) if (f[i] > f[slechtst]) slechtst = i;
-    if (f[slechtst] > Math.max(grens, med * 4) && idx.length > minPunten) { idx.splice(slechtst, 1); continue; }
-    return { H: r.H, lens: Math.abs(r.k1) > 1e-4 || Math.abs(r.k2) > 1e-4 ? L : null, fouten: f, gebruikt: idx };
-  }
-}
-
-// ---------------------------------------------------------------- meten
-
-/** Waar de stippen komen: 5×4 over het hele vlak, tot vlak bij de randen. */
-const KAL_RASTER = (() => {
-  const us = [0.04, 0.27, 0.5, 0.73, 0.96], vs = [0.06, 0.35, 0.65, 0.94], out = [];
-  for (const v of vs) for (const u of us) out.push([u, v]);
-  return out;
-})();
-/** Vier controlestippen die niet meedoen met passen: vlak bij de hoeken. */
-const KAL_CONTROLE = [[0.12, 0.13], [0.88, 0.13], [0.88, 0.87], [0.12, 0.87], [0.5, 0.5]];
-
-function kalLuma(data, n) {
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) out[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
-  return out;
-}
-
-/** Zwaartepunt van wat er feller is dan de zwarte referentie, binnen een venster (werkpixels). */
-function kalZwaartepunt(lum, ref, vw, vh, cx, cy, half) {
-  const x0 = Math.max(0, Math.floor(cx - half)), x1 = Math.min(vw - 1, Math.ceil(cx + half));
-  const y0 = Math.max(0, Math.floor(cy - half)), y1 = Math.min(vh - 1, Math.ceil(cy + half));
-  if (x1 - x0 < 4 || y1 - y0 < 4) return null;
-  let max = 0, som = 0;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const d = lum[y * vw + x] - ref[y * vw + x];
-    if (d > max) max = d;
-    som += d;
-  }
-  const thr = max * 0.5;
-  let sx = 0, sy = 0, sw = 0, rand = 0, n = 0;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const d = lum[y * vw + x] - ref[y * vw + x] - thr;
-    if (d <= 0) continue;
-    sx += x * d; sy += y * d; sw += d; n++;
-    if (x === x0 || x === x1 || y === y0 || y === y1) rand += d;
-  }
-  if (!sw) return null;
-  return { x: sx / sw + 0.5, y: sy / sw + 0.5, max, som, n, rand: rand / sw };
-}
-
-/**
- * Meet één stip: wacht tot de camera hem echt laat zien (vertraging van 50–300 ms is
- * normaal) en tot twee opeenvolgende, verschillende camerabeelden hetzelfde zeggen.
- */
-async function kalMeetStip(o, ref, verwacht, half, settle) {
-  const { vision, sleep } = o;
-  const vw = vision.vw, vh = vision.vh, n = vw * vh;
-  let vorige = null, gelijk = 0, laatsteSom = NaN;
-  const eind = Date.now() + settle;
-  let cx = verwacht[0], cy = verwacht[1];
-  while (Date.now() < eind) {
-    if (o.afbreken && o.afbreken()) return null;
-    await sleep(30);
-    if (!vision.grab()) continue;
-    const lum = kalLuma(vision.data, n);
-    const z = kalZwaartepunt(lum, ref, vw, vh, cx, cy, half);
-    if (!z || z.som === laatsteSom) continue;            // nog hetzelfde camerabeeld
-    laatsteSom = z.som;
-    if (z.max < o.minContrast) { vorige = null; gelijk = 0; continue; }
-    if (z.rand > 0.08) {
-      // stip ligt tegen de rand van het venster: venster één keer op de stip zetten
-      if (Math.hypot(z.x - cx, z.y - cy) > 1) { cx = z.x; cy = z.y; vorige = null; gelijk = 0; continue; }
-      return null;
-    }
-    if (vorige && Math.hypot(z.x - vorige.x, z.y - vorige.y) < 0.35 && Math.abs(z.max - vorige.max) < vorige.max * 0.12) {
-      if (++gelijk >= 1) return z;
-    } else gelijk = 0;
-    vorige = z;
-  }
-  return null;
-}
-
-/**
- * Het hele raster meten en passen. o: { vision, sleep, toon(patroon), Hruw, ar, bw, bh,
- * voortgang(n, m), afbreken(), poging }. Hruw is de grove homografie (camera -> beamer)
- * uit het witte vlak; die zegt waar we elke stip moeten zoeken.
- * Geeft { H, lens, fout: { gem, max } in beamerpixels } of { mislukt: reden }.
- */
-async function kalRaster(o) {
-  const { vision, sleep } = o;
-  const poging = o.poging || 0;
-  const r = 0.028 + poging * 0.01;                 // stipstraal, deel van de korte zijde
-  const settle = 1400 + poging * 900;
-  const vw = vision.vw, vh = vision.vh, n = vw * vh;
-  const Hinv = invertH(o.Hruw);
-  if (!Hinv) return { mislukt: 'homografie' };
-  // zwarte referentie op pixelniveau, pas als het beeld niet meer verandert
-  o.toon({ kind: 'black' });
-  let ref = null, vorigGem = -1;
-  const eindRef = Date.now() + 2500;
-  while (Date.now() < eindRef) {
-    await sleep(60);
-    if (!vision.grab()) continue;
-    const l = kalLuma(vision.data, n);
-    let s = 0;
-    for (let i = 0; i < n; i += 7) s += l[i];
-    const gem = s / Math.ceil(n / 7);
-    if (vorigGem >= 0 && Math.abs(gem - vorigGem) < 0.4) { ref = l; break; }
-    vorigGem = gem;
-    ref = l;
-  }
-  if (!ref) return { mislukt: 'camera' };
-
-  // stippen ongeveer even ver uit elkaar als in de camera: venster = 40% van de kleinste afstand
-  const naarPx = (u, v) => { const c = applyH(Hinv, u, v); return vision.camPx(c[0], c[1]); };
-  const alle = [...KAL_RASTER, ...KAL_CONTROLE];
-  let minAfst = Infinity;
-  for (let i = 0; i < KAL_RASTER.length; i++) for (let j = i + 1; j < KAL_RASTER.length; j++) {
-    const a = naarPx(...KAL_RASTER[i]), b = naarPx(...KAL_RASTER[j]);
-    minAfst = Math.min(minAfst, Math.hypot(a[0] - b[0], a[1] - b[1]));
-  }
-  const half = Math.max(4, minAfst * 0.42);
-  const cam = [], proj = [], ctrlCam = [], ctrlProj = [];
-  for (let i = 0; i < alle.length; i++) {
-    if (o.afbreken && o.afbreken()) return { mislukt: 'afgebroken' };
-    o.voortgang && o.voortgang(i + 1, alle.length);
-    const [u, v] = alle[i];
-    const verwacht = naarPx(u, v);
-    if (verwacht[0] < -half || verwacht[1] < -half || verwacht[0] > vw + half || verwacht[1] > vh + half) continue;
-    o.toon({ kind: 'stip', u, v, r });
-    const z = await kalMeetStip({ ...o, minContrast: o.minContrast || 10 }, ref, verwacht, half, settle);
-    if (!z) continue;
-    const c = vision.camNorm(z.x, z.y);
-    if (i < KAL_RASTER.length) { cam.push(c); proj.push([u, v]); }
-    else { ctrlCam.push(c); ctrlProj.push([u, v]); }
-  }
-  o.toon({ kind: 'black' });
-  const pas = kalPas(cam, proj, o.ar);
-  if (!pas) return { mislukt: 'te weinig stippen', gezien: cam.length };
-  if (ctrlCam.length < 2) return { mislukt: 'controle', gezien: cam.length };
-  // controle op stippen die niet meededen
-  const bw = o.bw || 1280, bh = o.bh || 720;
-  const L = pas.lens;
-  const f = ctrlCam.map((c, i) => {
-    const p = kalOntvorm(L, c[0], c[1]), q = applyH(pas.H, p[0], p[1]);
-    return Math.hypot((q[0] - ctrlProj[i][0]) * bw, (q[1] - ctrlProj[i][1]) * bh);
-  });
-  const fout = { gem: f.reduce((s, x) => s + x, 0) / f.length, max: Math.max(...f), stippen: cam.length, weg: cam.length - pas.gebruikt.length };
-  return { H: pas.H, lens: L, fout };
-}
-
 // ---- js/taal-en.js
 // Het Engels van Sticky Clash. Links de Nederlandse tekst precies zoals hij in de code of
 // in index.html staat, rechts het Engels. Zie js/taal.js voor hoe het werkt.
@@ -3973,8 +3656,6 @@ const TAAL_EN = {
   'Kalibratie mislukt.': 'Calibration failed.',
   'Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt': 'Calibration done — check that the dashed line runs around the projected image',
   'Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)': "Calibration done (rough measurement; the dots weren't clearly visible)",
-  'Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels': 'Calibration done — accurate to about {px} projector pixels',
-  'Kalibreren… stip {n} van {m}': 'Calibrating… dot {n} of {m}',
   'Klik punt {n} van 4 in het camerabeeld': 'Click point {n} of 4 in the camera view',
   'Gekalibreerd': 'Calibrated',
   'Vastzetten maakte het camerabeeld donkerder — belichting blijft automatisch': 'Locking made the camera image darker — exposure stays automatic',
@@ -9960,6 +9641,7 @@ const OMGEVING = {
   muurDeel: 0.02,       // zoveel van het beamervlak blijvend veranderd: de muur is anders
   lichtMarge: 1.3,      // de lege muur zoveel keer lichter of donkerder dan bij het leren
   lichtTau: 8,          // s: glijdend gemiddelde van de lichtfactor (vision.gain)
+  flikker: 0.06,        // springt het licht gemiddeld meer dan zoveel per meting (flitsende lampen): niet op licht bijstellen
   donker: 45,           // de lege muur donkerder dan dit (0-255): meer muurverlichting
   kapotDeel: 0.45,      // zoveel van het beeld voorgrond of schaduw: de herkenning is stuk
   kapotClip: 0.12,      // zoveel meer overbelicht dan bij het leren: ook stuk
@@ -10071,10 +9753,14 @@ class Omgevingswacht {
   oordeel(m, s) {
     const o = this.o, marge = Math.log(o.lichtMarge);
     const b = this.basis;
+    const L = m.L;
     let licht = Math.abs(Math.log(Math.max(0.05, this.gain))) > marge;
-    if (b && b.L > 8 && m.L > 0) licht = licht || Math.abs(Math.log(m.L / b.L)) > marge;
+    if (b && b.L > 8 && L > 0) licht = licht || Math.abs(Math.log(L / b.L)) > marge;
     // Te donker voor de herkenning, en de muurverlichting kan nog hoger.
-    const donker = m.L > 0 && m.L < o.donker && s.magLicht && s.fill < s.fillMax - 0.01;
+    let donker = L > 0 && L < o.donker && s.magLicht && s.fill < s.fillMax - 0.01;
+    // Flitsende lampen (een podium, een discobal): dan zegt het licht niets over de muur.
+    // Alleen wat blijvend anders is (muur) of echt stuk is, telt dan nog.
+    if ((this.flikker || 0) > o.flikker) { licht = false; donker = false; }
     const muur = m.deel > o.muurDeel;
     if (!licht && !donker && !muur) return null;
     return { licht: !!((licht || donker) && s.magLicht), leren: true, kleur: false,
@@ -10087,6 +9773,16 @@ class Omgevingswacht {
     this.sindsPauze += dt;
     this.rust = Math.max(0, this.rust - dt);
     if (Number.isFinite(m.gain) && m.gain > 0) this.gain += (m.gain - this.gain) * (1 - Math.exp(-dt / o.lichtTau));
+    if (m.L > 0) {
+      // Hoe hard het licht van meting tot meting springt, glijdend over ~10 s. Ten opzichte
+      // van de vorige meting: een lamp die aangaat is één sprong, een flitslamp steeds weer.
+      // Hooguit 0,3 per meting: één lamp die aangaat telt dan als één klein sprongetje.
+      // Alleen bij een redelijk lichte muur: in het donker is elke meting korrelig.
+      const sprong = this.Lvorig > 0 && Math.max(m.L, this.Lvorig) > 35
+        ? Math.min(0.3, Math.abs(m.L - this.Lvorig) / Math.max(35, this.Lvorig)) : 0;
+      this.Lvorig = m.L;
+      this.flikker = (this.flikker || 0) + (sprong - (this.flikker || 0)) * (1 - Math.exp(-dt / 10));
+    }
     const kapot = m.bedekt > o.kapotDeel || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
       (!!this.basis && m.clip > this.basis.clip + o.kapotClip);
     this.kapotT = kapot ? this.kapotT + dt : 0;
@@ -10105,7 +9801,9 @@ class Omgevingswacht {
       if (nodig) open = samenOpen(open, nodig);
     }
     if (this.kapotT >= o.kapotNa) {
-      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot', dringend: !this.geenPauze });
+      // Met flitsende lampen niet midden in het spel pauzeren: dat flitsen gaat gewoon door.
+      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot',
+        dringend: !this.geenPauze && !((this.flikker || 0) > o.flikker) });
     }
     if (s.kleur && !(open && open.kleur)) {
       open = samenOpen(open, { licht: false, leren: true, kleur: true, reden: 'kleur', dringend: false });
@@ -10254,7 +9952,6 @@ function samenOmtrekken(lijsten) {
 
 
 
-
 const $ = (id) => document.getElementById(id);
 // Wat deze computer kan (zie js/apparaat.js). Niet de naam van de browser: Firefox en Safari
 // spelen alles, ze kunnen alleen het beamerscherm niet zelf vinden.
@@ -10376,7 +10073,6 @@ function save() {
     localStorage.setItem(STORE, JSON.stringify({
       // op een scherm is app.H het camerabeeld zelf; de kalibratie van de beamer is muurH
       H: app.speelplek === 'scherm' ? app.muurH : app.H,
-      lens: kalLensVan(app.speelplek === 'scherm' ? app.muurH : app.H),
       speelplek: bewaarSpeelplek(app.speelplek, app.plekGekozen),
       schermSpiegel: app.schermSpiegel,
       classes: vision.classes,
@@ -10429,7 +10125,7 @@ function load() {
       if (old) s = { classes: old.classes, mirror: old.mirror, mode: old.mode, best: old.best };
     }
     if (!s) return;
-    if (s.H) { app.H = s.H; kalZetLens(app.H, s.lens); app.Hinv = invertH(s.H); app.steps.cal = 1; }
+    if (s.H) { app.H = s.H; app.Hinv = invertH(s.H); app.steps.cal = 1; }
     if (s.classes) {
       vision.classes = DEFAULT_CLASSES.map(d => {
         const f = s.classes.find(c => c.id === d.id);
@@ -10562,12 +10258,12 @@ function syncStepsFromState() {
  */
 function toProj(x, y) {
   const c = vision.camNorm(x, y);
-  return kalNaarBeamer(app.H, c[0], c[1]);
+  return applyH(app.H, c[0], c[1]);
 }
 
 /** En terug: plek op het beamervlak naar camerapixel in het werkbeeld. */
 function fromProj(u, v) {
-  const c = kalNaarCamera(app.H, app.Hinv, u, v);
+  const c = applyH(app.Hinv, u, v);
   return vision.camPx(c[0], c[1]);
 }
 
@@ -11037,11 +10733,99 @@ function quadOk(p) {
 }
 
 /** Verschil met het zwarte referentiebeeld, per cel. */
-async function diffAgainst(pattern, ref, settle) {
+/**
+ * Wachten tot het camerabeeld niet meer verandert. Een camera die zelf zijn helderheid
+ * regelt (gezien met een Femto Bolt) past zich na een ander beamerbeeld nog seconden aan;
+ * meten tijdens dat aanpassen gaf een beamervlak tot aan het plafond.
+ */
+async function wachtTotStil(maxMs) {
+  const t0 = performance.now();
+  let vorige = null, rustig = 0;
+  while (performance.now() - t0 < maxMs) {
+    vision.grab();
+    const nu = vision.lumaSnapshot();
+    if (vorige && nu.length === vorige.length) {
+      let som = 0;
+      for (let k = 0; k < nu.length; k++) som += Math.abs(nu[k] - vorige[k]);
+      if (som / nu.length < 1.5) { if (++rustig >= 2) return true; } else rustig = 0;
+    }
+    vorige = nu;
+    await sleep(120);
+  }
+  return false;
+}
+
+/** Otsu: de drempel die de verschillen het best in twee groepen splitst (vlak en rest). */
+function otsuDrempel(d, max) {
+  const N = 64, hist = new Float64Array(N);
+  if (!(max > 0)) return 0;
+  for (let k = 0; k < d.length; k++) if (d[k] > 0) hist[Math.min(N - 1, Math.floor(d[k] / max * N))]++;
+  let totaal = 0, somAlles = 0;
+  for (let i = 0; i < N; i++) { totaal += hist[i]; somAlles += i * hist[i]; }
+  let wB = 0, somB = 0, beste = 0, besteI = 0;
+  for (let i = 0; i < N; i++) {
+    wB += hist[i]; if (!wB) continue;
+    const wF = totaal - wB; if (!wF) break;
+    somB += i * hist[i];
+    const mB = somB / wB, mF = (somAlles - somB) / wF;
+    const tussen = wB * wF * (mB - mF) * (mB - mF);
+    if (tussen > beste) { beste = tussen; besteI = i; }
+  }
+  return (besteI + 1) / N * max;
+}
+
+/**
+ * Het grootste aaneengesloten vlak cellen boven de drempel. Losse lichtvlekjes (een
+ * discobal, een lamp aan het plafond) en weerkaatst licht op de muren eromheen horen
+ * er dan niet meer bij: alleen het beamerbeeld zelf is één groot, dicht vlak.
+ */
+function grootsteVlak(d, thr, cols, rows) {
+  const n = cols * rows, label = new Int32Array(n), stapel = new Int32Array(n);
+  let beste = null, besteN = 0, nr = 0;
+  for (let s = 0; s < n; s++) {
+    if (label[s] || d[s] < thr) continue;
+    nr++;
+    let top = 0, cnt = 0;
+    stapel[top++] = s; label[s] = nr;
+    const cellen = [];
+    while (top) {
+      const k = stapel[--top]; cellen.push(k); cnt++;
+      const x = k % cols, y = (k - x) / cols;
+      if (x > 0 && !label[k - 1] && d[k - 1] >= thr) { label[k - 1] = nr; stapel[top++] = k - 1; }
+      if (x < cols - 1 && !label[k + 1] && d[k + 1] >= thr) { label[k + 1] = nr; stapel[top++] = k + 1; }
+      if (y > 0 && !label[k - cols] && d[k - cols] >= thr) { label[k - cols] = nr; stapel[top++] = k - cols; }
+      if (y < rows - 1 && !label[k + cols] && d[k + cols] >= thr) { label[k + cols] = nr; stapel[top++] = k + cols; }
+    }
+    if (cnt > besteN) { besteN = cnt; beste = cellen; }
+  }
+  return beste || [];
+}
+
+/**
+ * De mediaan van een paar camerabeelden per cel. Een flitsende lamp of een discobal
+ * verandert één beeld, niet de meeste: zo telt dat niet mee bij het kalibreren.
+ */
+async function mediaanBeeld(aantal) {
+  const lagen = [];
+  for (let i = 0; i < aantal; i++) {
+    vision.grab();
+    lagen.push(vision.lumaSnapshot());
+    if (i < aantal - 1) await sleep(70);
+  }
+  const n = lagen[0].length, uit = new Float32Array(n), rij = new Float32Array(aantal);
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < aantal; i++) rij[i] = lagen[i].length === n ? lagen[i][k] : lagen[0][k];
+    rij.sort();
+    uit[k] = rij[aantal >> 1];
+  }
+  return uit;
+}
+
+async function diffAgainst(pattern, ref, settle, stil) {
   app.calPattern = pattern;
   await sleep(settle);
-  vision.grab();
-  const cur = vision.cl;
+  if (stil) await wachtTotStil(stil);
+  const cur = await mediaanBeeld(5);
   const d = new Float32Array(cur.length);
   let max = 0;
   for (let k = 0; k < cur.length; k++) {
@@ -11054,9 +10838,8 @@ async function diffAgainst(pattern, ref, settle) {
 /**
  * Stap 1 is een volledig wit beeld. Dat is veruit het sterkste signaal en werkt
  * ook in een verlichte kamer; de vier hoekpunten van het heldere vlak geven al
- * een bruikbare homografie. Stap 2 verfijnt die met een raster van stippen en de
- * kromming van de lens (js/kalibratie.js); lukt dat niet, dan met vier losse stippen,
- * maar alleen als die goed genoeg te zien zijn.
+ * een bruikbare homografie. Stap 2 verfijnt die met vier losse stippen, maar
+ * alleen als die goed genoeg te zien zijn.
  */
 async function autoCalibrate(silent) {
   if (!vision.ready) { if (!silent) status(t('Start eerst de camera'), 'err'); return false; }
@@ -11071,7 +10854,9 @@ async function autoCalibrate(silent) {
   await vision.unlockCamera();
   await sleep(500);
 
+  let vastCal = [];
   const fail = (msg) => {
+    if (vastCal.length && !app.lockExposure) vision.unlockCamera();
     app.calPattern = null; app.wiz = wasWiz;
     step('cal', app.H ? 1 : 0);
     if (!silent) status(msg, 'err');
@@ -11079,26 +10864,34 @@ async function autoCalibrate(silent) {
   };
 
   app.calPattern = { kind: 'black' };
-  await sleep(900);                                  // camera laten wennen aan zwart
-  vision.grab();
-  const ref = vision.lumaSnapshot();
+  await sleep(600);                                  // camera laten wennen aan zwart
+  await wachtTotStil(3500);
+  // Tijdens het kalibreren mag de camera zijn helderheid niet meer aanpassen: anders
+  // verandert de hele kamer mee met het witte vlak. Kan de camera dat niet, dan vangen
+  // het wachten hierboven en het grootste vlak hieronder het op.
+  vastCal = await vision.lockCamera();
+  if (vastCal.length) await sleep(250);
+  const ref = await mediaanBeeld(5);
 
   // ---- stap 1: het hele vlak wit ----
-  const white = await diffAgainst({ kind: 'white' }, ref, 900);
+  const white = await diffAgainst({ kind: 'white' }, ref, 700, 2500);
   app.calDiag = { wit: Math.round(white.max) };
   if (white.max < 9) {
     return fail(t('De camera ziet het beamerbeeld niet (contrast {n}). Staat het beamervenster op de beamer, en kijkt de camera naar dat vlak?',
       { n: Math.round(white.max) }));
   }
-  const thr = Math.max(7, white.max * 0.45);
+  const thr = Math.max(7, white.max * 0.45, otsuDrempel(white.d, white.max));
   const cols = vision.cols;
+  const vlak = grootsteVlak(white.d, thr, cols, vision.rows);
   let n = 0;
   let tl = null, tr = null, br = null, bl = null;
   let tlV = Infinity, trV = -Infinity, brV = -Infinity, blV = Infinity;
-  for (let k = 0; k < white.d.length; k++) {
-    if (white.d[k] < thr) continue;
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (const k of vlak) {
     const cx = k % cols, cy = (k - cx) / cols;
     n++;
+    if (cx < bx0) bx0 = cx; if (cx > bx1) bx1 = cx;
+    if (cy < by0) by0 = cy; if (cy > by1) by1 = cy;
     const s = cx + cy, t = cx - cy;
     if (s < tlV) { tlV = s; tl = [cx, cy]; }
     if (s > brV) { brV = s; br = [cx, cy]; }
@@ -11114,43 +10907,32 @@ async function autoCalibrate(silent) {
   let H = computeHomography(rough.map(p => vision.camNorm(p[0], p[1])), [[0, 0], [1, 0], [1, 1], [0, 1]]);
   if (!H) return fail(t('Kalibratie mislukt.'));
 
-  // ---- stap 2: raster van stippen, met lensvertekening (js/kalibratie.js) ----
-  // Werkt het niet (te donker, te weinig stippen in beeld), dan de oude meting met vier stippen.
-  let refined = false;
-  let rasterFout = null;
-  for (let poging = 0; poging < 2 && !app.abort; poging++) {
-    const pc = app.projCtx.canvas;
-    const v = vision.video;
-    const res = await kalRaster({
-      vision, sleep, poging, Hruw: H, ar: (v.videoWidth / v.videoHeight) || 4 / 3, bw: pc.width, bh: pc.height,
-      toon: (p) => { app.calPattern = p; },
-      voortgang: (n, m) => { if (!silent) status(t('Kalibreren… stip {n} van {m}', { n, m })); },
-      afbreken: () => app.abort || !projOk(),
-    });
-    app.calDiag.raster = res.fout || res.mislukt;
-    if (!res.H) continue;
-    if (res.fout.max <= Math.max(6, pc.width * 0.006) || (poging === 1 && res.fout.max <= pc.width * 0.02)) {
-      H = res.H; kalZetLens(H, res.lens); refined = true; rasterFout = res.fout;
-      break;
-    }
-  }
-
-  // ---- anders: verfijnen met vier stippen ----
+  // ---- stap 2: verfijnen met vier stippen ----
   const pts = [];
-  let ok = !rasterFout;
+  let ok = true;
   for (let i = 0; i < 4 && ok; i++) {
-    const m = await diffAgainst({ kind: 'marker', i }, ref, 520);
-    if (m.max < 8) { ok = false; break; }
-    const mt = m.max * 0.6;
+    const m = await diffAgainst({ kind: 'marker', i }, ref, 450, 1500);
+    // Alleen binnen het witte vlak (plus een randje) zoeken: een lichtvlekje elders in de
+    // kamer is nooit de stip.
+    const binnen = (cx, cy) => cx >= bx0 - 3 && cx <= bx1 + 3 && cy >= by0 - 3 && cy <= by1 + 3;
+    let mMax = 0;
+    for (let k = 0; k < m.d.length; k++) {
+      const cx = k % cols, cy = (k - cx) / cols;
+      if (binnen(cx, cy) && m.d[k] > mMax) mMax = m.d[k];
+    }
+    if (mMax < 8) { ok = false; break; }
+    const mt = mMax * 0.6;
     let sx = 0, sy = 0, sw = 0;
     for (let k = 0; k < m.d.length; k++) {
       if (m.d[k] < mt) continue;
       const cx = k % cols, cy = (k - cx) / cols;
+      if (!binnen(cx, cy)) continue;
       sx += cx * m.d[k]; sy += cy * m.d[k]; sw += m.d[k];
     }
     if (!sw) { ok = false; break; }
     pts.push([(sx / sw + 0.5) * vision.cell, (sy / sw + 0.5) * vision.cell]);
   }
+  let refined = false;
   if (ok && pts.length === 4 && quadOk(pts)) {
     const H2 = computeHomography(pts.map(p => vision.camNorm(p[0], p[1])), CAL_TARGETS);
     if (H2) { H = H2; refined = true; }
@@ -11158,6 +10940,7 @@ async function autoCalibrate(silent) {
 
   app.calPattern = null;
   app.wiz = wasWiz;
+  if (vastCal.length && !app.lockExposure) await vision.unlockCamera();
   app.H = H; app.Hinv = invertH(H);
   app.calPts = [];
   app.calCam = app.camId || '';
@@ -11174,9 +10957,7 @@ async function autoCalibrate(silent) {
   app.calPattern = null;
 
   if (!silent) {
-    status(rasterFout
-      ? t('Kalibratie gelukt — nauwkeurig tot ongeveer {px} beamerpixels', { px: Math.max(1, Math.round(rasterFout.max)) })
-      : refined
+    status(refined
       ? t('Kalibratie gelukt — controleer of de gestreepte lijn om het beamerbeeld ligt')
       : t('Kalibratie gelukt (grove meting; stippen waren niet goed zichtbaar)'), 'ok');
   }
@@ -12452,7 +12233,7 @@ function applyRoi() {
   if (!app.Hinv || !vision.ready || !app.useRoi) return false;
   let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity;
   for (const corner of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
-    const c = kalNaarCamera(app.H, app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
+    const c = applyH(app.Hinv, corner[0], corner[1]);   // genormaliseerd camerabeeld
     u0 = Math.min(u0, c[0]); u1 = Math.max(u1, c[0]);
     v0 = Math.min(v0, c[1]); v1 = Math.max(v1, c[1]);
   }
@@ -12739,11 +12520,6 @@ function drawPattern(ctx, w, h) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(t[0] * w, t[1] * h, Math.min(w, h) * 0.075, 0, 7);
-    ctx.fill();
-  } else if (k === 'stip') {
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(app.calPattern.u * w, app.calPattern.v * h, Math.min(w, h) * app.calPattern.r, 0, 7);
     ctx.fill();
   } else if (k === 'verify') {
     const m = Math.min(w, h) * 0.02;

@@ -659,15 +659,9 @@ through them. That's why a red bar appears on the wall and in the panel in that 
 
 Automatic calibration works in two steps: first a completely white image, where the four
 corners of the bright area already give a usable measurement — that signal is so strong
-it works in a lit room too. Then it refines with separate dots, but only if they're
+it works in a lit room too. Then it refines with four separate dots, but only if they're
 clearly visible enough. Finally it projects a green border for two seconds: it should sit
 exactly around the projected image.
-
-That refinement is a grid of twenty dots, shown one at a time (plus five check dots). For each
-dot it waits until the camera really shows it, then fits a homography plus the curve of
-the camera lens through all of them; a dot that lands far off is left out. That keeps it
-accurate into the corners with a wide-angle webcam. If the check dots are still off, it
-tries once more with bigger dots, and otherwise falls back to four separate dots.
 
 If it fails, it tells you *why* — too little contrast, or the projected area isn't
 completely in the camera image.
@@ -746,7 +740,6 @@ node test/apparaat.mjs      # every computer: full screen in old Safari, iPad an
 node test/omgeving.mjs      # checking every minute: when to adjust and when not; colours in the dark, with hysteresis
 node test/muurwacht.mjs     # simulated room: 10 quiet minutes = never relearn; light, lamp, curtain, shadow = do; notes stay
 node test/uitleg.mjs        # the setup guide (uitleg.html, the PDFs): both languages match, links work, buttons named as in the game
-node test/kalibratie.mjs    # calibration: lens distortion there and back, fitting with noise and outliers, old saved data
 ```
 
 The tests talk Dutch: "alles goed" at the end means "all good". `bench.mjs` only
