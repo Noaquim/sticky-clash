@@ -96,29 +96,29 @@ const tel = (uit, a) => uit.filter(u => u.actie === a).length;
   const w2 = nieuweWacht();
   const uit2 = [];
   for (let t = 0; t < 40; t += 0.5) {
-    const u = w2.stap({ gain: 1, deel: 0, bedekt: t >= 10 ? 0.7 : 0.02, vloed: false, clip: 0, L: 110, beweging: t >= 10 && t < 20 ? 0.05 : 0, mensen: false },
+    const u = w2.stap({ gain: t >= 10 ? 1.6 : 1, deel: 0, bedekt: 0.02, vloed: false, clip: 0, L: 110, beweging: t >= 10 && t < 20 ? 0.05 : 0, mensen: false },
       { ronde: gepauzeerd < 0, magLicht: true, fill: 0.12, fillMax: 0.55, kleur: false }, 0.5);
     if (u.actie === 'pauze' && gepauzeerd < 0) gepauzeerd = t;
     uit2.push({ t, actie: u.actie });
     if (u.actie === 'herstel') break;
   }
   const h = uit2.find(u => u.actie === 'herstel');
-  check('stuk tijdens een ronde: na 4 s pauze', gepauzeerd >= 13.5 && gepauzeerd <= 14.5, '(pauze op ' + gepauzeerd + ' s)');
-  check('  ... dan wachten zolang er iets beweegt, en bijstellen zodra het 3,5 s stil is', !!h && h.t >= 23 && h.t <= 24 && uit2.some(u => u.actie === 'wacht'),
-    '(bijgesteld op ' + (h ? h.t + ' s' : 'nooit') + ')');
+  // De speler wil nooit midden in het spel stilgezet worden: geen pauze, bijstellen na de ronde.
+  check('stuk tijdens een ronde: nooit meteen pauze, het wacht tot na de ronde', gepauzeerd < 0 && !h && uit2.some(u => u.actie === 'na-ronde'),
+    '(pauze op ' + gepauzeerd + ' s)');
 }
 {
-  // De spelers gaan zelf verder na de automatische pauze: deze ronde niet nog eens pauzeren.
+  // Stuk midden in een ronde: nooit pauzeren, na de ronde bijstellen.
   const w = nieuweWacht();
   let pauzes = 0, ronde = true, h = null;
   for (let t = 0; t < 120; t += 0.5) {
     if (t === 60) ronde = false;
-    const u = w.stap({ gain: 1, deel: 0, bedekt: t >= 5 ? 0.7 : 0.02, vloed: false, clip: 0, L: 110, beweging: 0, mensen: false },
+    const u = w.stap({ gain: t >= 5 ? 1.6 : 1, deel: 0, bedekt: 0.02, vloed: false, clip: 0, L: 110, beweging: 0, mensen: false },
       { ronde, magLicht: true, fill: 0.12, fillMax: 0.55, kleur: false }, 0.5);
     if (u.actie === 'pauze') { pauzes++; w.nietDringend(); }
     if (u.actie === 'herstel') { h = t; break; }
   }
-  check('spelers gaan zelf verder: geen tweede pauze, na de ronde bijstellen', pauzes === 1 && h >= 60 && h <= 64, '(' + pauzes + ' pauze(s), bijgesteld op ' + h + ' s)');
+  check('stuk midden in de ronde: geen pauze, na de ronde bijstellen', pauzes === 0 && h >= 60 && h <= 64, '(' + pauzes + ' pauze(s), bijgesteld op ' + h + ' s)');
 }
 {
   // Iemand staat voor de muur (geen stuk beeld): wachten. Pas 2,5 s nadat hij weg is.

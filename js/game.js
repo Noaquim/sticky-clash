@@ -559,6 +559,15 @@ export class Game {
     return Math.min(dg - (g.r + bn.r + 40), ds - (bn.r + 80), under);
   }
 
+  /** Staat de bak op (x, y) op of vlak tegen een briefje dat al vastzit? */
+  bakBezet(x, y) {
+    const r = this.goal.r + 12;
+    for (const ob of this.obstacles) {
+      if (!ob.pending && boxDist(polyBox(ob.poly), x, y) < r) return true;
+    }
+    return false;
+  }
+
   /** Nieuwe plek voor de bonusbak: middenband, binnen de marges, vrij van bak, bron en briefjes. */
   placeBonus() {
     const bn = this.bonus, m = bn.r + 80;
@@ -927,10 +936,27 @@ export class Game {
       this.source.x = Math.max(50, Math.min(this.W - 50, this.source.x));
     }
     if (this.goalSweep && !this.goal.auto) {
-      this.goalPhase += dt * this.goalSweep * 0.8;
+      // Heen en weer, maar nooit een briefje in: daar keert de bak om.
+      const stap = dt * this.goalSweep * 0.8 * (this.goalRicht || 1);
       const amp = this.W * 0.22;
-      this.goal.x = this.goalHome + Math.sin(this.goalPhase) * amp;
-      this.goal.x = Math.max(this.goal.r, Math.min(this.W - this.goal.r, this.goal.x));
+      const nx = Math.max(this.goal.r, Math.min(this.W - this.goal.r, this.goalHome + Math.sin(this.goalPhase + stap) * amp));
+      if (this.bakBezet(nx, this.goal.y)) this.goalRicht = -(this.goalRicht || 1);
+      else { this.goalPhase += stap; this.goal.x = nx; }
+    } else if (!this.goal.auto) {
+      // Hangt er een briefje op de getekende bak: de bak schuift naar de dichtstbijzijnde
+      // vrije plek op dezelfde hoogte. (Een echte emmer of doos, goal.auto, blijft staan.)
+      this.bakKijk = (this.bakKijk || 0) - dt;
+      if (this.bakKijk <= 0) {
+        this.bakKijk = 0.5;
+        const g = this.goal;
+        if (this.bakBezet(g.x, g.y)) {
+          for (let d = 20; d < this.W; d += 20) {
+            const links = g.x - d, rechts = g.x + d;
+            if (rechts <= this.W - g.r && !this.bakBezet(rechts, g.y)) { this.setGoal(rechts, g.y); break; }
+            if (links >= g.r && !this.bakBezet(links, g.y)) { this.setGoal(links, g.y); break; }
+          }
+        }
+      }
     }
 
     if (this.bonusOn) this.tickBonus(dt);

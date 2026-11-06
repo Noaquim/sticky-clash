@@ -162,7 +162,9 @@ export class Omgevingswacht {
       this.Lvorig = m.L;
       this.flikker = (this.flikker || 0) + (sprong - (this.flikker || 0)) * (1 - Math.exp(-dt / 10));
     }
-    const kapot = m.bedekt > o.kapotDeel || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
+    // Een groot vlak voorgrond telt alleen als stuk als er niemand in beeld is: staat er
+    // iemand voor de muur, dan is dat gewoon iemand, en niet het licht.
+    const kapot = (m.bedekt > o.kapotDeel && !m.mensen) || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
       (!!this.basis && m.clip > this.basis.clip + o.kapotClip);
     this.kapotT = kapot ? this.kapotT + dt : 0;
     // Stil en leeg? Is het beeld stuk of het licht flink anders, dan zeggen de sporen niets meer
@@ -180,9 +182,9 @@ export class Omgevingswacht {
       if (nodig) open = samenOpen(open, nodig);
     }
     if (this.kapotT >= o.kapotNa) {
-      // Met flitsende lampen niet midden in het spel pauzeren: dat flitsen gaat gewoon door.
-      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot',
-        dringend: !this.geenPauze && !((this.flikker || 0) > o.flikker) });
+      // Nooit meteen midden in het spel pauzeren (iemand voor de muur, flitsende lampen):
+      // alleen op een rustig moment, zoals bij de andere controles.
+      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot', dringend: !s.ronde });
     }
     if (s.kleur && !(open && open.kleur)) {
       open = samenOpen(open, { licht: false, leren: true, kleur: true, reden: 'kleur', dringend: false });
@@ -192,7 +194,6 @@ export class Omgevingswacht {
     if (this.rust > 0 && !open.dringend) return { actie: 'niets', open };
     const nodigStil = o.vrijNa + (anders ? 1 : 0);
     if (s.ronde) {
-      if (open.dringend) return { actie: 'pauze', open };
       // Zonder tijdslimiet komt het eind van de ronde nooit: dan op een rustig moment (niemand
       // in beeld, geen bal vlak bij de bak) even pauzeren. Zelden: hooguit eens per speelPauze.
       if (!s.lang || !s.rustig || this.sindsPauze < o.speelPauze || this.vrijT < nodigStil) return { actie: 'na-ronde', open };

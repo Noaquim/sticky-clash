@@ -4689,6 +4689,15 @@ class Game {
     return Math.min(dg - (g.r + bn.r + 40), ds - (bn.r + 80), under);
   }
 
+  /** Staat de bak op (x, y) op of vlak tegen een briefje dat al vastzit? */
+  bakBezet(x, y) {
+    const r = this.goal.r + 12;
+    for (const ob of this.obstacles) {
+      if (!ob.pending && boxDist(polyBox(ob.poly), x, y) < r) return true;
+    }
+    return false;
+  }
+
   /** Nieuwe plek voor de bonusbak: middenband, binnen de marges, vrij van bak, bron en briefjes. */
   placeBonus() {
     const bn = this.bonus, m = bn.r + 80;
@@ -5057,10 +5066,27 @@ class Game {
       this.source.x = Math.max(50, Math.min(this.W - 50, this.source.x));
     }
     if (this.goalSweep && !this.goal.auto) {
-      this.goalPhase += dt * this.goalSweep * 0.8;
+      // Heen en weer, maar nooit een briefje in: daar keert de bak om.
+      const stap = dt * this.goalSweep * 0.8 * (this.goalRicht || 1);
       const amp = this.W * 0.22;
-      this.goal.x = this.goalHome + Math.sin(this.goalPhase) * amp;
-      this.goal.x = Math.max(this.goal.r, Math.min(this.W - this.goal.r, this.goal.x));
+      const nx = Math.max(this.goal.r, Math.min(this.W - this.goal.r, this.goalHome + Math.sin(this.goalPhase + stap) * amp));
+      if (this.bakBezet(nx, this.goal.y)) this.goalRicht = -(this.goalRicht || 1);
+      else { this.goalPhase += stap; this.goal.x = nx; }
+    } else if (!this.goal.auto) {
+      // Hangt er een briefje op de getekende bak: de bak schuift naar de dichtstbijzijnde
+      // vrije plek op dezelfde hoogte. (Een echte emmer of doos, goal.auto, blijft staan.)
+      this.bakKijk = (this.bakKijk || 0) - dt;
+      if (this.bakKijk <= 0) {
+        this.bakKijk = 0.5;
+        const g = this.goal;
+        if (this.bakBezet(g.x, g.y)) {
+          for (let d = 20; d < this.W; d += 20) {
+            const links = g.x - d, rechts = g.x + d;
+            if (rechts <= this.W - g.r && !this.bakBezet(rechts, g.y)) { this.setGoal(rechts, g.y); break; }
+            if (links >= g.r && !this.bakBezet(links, g.y)) { this.setGoal(links, g.y); break; }
+          }
+        }
+      }
     }
 
     if (this.bonusOn) this.tickBonus(dt);
@@ -9783,7 +9809,9 @@ class Omgevingswacht {
       this.Lvorig = m.L;
       this.flikker = (this.flikker || 0) + (sprong - (this.flikker || 0)) * (1 - Math.exp(-dt / 10));
     }
-    const kapot = m.bedekt > o.kapotDeel || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
+    // Een groot vlak voorgrond telt alleen als stuk als er niemand in beeld is: staat er
+    // iemand voor de muur, dan is dat gewoon iemand, en niet het licht.
+    const kapot = (m.bedekt > o.kapotDeel && !m.mensen) || !!m.vloed || !(m.gain < o.kapotGain && m.gain > 1 / o.kapotGain) ||
       (!!this.basis && m.clip > this.basis.clip + o.kapotClip);
     this.kapotT = kapot ? this.kapotT + dt : 0;
     // Stil en leeg? Is het beeld stuk of het licht flink anders, dan zeggen de sporen niets meer
@@ -9801,9 +9829,9 @@ class Omgevingswacht {
       if (nodig) open = samenOpen(open, nodig);
     }
     if (this.kapotT >= o.kapotNa) {
-      // Met flitsende lampen niet midden in het spel pauzeren: dat flitsen gaat gewoon door.
-      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot',
-        dringend: !this.geenPauze && !((this.flikker || 0) > o.flikker) });
+      // Nooit meteen midden in het spel pauzeren (iemand voor de muur, flitsende lampen):
+      // alleen op een rustig moment, zoals bij de andere controles.
+      open = samenOpen(open, { licht: !!s.magLicht, leren: true, kleur: false, reden: 'kapot', dringend: !s.ronde });
     }
     if (s.kleur && !(open && open.kleur)) {
       open = samenOpen(open, { licht: false, leren: true, kleur: true, reden: 'kleur', dringend: false });
@@ -9813,7 +9841,6 @@ class Omgevingswacht {
     if (this.rust > 0 && !open.dringend) return { actie: 'niets', open };
     const nodigStil = o.vrijNa + (anders ? 1 : 0);
     if (s.ronde) {
-      if (open.dringend) return { actie: 'pauze', open };
       // Zonder tijdslimiet komt het eind van de ronde nooit: dan op een rustig moment (niemand
       // in beeld, geen bal vlak bij de bak) even pauzeren. Zelden: hooguit eens per speelPauze.
       if (!s.lang || !s.rustig || this.sindsPauze < o.speelPauze || this.vrijT < nodigStil) return { actie: 'na-ronde', open };

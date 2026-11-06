@@ -214,16 +214,17 @@ deel(() => {
     '(' + lijst(s) + ', na-ronde ' + (s.acties['na-ronde'] || 0) + '×, pauze ' + (s.acties.pauze || 0) + '×)');
 });
 deel(() => {
-  // Het licht gaat uit midden in een ronde: dan is het beeld stuk, en gaat de ronde op pauze.
+  // Het licht gaat uit midden in een ronde: het beeld is stuk, maar de ronde gaat NIET op pauze
+  // (de speler wil nooit midden in het spel stilgezet worden); na de ronde wordt het bijgesteld.
   const s = opstelling(52);
   speel(s, 10);
   let pauze = -1;
   const ronde = (t) => pauze < 0 && t < 120;
   const oud = s.w.stap.bind(s.w);
   s.w.stap = (m, sp, dt) => { const u = oud(m, sp, dt); if (u.actie === 'pauze' && pauze < 0) pauze = s.t; return u; };
-  speel(s, 60, (s2, t) => { if (t > 30) s2.k.licht = 0.03; }, ronde);
+  speel(s, 130, (s2, t) => { if (t > 30) s2.k.licht = 0.03; }, ronde);
   const h = s.herstel[0];
-  check('licht uit tijdens een ronde: pauze, dan meteen bijgesteld', pauze > 30 && pauze < 36 && !!h && h.reden === 'kapot' && h.t - pauze < 6,
+  check('licht uit tijdens een ronde: nooit pauze, na de ronde bijgesteld', pauze < 0 && !!h && h.reden === 'kapot' && h.t >= 120,
     '(pauze op ' + (pauze < 0 ? 'nooit' : sec(pauze)) + ', ' + lijst(s) + ')');
 });
 
